@@ -42,6 +42,49 @@ export const citySuggestions = [
 
 export const featuredJobs: JobListing[] = [
   {
+    id: "job-0",
+    slug: "full-stack-engineer-hiregeneral",
+    title: "Full-Stack Engineer",
+    company: "Brightline Studio",
+    logo: "BS",
+    companyTagline: "Independent product studio shipping climate-tech tools.",
+    companySize: "20–40 employees",
+    companyWebsite: "https://brightlinestudio.example.com",
+    location: "Remote - United States",
+    distance: 0,
+    salary: "$135k – $170k",
+    postedDaysAgo: 0,
+    employmentType: "Full-time",
+    workMode: "Remote",
+    experienceLevel: "Mid–Senior · 4+ years",
+    skills: ["TypeScript", "React", "Node.js", "Postgres", "AWS"],
+    summary: "Posted directly on HireGeneral — apply in under 2 minutes with your profile and resume.",
+    category: "Engineering",
+    description:
+      "Brightline Studio is a small, focused team building tools that help climate-tech startups ship faster. We're hiring a Full-Stack Engineer to own end-to-end product features across our React frontends, Node services, and Postgres data layer. You'll work directly with founders and designers, shipping weekly to a tight community of early customers.",
+    responsibilities: [
+      "Own product features end-to-end, from API design to polished UI",
+      "Pair with design on prototypes that you take into production",
+      "Improve performance, reliability, and developer experience across the stack",
+      "Help shape engineering practices for a growing team",
+    ],
+    requirements: [
+      "4+ years of full-stack experience with TypeScript, React, and Node.js",
+      "Comfort with relational data modeling and writing SQL",
+      "Experience deploying to AWS or a similar cloud",
+      "Strong written communication for a fully-remote team",
+    ],
+    benefits: [
+      "Fully remote across the United States",
+      "Meaningful equity in a profitable studio",
+      "$2,500 annual learning and equipment budget",
+      "Four-day work week, every week",
+    ],
+    // No applyUrl — apply directly on HireGeneral
+    applicants: 12,
+  },
+
+  {
     id: "job-1",
     slug: "senior-frontend-engineer-northstar-labs",
     title: "Senior Frontend Engineer",

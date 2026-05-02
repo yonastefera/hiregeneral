@@ -35,44 +35,37 @@ All colors MUST be HSL.
     --input: 214 18% 84%;
     --ring: 188 86% 28%;
 
-    --radius: 0.75rem;
-
+    --radius: 0.5rem;
     --surface: 42 45% 99%;
     --surface-strong: 218 38% 12%;
     --surface-strong-foreground: 40 38% 98%;
-
     --success: 151 62% 36%;
     --success-foreground: 40 38% 98%;
-
     --warning: 38 94% 50%;
     --warning-foreground: 218 38% 12%;
-
     --hero-glow: 174 68% 47%;
-
     --gradient-hero: radial-gradient(circle at 12% 15%, hsl(174 68% 47% / 0.24), transparent 28%), radial-gradient(circle at 86% 18%, hsl(18 92% 60% / 0.2), transparent 25%), linear-gradient(135deg, hsl(42 38% 97%) 0%, hsl(174 44% 91%) 48%, hsl(42 45% 99%) 100%);
     --gradient-primary: linear-gradient(135deg, hsl(188 86% 28%), hsl(174 68% 39%));
     --gradient-warm: linear-gradient(135deg, hsl(18 92% 60%), hsl(38 94% 50%));
-
-    --shadow-soft: 0 18px 50px -28px hsl(218 38% 12% / 0.35);
-    --shadow-lift: 0 22px 70px -34px hsl(188 86% 20% / 0.45);
+    --shadow-soft: 0 1px 2px hsl(218 38% 12% / 0.04), 0 8px 24px -12px hsl(218 38% 12% / 0.12);
+    --shadow-lift: 0 2px 4px hsl(218 38% 12% / 0.06), 0 16px 40px -16px hsl(188 86% 20% / 0.22);
+    --shadow-ring: 0 0 0 1px hsl(var(--border));
 
     --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
 
-    /* These are referenced in your tailwind.config.mts */
-    --electric: 188 86% 28%;
-    --electric-foreground: 40 38% 98%;
-    --navy: 218 38% 12%;
-    --navy-foreground: 40 38% 98%;
-    --navy-light: 218 28% 22%;
-    --gold: 38 94% 50%;
-    --gold-dark: 38 84% 42%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
@@ -103,26 +96,6 @@ All colors MUST be HSL.
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
-
-    --surface: 222.2 84% 4.9%;
-    --surface-strong: 210 40% 98%;
-    --surface-strong-foreground: 222.2 47.4% 11.2%;
-
-    --success: 151 62% 36%;
-    --success-foreground: 210 40% 98%;
-
-    --warning: 38 94% 50%;
-    --warning-foreground: 222.2 47.4% 11.2%;
-
-    --hero-glow: 174 68% 47%;
-
-    --gradient-hero: radial-gradient(circle at 12% 15%, hsl(174 68% 47% / 0.18), transparent 28%), radial-gradient(circle at 86% 18%, hsl(18 92% 60% / 0.12), transparent 25%), linear-gradient(135deg, hsl(222.2 84% 4.9%) 0%, hsl(217.2 32.6% 17.5%) 48%, hsl(222.2 84% 4.9%) 100%);
-    --gradient-primary: linear-gradient(135deg, hsl(188 86% 28%), hsl(174 68% 39%));
-    --gradient-warm: linear-gradient(135deg, hsl(18 92% 60%), hsl(38 94% 50%));
-
-    --shadow-soft: 0 18px 50px -28px hsl(0 0% 0% / 0.5);
-    --shadow-lift: 0 22px 70px -34px hsl(0 0% 0% / 0.65);
-
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -131,29 +104,17 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
-
-    --electric: 188 86% 48%;
-    --electric-foreground: 222.2 47.4% 11.2%;
-    --navy: 210 40% 98%;
-    --navy-foreground: 222.2 47.4% 11.2%;
-    --navy-light: 215 20.2% 65.1%;
-    --gold: 38 94% 50%;
-    --gold-dark: 38 84% 42%;
   }
 }
 
 @layer base {
   * {
-    border-color: hsl(var(--border));
+    @apply border-border;
   }
 
   body {
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
+    @apply bg-background text-foreground antialiased;
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    
   }
 
   ::selection {
@@ -162,27 +123,10 @@ All colors MUST be HSL.
 }
 
 @layer utilities {
-  .bg-hero-gradient {
-    background-image: var(--gradient-hero);
-  }
-
-  .bg-primary-gradient {
-    background-image: var(--gradient-primary);
-  }
-
-  .bg-warm-gradient {
-    background-image: var(--gradient-warm);
-  }
-
-  .shadow-soft {
-    box-shadow: var(--shadow-soft);
-  }
-
-  .shadow-lift {
-    box-shadow: var(--shadow-lift);
-  }
-
-  .text-balance {
-    text-wrap: balance;
-  }
+  .bg-hero-gradient { background-image: var(--gradient-hero); }
+  .bg-primary-gradient { background-image: var(--gradient-primary); }
+  .bg-warm-gradient { background-image: var(--gradient-warm); }
+  .shadow-soft { box-shadow: var(--shadow-soft); }
+  .shadow-lift { box-shadow: var(--shadow-lift); }
+  .text-balance { text-wrap: balance; }
 }

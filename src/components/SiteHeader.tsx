@@ -27,9 +27,10 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
+    const onScroll = () => setScrolled(window.scrollY > 4);
 
     onScroll();
+
     window.addEventListener("scroll", onScroll, { passive: true });
 
     return () => window.removeEventListener("scroll", onScroll);
@@ -39,18 +40,26 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
     setOpen(false);
   }, [pathname]);
 
+  useEffect(() => {
+    document.body.style.overflow = open ? "hidden" : "";
+
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
   const elevated = variant === "default" || scrolled;
 
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 w-full transition-all duration-300",
+        "sticky top-0 z-40 w-full transition-all duration-200",
         elevated
-          ? "border-b border-border/70 bg-surface/85 shadow-soft backdrop-blur-md supports-[backdrop-filter]:bg-surface/70"
+          ? "border-b border-border/60 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60"
           : "border-b border-transparent bg-transparent"
       )}
     >
-      <nav className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 md:py-4">
+      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-6 px-4 md:px-6">
         <Link
           href="/"
           aria-label="HireGeneral home"
@@ -70,24 +79,28 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  "relative rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                   active
-                    ? "bg-secondary text-secondary-foreground"
-                    : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 {link.label}
+
+                {active && (
+                  <span className="absolute inset-x-3 -bottom-[21px] h-px bg-primary" />
+                )}
               </Link>
             );
           })}
         </div>
 
         <div className="hidden items-center gap-2 md:flex">
-          <Button variant="ghost" asChild>
+          <Button variant="ghost" size="sm" asChild>
             <Link href="/signin">Sign in</Link>
           </Button>
 
-          <Button variant="hero" asChild>
+          <Button variant="default" size="sm" asChild>
             <Link href="/signup">Post a job</Link>
           </Button>
         </div>
@@ -97,28 +110,28 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
           aria-label={open ? "Close menu" : "Open menu"}
           aria-expanded={open}
           onClick={() => setOpen((value) => !value)}
-          className="group relative grid size-11 place-items-center rounded-xl border border-border bg-surface/80 text-foreground shadow-soft backdrop-blur transition-all hover:border-primary/40 hover:shadow-lift active:scale-95 md:hidden"
+          className="relative grid size-10 place-items-center rounded-md text-foreground transition-colors hover:bg-secondary md:hidden"
         >
-          <span className="sr-only">{open ? "Close menu" : "Open menu"}</span>
+          <span className="sr-only">Toggle menu</span>
 
-          <span className="relative block h-4 w-5">
+          <span className="relative block h-3.5 w-5">
             <span
               className={cn(
-                "absolute left-0 block h-0.5 w-5 rounded-full bg-foreground transition-all duration-300",
+                "absolute left-0 block h-[1.5px] w-5 rounded-full bg-foreground transition-all duration-300",
                 open ? "top-1/2 -translate-y-1/2 rotate-45" : "top-0"
               )}
             />
 
             <span
               className={cn(
-                "absolute left-0 top-1/2 block h-0.5 w-5 -translate-y-1/2 rounded-full bg-foreground transition-all duration-200",
-                open ? "opacity-0" : "opacity-100"
+                "absolute left-0 top-1/2 block h-[1.5px] w-5 -translate-y-1/2 rounded-full bg-foreground transition-all duration-200",
+                open ? "scale-x-0 opacity-0" : "scale-x-100 opacity-100"
               )}
             />
 
             <span
               className={cn(
-                "absolute left-0 block h-0.5 w-5 rounded-full bg-foreground transition-all duration-300",
+                "absolute left-0 block h-[1.5px] w-5 rounded-full bg-foreground transition-all duration-300",
                 open ? "top-1/2 -translate-y-1/2 -rotate-45" : "bottom-0"
               )}
             />
@@ -126,31 +139,41 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
         </button>
       </nav>
 
-      {open && (
-        <div className="border-t border-border bg-surface md:hidden">
-          <div className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-3">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-secondary"
-              >
-                {link.label}
-              </Link>
-            ))}
+      <div
+        className={cn(
+          "fixed inset-x-0 top-16 z-30 origin-top overflow-hidden border-b border-border bg-background transition-all duration-300 md:hidden",
+          open
+            ? "max-h-[calc(100vh-4rem)] opacity-100"
+            : "pointer-events-none max-h-0 opacity-0"
+        )}
+      >
+        <div className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-4">
+          {navLinks.map((link, index) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              style={{ transitionDelay: open ? `${index * 30}ms` : "0ms" }}
+              className={cn(
+                "flex items-center justify-between rounded-md px-3 py-3 text-base font-medium text-foreground transition-all hover:bg-secondary",
+                open ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"
+              )}
+            >
+              <span>{link.label}</span>
+              <span className="text-muted-foreground">→</span>
+            </Link>
+          ))}
 
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <Button variant="glass" asChild>
-                <Link href="/signin">Sign in</Link>
-              </Button>
+          <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border pt-4">
+            <Button variant="outline" asChild>
+              <Link href="/signin">Sign in</Link>
+            </Button>
 
-              <Button variant="hero" asChild>
-                <Link href="/signup">Post a job</Link>
-              </Button>
-            </div>
+            <Button asChild>
+              <Link href="/signup">Post a job</Link>
+            </Button>
           </div>
         </div>
-      )}
+      </div>
     </header>
   );
 }
