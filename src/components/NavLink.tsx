@@ -12,22 +12,11 @@ type NavLinkCompatProps = Omit<
   href: string;
   className?: string;
   activeClassName?: string;
-  pendingClassName?: string;
   exact?: boolean;
 };
 
 const NavLink = forwardRef<HTMLAnchorElement, NavLinkCompatProps>(
-  (
-    {
-      className,
-      activeClassName,
-      pendingClassName,
-      href,
-      exact = false,
-      ...props
-    },
-    ref
-  ) => {
+  ({ className, activeClassName, href, exact = false, ...props }, ref) => {
     const pathname = usePathname();
 
     const isActive = exact
@@ -42,7 +31,7 @@ const NavLink = forwardRef<HTMLAnchorElement, NavLinkCompatProps>(
         {...props}
       />
     );
-  }
+  },
 );
 
 NavLink.displayName = "NavLink";

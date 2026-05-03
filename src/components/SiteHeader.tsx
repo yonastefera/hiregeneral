@@ -56,7 +56,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
         "sticky top-0 z-40 w-full transition-all duration-200",
         elevated
           ? "border-b border-border/60 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60"
-          : "border-b border-transparent bg-transparent"
+          : "border-b border-transparent bg-transparent",
       )}
     >
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-6 px-4 md:px-6">
@@ -82,7 +82,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
                   "relative rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                   active
                     ? "text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {link.label}
@@ -118,21 +118,21 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
             <span
               className={cn(
                 "absolute left-0 block h-[1.5px] w-5 rounded-full bg-foreground transition-all duration-300",
-                open ? "top-1/2 -translate-y-1/2 rotate-45" : "top-0"
+                open ? "top-1/2 -translate-y-1/2 rotate-45" : "top-0",
               )}
             />
 
             <span
               className={cn(
                 "absolute left-0 top-1/2 block h-[1.5px] w-5 -translate-y-1/2 rounded-full bg-foreground transition-all duration-200",
-                open ? "scale-x-0 opacity-0" : "scale-x-100 opacity-100"
+                open ? "scale-x-0 opacity-0" : "scale-x-100 opacity-100",
               )}
             />
 
             <span
               className={cn(
                 "absolute left-0 block h-[1.5px] w-5 rounded-full bg-foreground transition-all duration-300",
-                open ? "top-1/2 -translate-y-1/2 -rotate-45" : "bottom-0"
+                open ? "top-1/2 -translate-y-1/2 -rotate-45" : "bottom-0",
               )}
             />
           </span>
@@ -144,7 +144,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
           "fixed inset-x-0 top-16 z-30 origin-top overflow-hidden border-b border-border bg-background transition-all duration-300 md:hidden",
           open
             ? "max-h-[calc(100vh-4rem)] opacity-100"
-            : "pointer-events-none max-h-0 opacity-0"
+            : "pointer-events-none max-h-0 opacity-0",
         )}
       >
         <div className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-4">
@@ -155,7 +155,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
               style={{ transitionDelay: open ? `${index * 30}ms` : "0ms" }}
               className={cn(
                 "flex items-center justify-between rounded-md px-3 py-3 text-base font-medium text-foreground transition-all hover:bg-secondary",
-                open ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"
+                open ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0",
               )}
             >
               <span>{link.label}</span>

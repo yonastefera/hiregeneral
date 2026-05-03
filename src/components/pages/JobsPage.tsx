@@ -36,14 +36,14 @@ export default function JobsPage() {
 
         return textMatch && locationMatch && dateMatch && distanceMatch;
       }),
-    [query, location, dateFilter, distance]
+    [query, location, dateFilter, distance],
   );
 
   const handleSave = (jobId: string) => {
     setSaved((current) =>
       current.includes(jobId)
         ? current.filter((id) => id !== jobId)
-        : [...current, jobId]
+        : [...current, jobId],
     );
 
     toast.info("Sign in to sync saved jobs across devices.");

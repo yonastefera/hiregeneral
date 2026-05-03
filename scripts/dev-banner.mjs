@@ -37,7 +37,9 @@ ${reset}`;
 console.log(logo);
 console.log(`${teal}✓ HireGeneral development server starting.${reset}`);
 console.log(`${orange}Local app will be available from Next.js below.${reset}`);
-console.log(`${muted}Search smarter. Hire faster. Move with general.${reset}\n`);
+console.log(
+  `${muted}Search smarter. Hire faster. Move with general.${reset}\n`,
+);
 
 const dev = spawn(nextBin, ["dev"], {
   stdio: "inherit",

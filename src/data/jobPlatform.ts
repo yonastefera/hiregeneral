@@ -1,4 +1,11 @@
-import { Building2, Code2, Database, LineChart, Megaphone, ShieldCheck } from "lucide-react";
+import {
+  Building2,
+  Code2,
+  Database,
+  LineChart,
+  Megaphone,
+  ShieldCheck,
+} from "lucide-react";
 
 export type UserFlow = "job_seeker" | "recruiter" | "admin";
 
@@ -58,7 +65,8 @@ export const featuredJobs: JobListing[] = [
     workMode: "Remote",
     experienceLevel: "Mid–Senior · 4+ years",
     skills: ["TypeScript", "React", "Node.js", "Postgres", "AWS"],
-    summary: "Posted directly on HireGeneral — apply in under 2 minutes with your profile and resume.",
+    summary:
+      "Posted directly on HireGeneral — apply in under 2 minutes with your profile and resume.",
     category: "Engineering",
     description:
       "Brightline Studio is a small, focused team building tools that help climate-tech startups ship faster. We're hiring a Full-Stack Engineer to own end-to-end product features across our React frontends, Node services, and Postgres data layer. You'll work directly with founders and designers, shipping weekly to a tight community of early customers.",
@@ -90,7 +98,8 @@ export const featuredJobs: JobListing[] = [
     title: "Senior Frontend Engineer",
     company: "Northstar Labs",
     logo: "NL",
-    companyTagline: "Hiring intelligence platform used by 1,200+ recruiting teams.",
+    companyTagline:
+      "Hiring intelligence platform used by 1,200+ recruiting teams.",
     companySize: "120–180 employees",
     companyWebsite: "https://careers.northstarlabs.example.com",
     location: "New York, NY",
@@ -101,7 +110,8 @@ export const featuredJobs: JobListing[] = [
     workMode: "Hybrid",
     experienceLevel: "Senior · 5+ years",
     skills: ["React", "TypeScript", "Design Systems", "Next.js", "Testing"],
-    summary: "Own the candidate-facing experience for a fast-growing hiring intelligence product.",
+    summary:
+      "Own the candidate-facing experience for a fast-growing hiring intelligence product.",
     category: "Engineering",
     description:
       "Northstar Labs is hiring a Senior Frontend Engineer to lead the candidate-facing experience across our hiring intelligence platform. You will partner closely with design, product, and platform engineering to ship a fast, accessible interface trusted by hundreds of thousands of weekly applicants.",
@@ -123,7 +133,8 @@ export const featuredJobs: JobListing[] = [
       "$2,000 annual learning and conference stipend",
       "Comprehensive medical, dental, vision, and 401(k) match",
     ],
-    applyUrl: "https://careers.northstarlabs.example.com/senior-frontend-engineer",
+    applyUrl:
+      "https://careers.northstarlabs.example.com/senior-frontend-engineer",
     applicants: 84,
   },
   {
@@ -132,7 +143,8 @@ export const featuredJobs: JobListing[] = [
     title: "Product Designer, Marketplace",
     company: "Luma Works",
     logo: "LW",
-    companyTagline: "Remote-first design studio building modern marketplace tools.",
+    companyTagline:
+      "Remote-first design studio building modern marketplace tools.",
     companySize: "60–90 employees",
     companyWebsite: "https://lumaworks.example.com/careers",
     location: "Remote - United States",
@@ -143,7 +155,8 @@ export const featuredJobs: JobListing[] = [
     workMode: "Remote",
     experienceLevel: "Mid–Senior · 4+ years",
     skills: ["Figma", "UX Research", "Prototyping", "Design Systems"],
-    summary: "Shape a modern job matching flow for candidates and high-volume recruiting teams.",
+    summary:
+      "Shape a modern job matching flow for candidates and high-volume recruiting teams.",
     category: "Design",
     description:
       "Luma Works is looking for a Product Designer to lead end-to-end design for our marketplace surfaces. You will own discovery, candidate matching, and recruiter workflows, partnering with research and engineering on every release.",
@@ -165,7 +178,8 @@ export const featuredJobs: JobListing[] = [
       "Quarterly team offsites in Lisbon, Mexico City, and Denver",
       "Unlimited PTO with a 4-week minimum",
     ],
-    applyUrl: "https://lumaworks.example.com/careers/product-designer-marketplace",
+    applyUrl:
+      "https://lumaworks.example.com/careers/product-designer-marketplace",
     applicants: 156,
   },
   {
@@ -185,7 +199,8 @@ export const featuredJobs: JobListing[] = [
     workMode: "On-site",
     experienceLevel: "Mid · 3+ years",
     skills: ["SQL", "Tableau", "Python", "dbt"],
-    summary: "Build trusted reporting pipelines for clinical operations and finance teams.",
+    summary:
+      "Build trusted reporting pipelines for clinical operations and finance teams.",
     category: "Data",
     description:
       "Meridian Health is hiring a Data Platform Analyst on a 12-month contract to support our clinical operations and finance reporting modernization. You will partner with engineering and analytics leaders to ship trusted, well-documented reporting models.",
@@ -207,7 +222,8 @@ export const featuredJobs: JobListing[] = [
       "Access to learning subscriptions and internal data community",
       "Possible conversion to full-time after the contract",
     ],
-    applyUrl: "https://careers.meridianhealth.example.com/data-platform-analyst",
+    applyUrl:
+      "https://careers.meridianhealth.example.com/data-platform-analyst",
     applicants: 41,
   },
   {
@@ -216,7 +232,8 @@ export const featuredJobs: JobListing[] = [
     title: "Growth Marketing Manager",
     company: "Evergreen Solar",
     logo: "ES",
-    companyTagline: "Residential solar installer operating across 14 US states.",
+    companyTagline:
+      "Residential solar installer operating across 14 US states.",
     companySize: "300–500 employees",
     companyWebsite: "https://evergreensolar.example.com/careers",
     location: "Austin, TX",
@@ -227,7 +244,8 @@ export const featuredJobs: JobListing[] = [
     workMode: "Hybrid",
     experienceLevel: "Mid–Senior · 4+ years",
     skills: ["Lifecycle", "SEO", "Analytics", "Paid media"],
-    summary: "Lead acquisition experiments across paid, lifecycle, content, and partner channels.",
+    summary:
+      "Lead acquisition experiments across paid, lifecycle, content, and partner channels.",
     category: "Marketing",
     description:
       "Evergreen Solar is hiring a Growth Marketing Manager to own paid, lifecycle, and partner acquisition for our residential solar product across 14 states. You will work with data, sales, and creative teams to ship measurable experiments every week.",
@@ -249,7 +267,8 @@ export const featuredJobs: JobListing[] = [
       "Generous parental leave and caregiver support",
       "Sustainable commute and home solar employee credits",
     ],
-    applyUrl: "https://evergreensolar.example.com/careers/growth-marketing-manager",
+    applyUrl:
+      "https://evergreensolar.example.com/careers/growth-marketing-manager",
     applicants: 67,
   },
   {
@@ -258,7 +277,8 @@ export const featuredJobs: JobListing[] = [
     title: "Cloud Security Engineer",
     company: "ArcVault",
     logo: "AV",
-    companyTagline: "Compliance automation platform for cloud-native engineering teams.",
+    companyTagline:
+      "Compliance automation platform for cloud-native engineering teams.",
     companySize: "80–120 employees",
     companyWebsite: "https://arcvault.example.com/careers",
     location: "Seattle, WA",
@@ -269,7 +289,8 @@ export const featuredJobs: JobListing[] = [
     workMode: "Remote",
     experienceLevel: "Senior · 6+ years",
     skills: ["AWS", "SOC 2", "Kubernetes", "Terraform", "IAM"],
-    summary: "Harden infrastructure, automate compliance, and partner with product engineering.",
+    summary:
+      "Harden infrastructure, automate compliance, and partner with product engineering.",
     category: "Security",
     description:
       "ArcVault is hiring a Cloud Security Engineer to harden our AWS and Kubernetes footprint, automate compliance evidence collection, and partner with product engineering on secure-by-default platform patterns.",
@@ -311,7 +332,8 @@ export const featuredJobs: JobListing[] = [
     workMode: "Hybrid",
     experienceLevel: "Staff · 8+ years",
     skills: ["Platform PM", "APIs", "Roadmapping", "Developer experience"],
-    summary: "Define the platform roadmap for AI APIs trusted by thousands of developers.",
+    summary:
+      "Define the platform roadmap for AI APIs trusted by thousands of developers.",
     category: "Product",
     description:
       "Helix Labs is hiring a Staff Product Manager to own our platform roadmap. You will partner with engineering, design, and developer relations to ship APIs and SDKs that developers love.",
@@ -333,7 +355,8 @@ export const featuredJobs: JobListing[] = [
       "Comprehensive health, dental, and vision coverage",
       "Catered lunches and commuter benefits",
     ],
-    applyUrl: "https://helixlabs.example.com/careers/staff-product-manager-platform",
+    applyUrl:
+      "https://helixlabs.example.com/careers/staff-product-manager-platform",
     applicants: 213,
   },
 ];
@@ -346,19 +369,22 @@ export const flowCards = [
   {
     role: "job_seeker" as const,
     title: "Job seeker",
-    description: "Search roles, save favorites, manage resume, skills, privacy, and applications.",
+    description:
+      "Search roles, save favorites, manage resume, skills, privacy, and applications.",
     icon: Code2,
   },
   {
     role: "recruiter" as const,
     title: "Recruiter",
-    description: "Post jobs, manage company presence, review applicants, and update listings.",
+    description:
+      "Post jobs, manage company presence, review applicants, and update listings.",
     icon: Building2,
   },
   {
     role: "admin" as const,
     title: "Admin",
-    description: "Monitor marketplace quality, roles, companies, reports, and publishing activity.",
+    description:
+      "Monitor marketplace quality, roles, companies, reports, and publishing activity.",
     icon: ShieldCheck,
   },
 ];

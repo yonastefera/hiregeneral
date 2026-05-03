@@ -80,9 +80,7 @@ export function JobCard({ job, saved, onSave }: JobCardProps) {
               className="relative z-10 grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
             >
               <Bookmark
-                className={
-                  saved ? "size-4 fill-accent text-accent" : "size-4"
-                }
+                className={saved ? "size-4 fill-accent text-accent" : "size-4"}
               />
             </Button>
           </div>
@@ -95,9 +93,7 @@ export function JobCard({ job, saved, onSave }: JobCardProps) {
 
             <span className="inline-flex items-center gap-1.5">
               <Clock3 className="size-3.5" />
-              {job.postedDaysAgo === 0
-                ? "Today"
-                : `${job.postedDaysAgo}d ago`}
+              {job.postedDaysAgo === 0 ? "Today" : `${job.postedDaysAgo}d ago`}
             </span>
 
             <span className="inline-flex items-center gap-1.5">

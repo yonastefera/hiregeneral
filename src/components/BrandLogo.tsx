@@ -10,7 +10,11 @@ type BrandLogoProps = {
 /**
  * HireGeneral brand mark. Pure SVG so it scales crisply and themes via tokens.
  */
-export function BrandLogo({ className, variant = "full", wordClassName }: BrandLogoProps) {
+export function BrandLogo({
+  className,
+  variant = "full",
+  wordClassName,
+}: BrandLogoProps) {
   if (variant === "mark") {
     return (
       <svg
@@ -26,7 +30,14 @@ export function BrandLogo({ className, variant = "full", wordClassName }: BrandL
             <stop offset="100%" stopColor="hsl(var(--accent))" />
           </linearGradient>
         </defs>
-        <rect x="2" y="2" width="44" height="44" rx="11" fill="url(#hg-mark-grad)" />
+        <rect
+          x="2"
+          y="2"
+          width="44"
+          height="44"
+          rx="11"
+          fill="url(#hg-mark-grad)"
+        />
         <path
           d="M15 14 V34 M15 24 H27 M27 14 V34"
           stroke="white"
@@ -49,7 +60,12 @@ export function BrandLogo({ className, variant = "full", wordClassName }: BrandL
   return (
     <span className={cn("inline-flex items-center gap-2.5", className)}>
       <BrandLogo variant="mark" className="size-8 shrink-0" />
-      <span className={cn("text-lg font-bold tracking-tight text-foreground", wordClassName)}>
+      <span
+        className={cn(
+          "text-lg font-bold tracking-tight text-foreground",
+          wordClassName,
+        )}
+      >
         Hire<span className="text-primary">General</span>
       </span>
     </span>

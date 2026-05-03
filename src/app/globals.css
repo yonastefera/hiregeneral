@@ -44,11 +44,35 @@ All colors MUST be HSL.
     --warning: 38 94% 50%;
     --warning-foreground: 218 38% 12%;
     --hero-glow: 174 68% 47%;
-    --gradient-hero: radial-gradient(circle at 12% 15%, hsl(174 68% 47% / 0.24), transparent 28%), radial-gradient(circle at 86% 18%, hsl(18 92% 60% / 0.2), transparent 25%), linear-gradient(135deg, hsl(42 38% 97%) 0%, hsl(174 44% 91%) 48%, hsl(42 45% 99%) 100%);
-    --gradient-primary: linear-gradient(135deg, hsl(188 86% 28%), hsl(174 68% 39%));
+    --gradient-hero:
+      radial-gradient(
+        circle at 12% 15%,
+        hsl(174 68% 47% / 0.24),
+        transparent 28%
+      ),
+      radial-gradient(
+        circle at 86% 18%,
+        hsl(18 92% 60% / 0.2),
+        transparent 25%
+      ),
+      linear-gradient(
+        135deg,
+        hsl(42 38% 97%) 0%,
+        hsl(174 44% 91%) 48%,
+        hsl(42 45% 99%) 100%
+      );
+    --gradient-primary: linear-gradient(
+      135deg,
+      hsl(188 86% 28%),
+      hsl(174 68% 39%)
+    );
     --gradient-warm: linear-gradient(135deg, hsl(18 92% 60%), hsl(38 94% 50%));
-    --shadow-soft: 0 1px 2px hsl(218 38% 12% / 0.04), 0 8px 24px -12px hsl(218 38% 12% / 0.12);
-    --shadow-lift: 0 2px 4px hsl(218 38% 12% / 0.06), 0 16px 40px -16px hsl(188 86% 20% / 0.22);
+    --shadow-soft:
+      0 1px 2px hsl(218 38% 12% / 0.04),
+      0 8px 24px -12px hsl(218 38% 12% / 0.12);
+    --shadow-lift:
+      0 2px 4px hsl(218 38% 12% / 0.06),
+      0 16px 40px -16px hsl(188 86% 20% / 0.22);
     --shadow-ring: 0 0 0 1px hsl(var(--border));
 
     --sidebar-background: 0 0% 98%;
@@ -114,7 +138,14 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family:
+      Inter,
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      sans-serif;
   }
 
   ::selection {
@@ -123,10 +154,22 @@ All colors MUST be HSL.
 }
 
 @layer utilities {
-  .bg-hero-gradient { background-image: var(--gradient-hero); }
-  .bg-primary-gradient { background-image: var(--gradient-primary); }
-  .bg-warm-gradient { background-image: var(--gradient-warm); }
-  .shadow-soft { box-shadow: var(--shadow-soft); }
-  .shadow-lift { box-shadow: var(--shadow-lift); }
-  .text-balance { text-wrap: balance; }
+  .bg-hero-gradient {
+    background-image: var(--gradient-hero);
+  }
+  .bg-primary-gradient {
+    background-image: var(--gradient-primary);
+  }
+  .bg-warm-gradient {
+    background-image: var(--gradient-warm);
+  }
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+  .shadow-lift {
+    box-shadow: var(--shadow-lift);
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
 }

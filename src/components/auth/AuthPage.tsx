@@ -52,9 +52,12 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
     setLoading(true);
 
     if (mode === "forgot") {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        email.trim(),
+        {
+          redirectTo: `${window.location.origin}/reset-password`,
+        },
+      );
 
       setLoading(false);
 

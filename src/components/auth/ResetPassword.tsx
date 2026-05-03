@@ -7,7 +7,7 @@ import { LockKeyhole } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 
 export default function ResetPassword() {
   const router = useRouter();
@@ -19,13 +19,11 @@ export default function ResetPassword() {
   useEffect(() => {
     setHasRecoveryToken(
       window.location.hash.includes("type=recovery") ||
-        window.location.search.includes("type=recovery")
+        window.location.search.includes("type=recovery"),
     );
   }, []);
 
-  const handleSubmit = async (
-    event: React.SyntheticEvent<HTMLFormElement>
-  ) => {
+  const handleSubmit = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     setLoading(true);
@@ -63,7 +61,6 @@ export default function ResetPassword() {
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
           <label className="block text-sm font-medium">
             New password
-
             <div className="mt-2 flex items-center gap-2 rounded-lg border border-input bg-background px-3">
               <LockKeyhole className="size-4 text-muted-foreground" />
 

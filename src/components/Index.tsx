@@ -27,7 +27,7 @@ const Index = () => {
   const highlightedJobs = useMemo(() => featuredJobs.slice(0, 3), []);
   const publicFlows = useMemo(
     () => flowCards.filter((flow) => flow.role !== "admin"),
-    []
+    [],
   );
 
   const useMyLocation = () => {
@@ -41,7 +41,7 @@ const Index = () => {
         setLocation("Current location");
         toast.success("Location detected for nearby job matches.");
       },
-      () => toast.error("Location permission was not granted.")
+      () => toast.error("Location permission was not granted."),
     );
   };
 
@@ -60,7 +60,7 @@ const Index = () => {
     setSaved((current) =>
       current.includes(jobId)
         ? current.filter((id) => id !== jobId)
-        : [...current, jobId]
+        : [...current, jobId],
     );
 
     toast.info("Create an account or sign in to keep saved jobs.");
@@ -86,7 +86,8 @@ const Index = () => {
 
             <p className="mt-6 max-w-2xl text-lg leading-8 text-muted-foreground">
               A minimal job board for candidates and recruiters with public job
-              search, secure saved listings, recruiter posting, and rich profiles.
+              search, secure saved listings, recruiter posting, and rich
+              profiles.
             </p>
 
             <div className="mt-8 rounded-lg border border-border bg-surface/90 p-3 shadow-lift backdrop-blur">
@@ -146,7 +147,9 @@ const Index = () => {
             <div className="rounded-lg border border-border bg-surface/80 p-4 shadow-lift backdrop-blur">
               <div className="flex items-center justify-between border-b border-border pb-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Live market pulse</p>
+                  <p className="text-sm text-muted-foreground">
+                    Live market pulse
+                  </p>
                   <h2 className="text-xl font-bold tracking-tight">
                     Today’s featured roles
                   </h2>

@@ -44,7 +44,9 @@ build.on("close", (code) => {
     console.log(logo);
     console.log(`${teal}✓ Build completed successfully.${reset}`);
     console.log(`${orange}HireGeneral is ready for deployment.${reset}`);
-    console.log(`${muted}Search smarter. Hire faster. Move with general.${reset}\n`);
+    console.log(
+      `${muted}Search smarter. Hire faster. Move with general.${reset}\n`,
+    );
     process.exit(0);
   }
 
