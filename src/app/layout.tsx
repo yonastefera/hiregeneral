@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Footer } from "@/components/Footer";
+import { SiteHeaderController } from "@/components/SiteHeaderController";
 import { AppProviders } from "@/components/providers/AppProviders";
 import "./globals.css";
 
@@ -18,6 +19,7 @@ export default function RootLayout({
       <body>
         <AppProviders>
           <div className="flex min-h-screen flex-col bg-background">
+            <SiteHeaderController />
             <div className="flex-1">{children}</div>
             <Footer />
           </div>

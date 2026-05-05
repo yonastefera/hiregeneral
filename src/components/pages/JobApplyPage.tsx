@@ -29,7 +29,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SiteHeader } from "@/components/SiteHeader";
 import { supabase } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import type { Job } from "@/lib/db/types";
@@ -261,7 +260,6 @@ export default function JobApplyPage() {
   if (jobLoading) {
     return (
       <main className="min-h-screen bg-background">
-        <SiteHeader />
         <div className="flex items-center justify-center py-32 text-muted-foreground">
           <Loader2 className="size-6 animate-spin" />
         </div>
@@ -273,7 +271,6 @@ export default function JobApplyPage() {
   if (!job) {
     return (
       <main className="min-h-screen bg-background">
-        <SiteHeader />
         <section className="mx-auto max-w-3xl px-4 py-24 text-center">
           <Badge variant="soft">Job not found</Badge>
           <h1 className="mt-5 text-3xl font-bold tracking-tight">
@@ -291,7 +288,6 @@ export default function JobApplyPage() {
   if (authChecked && !userId) {
     return (
       <main className="min-h-screen bg-background">
-        <SiteHeader />
         <section className="mx-auto max-w-2xl px-4 py-20 text-center">
           <Badge variant="soft">Sign in required</Badge>
           <h1 className="mt-4 text-3xl font-bold tracking-tight">
@@ -320,7 +316,6 @@ export default function JobApplyPage() {
   if (done) {
     return (
       <main className="min-h-screen bg-background">
-        <SiteHeader />
         <section className="mx-auto max-w-2xl px-4 py-20 text-center">
           <div className="mx-auto grid size-16 place-items-center rounded-full bg-success/10 text-success">
             <CheckCircle2 className="size-8" />
@@ -359,8 +354,6 @@ export default function JobApplyPage() {
 
   return (
     <main className="min-h-screen bg-background">
-      <SiteHeader />
-
       {/* ── Job header ── */}
       <section className="border-b border-border bg-background px-4 pb-6 pt-8">
         <div className="mx-auto max-w-5xl">

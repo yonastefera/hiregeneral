@@ -1,30 +1,58 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  Bell,
+  Bookmark,
+  BriefcaseBusiness,
+  LayoutDashboard,
+  LogOut,
+  MessageSquare,
+  Settings,
+  ShieldCheck,
+  UserRound,
+} from "lucide-react";
+import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/BrandLogo";
 import { cn } from "@/lib/utils";
-
-const navLinks = [
-  { label: "Find jobs", href: "/jobs" },
-  { label: "Saved", href: "/saved-jobs" },
-  { label: "Salary guide", href: "/salary-guide" },
-  { label: "Career advice", href: "/career-advice" },
-  { label: "For employers", href: "/employers/dashboard" },
-];
+import { supabase } from "@/lib/supabase/client";
 
 type SiteHeaderProps = {
   variant?: "default" | "transparent";
 };
 
+interface UserProfile {
+  full_name: string | null;
+  email: string | null;
+  user_type: string;
+}
+
+const baseNavLinks = [
+  { label: "Find jobs", href: "/jobs" },
+  { label: "Salary guide", href: "/salary-guide" },
+  { label: "Career advice", href: "/career-advice" },
+  { label: "For employers", href: "/employers/dashboard" },
+];
+
+const savedNavLink = { label: "Saved", href: "/saved-jobs" };
+
 export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
   const pathname = usePathname();
+  const router = useRouter();
 
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const [user, setUser] = useState<{ id: string; email?: string } | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 4);
@@ -38,6 +66,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
 
   useEffect(() => {
     setOpen(false);
+    setAccountMenuOpen(false);
   }, [pathname]);
 
   useEffect(() => {
@@ -48,27 +77,146 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
     };
   }, [open]);
 
+  useEffect(() => {
+    let mounted = true;
+
+    supabase.auth.getUser().then(({ data }) => {
+      if (!mounted) return;
+
+      setUser(data.user ?? null);
+      setAuthLoading(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+
+      if (!session?.user) {
+        setProfile(null);
+        setUnreadCount(0);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setProfile(null);
+      return;
+    }
+
+    let mounted = true;
+
+    supabase
+      .from("profiles")
+      .select("full_name, email, user_type")
+      .eq("user_id", user.id)
+      .single()
+      .then(({ data }) => {
+        if (!mounted) return;
+        setProfile(data);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setUnreadCount(0);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadUnreadCount = async () => {
+      const { count } = await supabase
+        .from("notifications")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .is("read_at", null);
+
+      if (!cancelled) {
+        setUnreadCount(count ?? 0);
+      }
+    };
+
+    loadUnreadCount();
+
+    const intervalId = window.setInterval(loadUnreadCount, 30_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [user?.id, pathname]);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+
+    setOpen(false);
+    setAccountMenuOpen(false);
+    setUser(null);
+    setProfile(null);
+    setUnreadCount(0);
+
+    toast.success("Signed out.");
+
+    router.push("/jobs");
+    router.refresh();
+  };
+
+  const displayName =
+    profile?.full_name || user?.email?.split("@")[0] || "Account";
+
+  const initials = (profile?.full_name || user?.email || "U")
+    .split(/\s+/)
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  const isRecruiter =
+    profile?.user_type === "recruiter" || profile?.user_type === "admin";
+
+  const navLinks = useMemo(() => {
+    const links = user
+      ? [baseNavLinks[0], savedNavLink, ...baseNavLinks.slice(1)]
+      : baseNavLinks;
+
+    return links.filter((link) => {
+      if (link.href === "/employers/dashboard") return isRecruiter;
+      return true;
+    });
+  }, [user, isRecruiter]);
+
   const elevated = variant === "default" || scrolled;
 
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 w-full transition-all duration-200",
+        "sticky top-0 z-40 w-full will-change-transform",
         elevated
-          ? "border-b border-border/60 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60"
+          ? "border-b border-border/60 bg-background/80 backdrop-blur-xl supports-backdrop-filter:bg-background/60"
           : "border-b border-transparent bg-transparent",
       )}
     >
-      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-6 px-4 md:px-6">
+      <nav className="mx-auto grid h-16 max-w-7xl grid-cols-[auto_1fr_auto] items-center gap-6 px-4 md:px-6">
         <Link
           href="/"
           aria-label="HireGeneral home"
-          className="flex items-center"
+          className="flex shrink-0 items-center"
         >
           <BrandLogo />
         </Link>
 
-        <div className="hidden items-center gap-1 md:flex">
+        <div className="hidden min-w-0 items-center justify-center gap-1 md:flex">
           {navLinks.map((link) => {
             const active =
               pathname === link.href ||
@@ -87,56 +235,232 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
               >
                 {link.label}
 
-                {active && (
-                  <span className="absolute inset-x-3 -bottom-[21px] h-px bg-primary" />
-                )}
+                <span
+                  className={cn(
+                    "absolute inset-x-3 -bottom-5.5 h-px bg-primary transition-opacity duration-150",
+                    active ? "opacity-100" : "opacity-0",
+                  )}
+                />
               </Link>
             );
           })}
         </div>
 
-        <div className="hidden items-center gap-2 md:flex">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/signin">Sign in</Link>
-          </Button>
+        <div className="hidden min-w-55 items-center justify-end gap-1 md:flex">
+          {authLoading ? (
+            <div className="h-9 w-45" aria-hidden="true" />
+          ) : user ? (
+            <>
+              {isRecruiter && (
+                <Button variant="default" size="sm" asChild>
+                  <Link href="/employer/post-job">Post a job</Link>
+                </Button>
+              )}
 
-          <Button variant="default" size="sm" asChild>
-            <Link href="/signup">Post a job</Link>
-          </Button>
+              <IconLink href="/messages" label="Messages">
+                <MessageSquare className="size-4.5" />
+              </IconLink>
+
+              <IconLink
+                href="/notifications"
+                label="Notifications"
+                badge={unreadCount}
+              >
+                <Bell className="size-4.5" />
+              </IconLink>
+
+              <div className="relative">
+                <button
+                  type="button"
+                  aria-label="Profile menu"
+                  aria-haspopup="menu"
+                  aria-expanded={accountMenuOpen}
+                  onClick={() => setAccountMenuOpen((value) => !value)}
+                  className="ml-1 grid size-9 place-items-center rounded-full bg-secondary text-xs font-semibold text-secondary-foreground transition-colors hover:bg-secondary/70"
+                >
+                  {initials}
+                </button>
+
+                {accountMenuOpen && (
+                  <button
+                    type="button"
+                    aria-label="Close account menu"
+                    className="fixed inset-0 z-10 cursor-default"
+                    onClick={() => setAccountMenuOpen(false)}
+                  />
+                )}
+
+                <div
+                  role="menu"
+                  className={cn(
+                    "absolute right-0 top-full z-20 mt-3 w-60 origin-top-right rounded-lg border border-border bg-background shadow-lg transition-all duration-150",
+                    accountMenuOpen
+                      ? "translate-y-0 scale-100 opacity-100"
+                      : "pointer-events-none -translate-y-1 scale-95 opacity-0",
+                  )}
+                >
+                  <div className="border-b border-border px-4 py-3">
+                    <p className="truncate text-sm font-medium text-foreground">
+                      {displayName}
+                    </p>
+
+                    <p className="truncate text-xs text-muted-foreground">
+                      {user.email}
+                    </p>
+
+                    <Badge variant="soft" className="mt-1 text-xs capitalize">
+                      {profile?.user_type?.replace("_", " ") ?? "job seeker"}
+                    </Badge>
+                  </div>
+
+                  <div className="p-1">
+                    <AccountMenuLink
+                      href="/profile"
+                      onClick={() => setAccountMenuOpen(false)}
+                    >
+                      <UserRound className="size-4 text-muted-foreground" />
+                      Profile
+                    </AccountMenuLink>
+
+                    <AccountMenuLink
+                      href="/saved-jobs"
+                      onClick={() => setAccountMenuOpen(false)}
+                    >
+                      <Bookmark className="size-4 text-muted-foreground" />
+                      Saved & applied
+                    </AccountMenuLink>
+
+                    <AccountMenuLink
+                      href="/messages"
+                      onClick={() => setAccountMenuOpen(false)}
+                    >
+                      <MessageSquare className="size-4 text-muted-foreground" />
+                      Messages
+                    </AccountMenuLink>
+
+                    {isRecruiter && (
+                      <AccountMenuLink
+                        href="/dashboard"
+                        onClick={() => setAccountMenuOpen(false)}
+                      >
+                        <LayoutDashboard className="size-4 text-muted-foreground" />
+                        Dashboard
+                      </AccountMenuLink>
+                    )}
+
+                    {isRecruiter && (
+                      <AccountMenuLink
+                        href="/applications"
+                        onClick={() => setAccountMenuOpen(false)}
+                      >
+                        <BriefcaseBusiness className="size-4 text-muted-foreground" />
+                        My applications
+                      </AccountMenuLink>
+                    )}
+                  </div>
+
+                  <div className="border-t border-border p-1">
+                    <AccountMenuLink
+                      href="/settings/account"
+                      onClick={() => setAccountMenuOpen(false)}
+                    >
+                      <Settings className="size-4 text-muted-foreground" />
+                      Account settings
+                    </AccountMenuLink>
+
+                    <AccountMenuLink
+                      href="/settings/notifications"
+                      onClick={() => setAccountMenuOpen(false)}
+                    >
+                      <Bell className="size-4 text-muted-foreground" />
+                      Notification settings
+                    </AccountMenuLink>
+
+                    <AccountMenuLink
+                      href="/settings/privacy"
+                      onClick={() => setAccountMenuOpen(false)}
+                    >
+                      <ShieldCheck className="size-4 text-muted-foreground" />
+                      Privacy
+                    </AccountMenuLink>
+                  </div>
+
+                  <div className="border-t border-border p-1">
+                    <button
+                      type="button"
+                      onClick={handleSignOut}
+                      className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10"
+                    >
+                      <LogOut className="size-4" />
+                      Sign out
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/signin">Sign in</Link>
+              </Button>
+
+              <Button variant="default" size="sm" asChild>
+                <Link href="/employer/post-job">Post a job</Link>
+              </Button>
+            </>
+          )}
         </div>
 
-        <button
-          type="button"
-          aria-label={open ? "Close menu" : "Open menu"}
-          aria-expanded={open}
-          onClick={() => setOpen((value) => !value)}
-          className="relative grid size-10 place-items-center rounded-md text-foreground transition-colors hover:bg-secondary md:hidden"
-        >
-          <span className="sr-only">Toggle menu</span>
+        <div className="flex items-center gap-1 justify-self-end md:hidden">
+          {!authLoading && user && (
+            <>
+              <IconLink href="/messages" label="Messages">
+                <MessageSquare className="size-4.5" />
+              </IconLink>
 
-          <span className="relative block h-3.5 w-5">
-            <span
-              className={cn(
-                "absolute left-0 block h-[1.5px] w-5 rounded-full bg-foreground transition-all duration-300",
-                open ? "top-1/2 -translate-y-1/2 rotate-45" : "top-0",
-              )}
-            />
+              <IconLink
+                href="/notifications"
+                label="Notifications"
+                badge={unreadCount}
+              >
+                <Bell className="size-4.5" />
+              </IconLink>
+            </>
+          )}
 
-            <span
-              className={cn(
-                "absolute left-0 top-1/2 block h-[1.5px] w-5 -translate-y-1/2 rounded-full bg-foreground transition-all duration-200",
-                open ? "scale-x-0 opacity-0" : "scale-x-100 opacity-100",
-              )}
-            />
+          <button
+            type="button"
+            aria-label={open ? "Close menu" : "Open menu"}
+            aria-expanded={open}
+            onClick={() => setOpen((value) => !value)}
+            className="relative grid size-10 place-items-center rounded-md text-foreground transition-colors hover:bg-secondary md:hidden"
+          >
+            <span className="sr-only">Toggle menu</span>
 
-            <span
-              className={cn(
-                "absolute left-0 block h-[1.5px] w-5 rounded-full bg-foreground transition-all duration-300",
-                open ? "top-1/2 -translate-y-1/2 -rotate-45" : "bottom-0",
-              )}
-            />
-          </span>
-        </button>
+            <span className="relative block h-3.5 w-5">
+              <span
+                className={cn(
+                  "absolute left-0 block h-[1.5px] w-5 rounded-full bg-foreground transition-all duration-300",
+                  open ? "top-1/2 -translate-y-1/2 rotate-45" : "top-0",
+                )}
+              />
+
+              <span
+                className={cn(
+                  "absolute left-0 top-1/2 block h-[1.5px] w-5 -translate-y-1/2 rounded-full bg-foreground transition-all duration-200",
+                  open ? "scale-x-0 opacity-0" : "scale-x-100 opacity-100",
+                )}
+              />
+
+              <span
+                className={cn(
+                  "absolute left-0 block h-[1.5px] w-5 rounded-full bg-foreground transition-all duration-300",
+                  open ? "top-1/2 -translate-y-1/2 -rotate-45" : "bottom-0",
+                )}
+              />
+            </span>
+          </button>
+        </div>
       </nav>
 
       <div
@@ -163,17 +487,160 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
             </Link>
           ))}
 
-          <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border pt-4">
-            <Button variant="outline" asChild>
-              <Link href="/signin">Sign in</Link>
-            </Button>
+          {!authLoading && user && (
+            <>
+              <MobileMenuLink href="/messages">
+                <span className="inline-flex items-center gap-2">
+                  <MessageSquare className="size-4" />
+                  Messages
+                </span>
+              </MobileMenuLink>
 
-            <Button asChild>
-              <Link href="/signup">Post a job</Link>
-            </Button>
+              <MobileMenuLink href="/settings/account">
+                <span className="inline-flex items-center gap-2">
+                  <Settings className="size-4" />
+                  Account settings
+                </span>
+              </MobileMenuLink>
+
+              <MobileMenuLink href="/settings/notifications">
+                <span className="inline-flex items-center gap-2">
+                  <Bell className="size-4" />
+                  Notification settings
+                </span>
+              </MobileMenuLink>
+
+              <MobileMenuLink href="/settings/privacy">
+                <span className="inline-flex items-center gap-2">
+                  <ShieldCheck className="size-4" />
+                  Privacy
+                </span>
+              </MobileMenuLink>
+            </>
+          )}
+
+          <div className="mt-3 border-t border-border pt-4">
+            {authLoading ? (
+              <div className="h-10 w-full" aria-hidden="true" />
+            ) : user ? (
+              <div className="flex flex-col gap-2">
+                <div className="rounded-md border border-border px-3 py-3">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {displayName}
+                  </p>
+
+                  <p className="truncate text-xs text-muted-foreground">
+                    {user.email}
+                  </p>
+
+                  <Badge variant="soft" className="mt-2 text-xs capitalize">
+                    {profile?.user_type?.replace("_", " ") ?? "job seeker"}
+                  </Badge>
+                </div>
+
+                <Button variant="outline" asChild>
+                  <Link href="/profile">Profile</Link>
+                </Button>
+
+                <Button variant="outline" asChild>
+                  <Link href="/saved-jobs">Saved & applied</Link>
+                </Button>
+
+                {isRecruiter && (
+                  <Button asChild>
+                    <Link href="/employer/post-job">Post a job</Link>
+                  </Button>
+                )}
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleSignOut}
+                  className="text-destructive hover:text-destructive"
+                >
+                  Sign out
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" asChild>
+                  <Link href="/signin">Sign in</Link>
+                </Button>
+
+                <Button asChild>
+                  <Link href="/employer/post-job">Post a job</Link>
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </div>
     </header>
+  );
+}
+
+function IconLink({
+  href,
+  label,
+  badge,
+  children,
+}: {
+  href: string;
+  label: string;
+  badge?: number;
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-label={label}
+      className="relative grid size-9 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+    >
+      {children}
+
+      {badge && badge > 0 ? (
+        <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground">
+          {badge > 9 ? "9+" : badge}
+        </span>
+      ) : null}
+    </Link>
+  );
+}
+
+function AccountMenuLink({
+  href,
+  onClick,
+  children,
+}: {
+  href: string;
+  onClick?: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm text-foreground transition-colors hover:bg-secondary"
+    >
+      {children}
+    </Link>
+  );
+}
+
+function MobileMenuLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center justify-between rounded-md px-3 py-3 text-base font-medium text-foreground hover:bg-secondary"
+    >
+      {children}
+      <span className="text-muted-foreground">→</span>
+    </Link>
   );
 }

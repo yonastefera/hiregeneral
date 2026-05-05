@@ -1,5 +1,5 @@
-import FooterInfoPage from "@/components/pages/FooterInfoPage";
+import SavedJobsPage from "@/components/pages/SavedJobsPage";
 
-export default function SavedJobsPage() {
-  return <FooterInfoPage type="saved-jobs" />;
+export default function SavedJobsPageRoute() {
+  return <SavedJobsPage />;
 }

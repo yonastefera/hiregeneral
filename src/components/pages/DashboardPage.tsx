@@ -1,31 +1,74 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
   BriefcaseBusiness,
+  Building2,
   CheckCircle2,
+  Loader2,
   ShieldCheck,
   UsersRound,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { SiteHeader } from "@/components/SiteHeader";
-import { flowCards, platformStats } from "@/data/jobPlatform";
+import { flowCards } from "@/data/jobPlatform";
+
+interface Stats {
+  totalJobs: number;
+  totalUsers: number;
+  totalApplications: number;
+  totalCompanies: number;
+}
+
+type FlowCard = (typeof flowCards)[number];
 
 export default function DashboardPage() {
   const pathname = usePathname();
-
   const isAdminRoute = pathname === "/admin-control-center";
-  const visibleFlows = isAdminRoute
+
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/stats")
+      .then((r) => r.json())
+      .then(setStats)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const visibleFlows: FlowCard[] = isAdminRoute
     ? flowCards
-    : flowCards.filter((flow) => flow.role !== "admin");
+    : flowCards.filter((flow: FlowCard) => flow.role !== "admin");
+
+  const statCards = [
+    {
+      label: "Active listings",
+      value: stats?.totalJobs ?? 0,
+      icon: BriefcaseBusiness,
+    },
+    {
+      label: "Registered users",
+      value: stats?.totalUsers ?? 0,
+      icon: UsersRound,
+    },
+    {
+      label: "Applications",
+      value: stats?.totalApplications ?? 0,
+      icon: BarChart3,
+    },
+    {
+      label: "Companies",
+      value: stats?.totalCompanies ?? 0,
+      icon: Building2,
+    },
+  ];
 
   return (
     <main className="min-h-screen bg-background">
-      <SiteHeader />
-
       <section className="mx-auto max-w-7xl px-4 py-8">
         <Badge variant="soft">Role-aware command center</Badge>
 
@@ -35,23 +78,31 @@ export default function DashboardPage() {
             : "Manage job postings, applicants, and employer hiring activity."}
         </h1>
 
+        {/* ── Stats ── */}
         <div className="mt-8 grid gap-4 md:grid-cols-4">
-          {platformStats.map((stat) => (
+          {statCards.map((stat) => (
             <div
               key={stat.label}
               className="rounded-lg border border-border bg-surface p-5 shadow-soft"
             >
-              <stat.icon className="size-5 text-primary" />
+              {loading ? (
+                <Loader2 className="size-5 animate-spin text-muted-foreground" />
+              ) : (
+                <stat.icon className="size-5 text-primary" />
+              )}
 
-              <p className="mt-4 text-3xl font-bold">{stat.value}</p>
+              <p className="mt-4 text-3xl font-bold">
+                {loading ? "—" : stat.value.toLocaleString()}
+              </p>
 
               <p className="text-sm text-muted-foreground">{stat.label}</p>
             </div>
           ))}
         </div>
 
+        {/* ── Flow cards ── */}
         <div className="mt-8 grid gap-5 lg:grid-cols-3">
-          {visibleFlows.map((flow) => (
+          {visibleFlows.map((flow: FlowCard) => (
             <article
               key={flow.role}
               className="rounded-lg border border-border bg-surface p-6 shadow-soft"
@@ -73,6 +124,7 @@ export default function DashboardPage() {
           ))}
         </div>
 
+        {/* ── Recruiter posting checklist ── */}
         <div className="mt-8 grid gap-5 lg:grid-cols-[1fr_0.8fr]">
           <section className="rounded-lg border border-border bg-surface p-6 shadow-soft">
             <div className="flex items-center gap-2">

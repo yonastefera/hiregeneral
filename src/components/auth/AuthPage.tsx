@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, LockKeyhole, Mail, UserRound } from "lucide-react";
 import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -20,12 +21,15 @@ type AuthMode = "signin" | "signup" | "forgot";
 
 export function AuthPage({ mode }: { mode: AuthMode }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextUrl = searchParams.get("next") ?? "/jobs";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState<UserFlow>("job_seeker");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const title =
     mode === "signup"
@@ -38,15 +42,31 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
     mode === "signup"
       ? "Choose your flow and start building your hiring profile."
       : mode === "forgot"
-        ? "We’ll send a secure reset link to your email."
+        ? "We'll send a secure reset link to your email."
         : "Sign in to save jobs, post listings, and manage your profile.";
 
-  // const handleGoogle = async () => {
-  //
-  //   if (result.error) toast.error("Google sign-in could not start.");
-  //   if (!result.redirected && !result.error) router.push("/jobs");
-  // };
+  // ── Google OAuth ──────────────────────────────────────────────────────────
+  const handleGoogle = async () => {
+    setGoogleLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextUrl)}`,
+        queryParams: {
+          // Request profile scope so we get full_name + avatar
+          access_type: "offline",
+          prompt: "consent",
+        },
+      },
+    });
+    if (error) {
+      toast.error(error.message);
+      setGoogleLoading(false);
+    }
+    // On success Supabase redirects the browser — no further action needed
+  };
 
+  // ── Email / password ──────────────────────────────────────────────────────
   const handleSubmit = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
@@ -58,14 +78,11 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
           redirectTo: `${window.location.origin}/reset-password`,
         },
       );
-
       setLoading(false);
-
       if (error) {
         toast.error(error.message);
         return;
       }
-
       toast.success("Password reset link sent.");
       return;
     }
@@ -75,21 +92,15 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
         email: email.trim(),
         password,
         options: {
-          emailRedirectTo: window.location.origin,
-          data: {
-            full_name: fullName,
-            role,
-          },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          data: { full_name: fullName, role },
         },
       });
-
       setLoading(false);
-
       if (error) {
         toast.error(error.message);
         return;
       }
-
       toast.success("Check your email to confirm your account.");
       router.push("/signin");
       return;
@@ -99,33 +110,28 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
       email: email.trim(),
       password,
     });
-
     setLoading(false);
-
     if (error) {
       toast.error(error.message);
       return;
     }
-
     toast.success("Signed in successfully.");
-    router.push("/jobs");
+    router.push(nextUrl);
   };
 
   return (
     <main className="min-h-screen bg-hero-gradient px-4 py-8">
       <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl items-center gap-10 lg:grid-cols-[1fr_0.9fr]">
+        {/* ── Left panel ── */}
         <section className="hidden lg:block">
           <Badge variant="soft">HireGeneral authentication</Badge>
-
           <h1 className="mt-5 max-w-xl text-5xl font-bold tracking-tight text-foreground text-balance">
             One account for every hiring workflow.
           </h1>
-
           <p className="mt-5 max-w-lg text-lg leading-8 text-muted-foreground">
             Search without signing in, then create an account when you want to
             save listings, post roles, or manage candidate details.
           </p>
-
           <div className="mt-8 grid max-w-xl grid-cols-2 gap-3">
             {roles.map((item) => (
               <div
@@ -138,22 +144,76 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
           </div>
         </section>
 
+        {/* ── Form panel ── */}
         <section className="rounded-lg border border-border bg-surface/90 p-6 shadow-lift backdrop-blur md:p-8">
           <Link
             href="/"
             className="inline-flex items-center gap-2 text-sm font-semibold text-primary"
           >
-            <Eye className="size-4" />
-            HireGeneral
+            <Eye className="size-4" /> HireGeneral
           </Link>
 
           <h2 className="mt-6 text-3xl font-bold tracking-tight">{title}</h2>
-
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             {subtitle}
           </p>
 
-          <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+          {/* ── Google button ── */}
+          {mode !== "forgot" && (
+            <Button
+              type="button"
+              variant="glass"
+              size="xl"
+              className="mt-6 w-full gap-3"
+              onClick={handleGoogle}
+              disabled={googleLoading}
+            >
+              {googleLoading ? (
+                "Redirecting…"
+              ) : (
+                <>
+                  {/* Google SVG icon */}
+                  <svg
+                    className="size-5"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                    />
+                  </svg>
+                  Continue with Google
+                </>
+              )}
+            </Button>
+          )}
+
+          {/* ── Divider ── */}
+          {mode !== "forgot" && (
+            <div className="my-5 flex items-center gap-3">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-xs text-muted-foreground">
+                or continue with email
+              </span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+          )}
+
+          {/* ── Email / password form ── */}
+          <form className="space-y-4" onSubmit={handleSubmit}>
             {mode === "signup" && (
               <label className="block text-sm font-medium">
                 Full name
@@ -161,8 +221,9 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
                   <UserRound className="size-4 text-muted-foreground" />
                   <Input
                     value={fullName}
-                    onChange={(event) => setFullName(event.target.value)}
+                    onChange={(e) => setFullName(e.target.value)}
                     required
+                    placeholder="Avery Morgan"
                     className="border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
                   />
                 </div>
@@ -176,8 +237,9 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
                 <Input
                   type="email"
                   value={email}
-                  onChange={(event) => setEmail(event.target.value)}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
+                  placeholder="you@email.com"
                   className="border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
                 />
               </div>
@@ -191,7 +253,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
                   <Input
                     type="password"
                     value={password}
-                    onChange={(event) => setPassword(event.target.value)}
+                    onChange={(e) => setPassword(e.target.value)}
                     required
                     minLength={8}
                     className="border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
@@ -236,18 +298,6 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
             </Button>
           </form>
 
-          {/* {mode !== "forgot" && (
-            <Button
-              type="button"
-              variant="glass"
-              size="xl"
-              className="mt-3 w-full"
-              onClick={handleGoogle}
-            >
-              Continue with Gmail
-            </Button>
-          )} */}
-
           <div className="mt-6 flex flex-wrap justify-between gap-3 text-sm text-muted-foreground">
             {mode !== "signin" ? (
               <Link href="/signin" className="font-medium text-primary">
@@ -258,7 +308,6 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
                 Create account
               </Link>
             )}
-
             {mode !== "forgot" && (
               <Link
                 href="/forgot-password"

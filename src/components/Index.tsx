@@ -4,25 +4,23 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Crosshair, MapPin, Search, Sparkles } from "lucide-react";
+import { toast } from "sonner";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { JobCard } from "@/components/jobs/JobCard";
-import { SiteHeader } from "@/components/SiteHeader";
-import {
-  citySuggestions,
-  featuredJobs,
-  flowCards,
-  platformStats,
-} from "@/data/jobPlatform";
-import { toast } from "sonner";
+import { featuredJobs, flowCards, platformStats } from "@/data/jobPlatform";
+import { keywordSuggestions, locationSuggestions } from "@/data/suggestions";
+import { useSavedJobs } from "@/hooks/useSavedJobs";
 
 const Index = () => {
   const router = useRouter();
 
   const [query, setQuery] = useState("");
   const [location, setLocation] = useState("");
-  const [saved, setSaved] = useState<string[]>([]);
+
+  const { isSaved, toggleSaved, pendingId } = useSavedJobs();
 
   const highlightedJobs = useMemo(() => featuredJobs.slice(0, 3), []);
   const publicFlows = useMemo(
@@ -56,20 +54,8 @@ const Index = () => {
     router.push(queryString ? `/jobs?${queryString}` : "/jobs");
   };
 
-  const handleSave = (jobId: string) => {
-    setSaved((current) =>
-      current.includes(jobId)
-        ? current.filter((id) => id !== jobId)
-        : [...current, jobId],
-    );
-
-    toast.info("Create an account or sign in to keep saved jobs.");
-  };
-
   return (
     <main className="min-h-screen bg-background">
-      <SiteHeader variant="transparent" />
-
       <section className="relative -mt-16 overflow-hidden bg-hero-gradient px-4 pb-16 pt-24 md:pb-24 md:pt-32">
         <div className="pointer-events-none absolute left-1/2 top-24 hidden h-72 w-72 -translate-x-1/2 rounded-full bg-secondary/50 blur-3xl md:block motion-safe:animate-float" />
 
@@ -100,19 +86,26 @@ const Index = () => {
                   <Search className="size-5 text-muted-foreground" />
 
                   <Input
+                    list="home-keyword-suggestions"
                     aria-label="Search by title, company, or skill"
-                    placeholder="Title, company, skill"
+                    placeholder="Title, company, skill, keyword"
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     className="h-12 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
                   />
+
+                  <datalist id="home-keyword-suggestions">
+                    {keywordSuggestions.map((suggestion) => (
+                      <option key={suggestion} value={suggestion} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div className="flex items-center gap-2 rounded-lg border border-input bg-background px-3">
                   <MapPin className="size-5 text-muted-foreground" />
 
                   <Input
-                    list="location-suggestions"
+                    list="home-location-suggestions"
                     aria-label="Search by location"
                     placeholder="Location"
                     value={location}
@@ -129,9 +122,9 @@ const Index = () => {
                     <Crosshair className="size-4" />
                   </button>
 
-                  <datalist id="location-suggestions">
-                    {citySuggestions.map((city) => (
-                      <option key={city} value={city} />
+                  <datalist id="home-location-suggestions">
+                    {locationSuggestions.map((suggestion) => (
+                      <option key={suggestion} value={suggestion} />
                     ))}
                   </datalist>
                 </div>
@@ -163,8 +156,9 @@ const Index = () => {
                   <JobCard
                     key={job.id}
                     job={job}
-                    saved={saved.includes(job.id)}
-                    onSave={handleSave}
+                    saved={isSaved(job.id)}
+                    saving={pendingId === job.id}
+                    onSave={toggleSaved}
                   />
                 ))}
               </div>

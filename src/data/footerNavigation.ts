@@ -7,7 +7,7 @@ export const footerSections = [
     links: [
       { label: "Browse tech jobs", to: "/jobs" },
       { label: "Saved jobs", to: "/saved-jobs" },
-      { label: "Salary gu3ide", to: "/salary-guide" },
+      { label: "Salary guide", to: "/salary-guide" },
       { label: "Career advice", to: "/career-advice" },
       { label: "Profile visibility", to: "/profile-visibility" },
     ],

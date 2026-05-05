@@ -13,7 +13,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { SiteHeader } from "@/components/SiteHeader";
 
 type FooterInfoPageProps = {
   type:
@@ -252,8 +251,6 @@ export default function FooterInfoPage({ type }: FooterInfoPageProps) {
 
   return (
     <main className="min-h-screen bg-background">
-      <SiteHeader />
-
       <section className="bg-hero-gradient px-4 py-14">
         <div className="mx-auto max-w-7xl">
           <Badge variant="soft">{content.label}</Badge>

@@ -24,8 +24,8 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { SiteHeader } from "@/components/SiteHeader";
 import { JobCard } from "@/components/jobs/JobCard";
+import { useSavedJobs } from "@/hooks/useSavedJobs";
 import type { Job } from "@/lib/db/types";
 
 type JobCardJob = React.ComponentProps<typeof JobCard>["job"];
@@ -87,6 +87,7 @@ function toCardShape(job: Job): JobCardJob {
     benefits: job.benefits ?? [],
   };
 }
+
 // ─── component ──────────────────────────────────────────────────────────────
 
 export default function JobDetailsPage() {
@@ -94,10 +95,11 @@ export default function JobDetailsPage() {
   const params = useParams<{ slug: string }>();
   const slug = params?.slug;
 
+  const { isSaved, toggleSaved, pendingId } = useSavedJobs();
+
   const [job, setJob] = useState<Job | null>(null);
   const [related, setRelated] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saved, setSaved] = useState(false);
 
   // Fetch main job
   useEffect(() => {
@@ -141,7 +143,6 @@ export default function JobDetailsPage() {
   if (loading) {
     return (
       <main className="min-h-screen bg-background">
-        <SiteHeader />
         <div className="flex items-center justify-center py-32 text-muted-foreground">
           <Loader2 className="size-6 animate-spin" />
         </div>
@@ -153,7 +154,6 @@ export default function JobDetailsPage() {
   if (!job) {
     return (
       <main className="min-h-screen bg-background">
-        <SiteHeader />
         <section className="mx-auto max-w-3xl px-4 py-24 text-center">
           <Badge variant="soft">Job not found</Badge>
           <h1 className="mt-5 text-3xl font-bold tracking-tight">
@@ -179,6 +179,8 @@ export default function JobDetailsPage() {
   const postedDays = daysAgoLabel(job.posted_at);
   const isExternal = Boolean(job.apply_url);
   const logoInitials = job.company_name.slice(0, 2).toUpperCase();
+  const saved = isSaved(job.id);
+  const saving = pendingId === job.id;
 
   const onApply = () => {
     if (isExternal && job.apply_url) {
@@ -190,13 +192,9 @@ export default function JobDetailsPage() {
     router.push(`/jobs/${job.slug}/apply`);
   };
 
-  const onSave = () => {
-    setSaved((value) => !value);
-    toast.info(
-      saved
-        ? "Removed from saved jobs."
-        : "Saved. Sign in to keep across devices.",
-    );
+  const onSave = async () => {
+    const nowSaved = await toggleSaved(job.id);
+    toast.info(nowSaved ? "Saved to your jobs." : "Removed from saved jobs.");
   };
 
   const onShare = async () => {
@@ -220,8 +218,6 @@ export default function JobDetailsPage() {
 
   return (
     <main className="min-h-screen bg-background">
-      <SiteHeader />
-
       {/* ── Hero ── */}
       <section className="border-b border-border bg-hero-gradient px-4 pb-10 pt-8">
         <div className="mx-auto max-w-7xl">
@@ -307,9 +303,14 @@ export default function JobDetailsPage() {
                 variant={saved ? "warm" : "glass"}
                 size="lg"
                 onClick={onSave}
+                disabled={saving}
               >
-                <Bookmark className={saved ? "fill-current" : ""} />
-                {saved ? "Saved" : "Save job"}
+                {saving ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Bookmark className={saved ? "fill-current" : ""} />
+                )}
+                {saving ? "Saving…" : saved ? "Saved" : "Save job"}
               </Button>
 
               <Button variant="ghost" size="lg" onClick={onShare}>
@@ -431,9 +432,18 @@ export default function JobDetailsPage() {
                 )}
               </Button>
 
-              <Button variant="glass" size="lg" onClick={onSave}>
-                <Bookmark className={saved ? "fill-current" : ""} />
-                {saved ? "Saved" : "Save for later"}
+              <Button
+                variant="glass"
+                size="lg"
+                onClick={onSave}
+                disabled={saving}
+              >
+                {saving ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Bookmark className={saved ? "fill-current" : ""} />
+                )}
+                {saving ? "Saving…" : saved ? "Saved" : "Save for later"}
               </Button>
             </div>
           </div>
@@ -546,8 +556,9 @@ export default function JobDetailsPage() {
                 <JobCard
                   key={item.id}
                   job={toCardShape(item)}
-                  saved={false}
-                  onSave={() => toast.info("Sign in to save jobs.")}
+                  saved={isSaved(item.id)}
+                  saving={pendingId === item.id}
+                  onSave={toggleSaved}
                 />
               ))}
             </div>
