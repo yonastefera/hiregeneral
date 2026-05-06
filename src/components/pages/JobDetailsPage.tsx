@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
+  ArrowRight,
   ArrowUpRight,
   Bookmark,
   BriefcaseBusiness,
@@ -24,11 +25,9 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { JobCard } from "@/components/jobs/JobCard";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
 import type { Job } from "@/lib/db/types";
-
-type JobCardJob = React.ComponentProps<typeof JobCard>["job"];
+import { htmlToText, cleanTextArray } from "@/lib/text/html";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -52,40 +51,375 @@ function formatSalary(
   return `Up to ${fmt(max!)}`;
 }
 
-function daysAgoLabel(postedAt: string) {
-  return Math.floor((Date.now() - new Date(postedAt).getTime()) / 86_400_000);
+function daysAgoLabel(postedAt: string | null | undefined) {
+  if (!postedAt) return 0;
+
+  const postedTime = new Date(postedAt).getTime();
+
+  if (Number.isNaN(postedTime)) return 0;
+
+  return Math.max(Math.floor((Date.now() - postedTime) / 86_400_000), 0);
 }
 
-function toCardShape(job: Job): JobCardJob {
+function cleanJob(job: Job): Job {
   return {
-    id: job.id,
-    slug: job.slug,
-    company: job.company_name,
-    logo: job.company_logo_url ?? job.company_name.slice(0, 2).toUpperCase(),
-    title: job.title,
-    location: job.location,
-    postedDaysAgo: daysAgoLabel(job.posted_at),
-    employmentType: job.employment_type,
-    summary: job.description.slice(0, 180),
-    description: job.description,
-    salary:
-      formatSalary(job.salary_min, job.salary_max, job.salary_currency) ??
-      undefined,
-    workMode: job.work_mode,
-    distance: 0,
-    skills: job.skills,
-    applicants: job.applicant_count ?? 0,
-    applyUrl: job.apply_url ?? undefined,
-
-    companyTagline: job.company_tagline ?? "",
-    companySize: job.company_size ?? "",
-    companyWebsite: job.company_website ?? "",
-    experienceLevel: job.experience_level ?? "",
-    category: job.category ?? "",
-    responsibilities: job.responsibilities ?? [],
-    requirements: job.requirements ?? [],
-    benefits: job.benefits ?? [],
+    ...job,
+    title: htmlToText(job.title),
+    description: htmlToText(job.description),
+    company_tagline: job.company_tagline
+      ? htmlToText(job.company_tagline)
+      : job.company_tagline,
+    responsibilities: cleanTextArray(job.responsibilities),
+    requirements: cleanTextArray(job.requirements),
+    benefits: cleanTextArray(job.benefits),
+    skills: job.skills ?? [],
   };
+}
+
+function compactText(value: string) {
+  return htmlToText(value)
+    .replace(/\s+/g, " ")
+    .replace(/\s+([,.;:])/g, "$1")
+    .trim();
+}
+
+function splitSentences(value: string, maxItems = 8) {
+  const cleaned = compactText(value);
+
+  if (!cleaned) return [];
+
+  return cleaned
+    .split(/(?<=[.!?])\s+(?=[A-Z0-9])/)
+    .map((item) => item.trim())
+    .filter((item) => item.length > 20)
+    .slice(0, maxItems);
+}
+
+function splitBullets(value: string, maxItems = 10) {
+  const cleaned = htmlToText(value)
+    .replace(/\r/g, "\n")
+    .replace(/•/g, "\n• ")
+    .replace(/\s*;\s*/g, "\n")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
+
+  const bulletItems = cleaned
+    .split(/\n|•| - | – /)
+    .map((item) => compactText(item))
+    .filter((item) => item.length > 12);
+
+  if (bulletItems.length > 1) {
+    return bulletItems.slice(0, maxItems);
+  }
+
+  return splitSentences(cleaned, maxItems);
+}
+
+type DerivedSections = {
+  about: string;
+  responsibilities: string[];
+  requirements: string[];
+  benefits: string[];
+  extra: string[];
+};
+
+function removeSectionHeading(value: string, headings: string[]) {
+  let result = compactText(value);
+
+  for (const heading of headings) {
+    const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    result = result.replace(new RegExp(`^${escaped}\\s*`, "i"), "");
+  }
+
+  return result.trim();
+}
+
+function deriveDescriptionSections(job: Job): DerivedSections {
+  const fullText = htmlToText(job.description)
+    .replace(/\r/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  const existingResponsibilities = cleanTextArray(job.responsibilities);
+  const existingRequirements = cleanTextArray(job.requirements);
+  const existingBenefits = cleanTextArray(job.benefits);
+
+  const sectionPattern =
+    /(Who we are|About the role|About Stripe|About the team|About this role|What you’ll do|What you'll do|Responsibilities|What we’re looking for|What we're looking for|Who you are|Minimum requirements|Preferred qualifications|Requirements|Qualifications|Benefits|Pay and benefits|Compensation|Salary)/gi;
+
+  const markers = [...fullText.matchAll(sectionPattern)].map((match) => ({
+    label: match[0],
+    index: match.index ?? 0,
+  }));
+
+  if (markers.length === 0) {
+    return {
+      about: splitSentences(fullText, 4).join(" "),
+      responsibilities: existingResponsibilities,
+      requirements: existingRequirements,
+      benefits: existingBenefits,
+      extra: [],
+    };
+  }
+
+  const chunks = markers.map((marker, index) => {
+    const next = markers[index + 1];
+    const raw = fullText.slice(marker.index, next?.index ?? fullText.length);
+
+    return {
+      label: marker.label.toLowerCase(),
+      text: raw,
+    };
+  });
+
+  const aboutChunks: string[] = [];
+  const responsibilityChunks: string[] = [];
+  const requirementChunks: string[] = [];
+  const benefitChunks: string[] = [];
+  const extraChunks: string[] = [];
+
+  for (const chunk of chunks) {
+    const label = chunk.label;
+
+    if (
+      label.includes("who we are") ||
+      label.includes("about") ||
+      label.includes("team")
+    ) {
+      aboutChunks.push(
+        removeSectionHeading(chunk.text, [
+          "Who we are",
+          "About the role",
+          "About Stripe",
+          "About the team",
+          "About this role",
+        ]),
+      );
+      continue;
+    }
+
+    if (label.includes("what you") || label.includes("responsibilities")) {
+      responsibilityChunks.push(
+        removeSectionHeading(chunk.text, [
+          "What you’ll do",
+          "What you'll do",
+          "Responsibilities",
+        ]),
+      );
+      continue;
+    }
+
+    if (
+      label.includes("looking for") ||
+      label.includes("who you are") ||
+      label.includes("requirements") ||
+      label.includes("qualifications")
+    ) {
+      requirementChunks.push(
+        removeSectionHeading(chunk.text, [
+          "What we’re looking for",
+          "What we're looking for",
+          "Who you are",
+          "Minimum requirements",
+          "Preferred qualifications",
+          "Requirements",
+          "Qualifications",
+        ]),
+      );
+      continue;
+    }
+
+    if (
+      label.includes("benefits") ||
+      label.includes("compensation") ||
+      label.includes("salary")
+    ) {
+      benefitChunks.push(
+        removeSectionHeading(chunk.text, [
+          "Benefits",
+          "Pay and benefits",
+          "Compensation",
+          "Salary",
+        ]),
+      );
+      continue;
+    }
+
+    extraChunks.push(chunk.text);
+  }
+
+  const about =
+    aboutChunks.length > 0
+      ? splitSentences(aboutChunks.join(" "), 4).join(" ")
+      : splitSentences(fullText, 4).join(" ");
+
+  const responsibilities =
+    existingResponsibilities.length > 0
+      ? existingResponsibilities
+      : splitBullets(responsibilityChunks.join("\n"), 8);
+
+  const requirements =
+    existingRequirements.length > 0
+      ? existingRequirements
+      : splitBullets(requirementChunks.join("\n"), 8);
+
+  const benefits =
+    existingBenefits.length > 0
+      ? existingBenefits
+      : splitBullets(benefitChunks.join("\n"), 6);
+
+  return {
+    about,
+    responsibilities,
+    requirements,
+    benefits,
+    extra: splitSentences(extraChunks.join(" "), 4),
+  };
+}
+
+function similarSummary(job: Job) {
+  const text = compactText(job.description);
+
+  if (text.length <= 110) return text;
+
+  return `${text.slice(0, 110).trim()}...`;
+}
+
+// ─── compact sidebar card ───────────────────────────────────────────────────
+
+function SimilarRoleCard({
+  job,
+  saved,
+  saving,
+  onSave,
+}: {
+  job: Job;
+  saved: boolean;
+  saving: boolean;
+  onSave: (jobId: string) => void;
+}) {
+  const router = useRouter();
+
+  const href = `/jobs/${job.slug ?? job.id}`;
+  const logoInitials = job.company_name.slice(0, 2).toUpperCase();
+  const postedDays = daysAgoLabel(job.posted_at);
+  const isExternal = Boolean(job.apply_url);
+
+  const goToDetails = () => {
+    router.push(href);
+  };
+
+  const onApply = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+
+    if (isExternal && job.apply_url) {
+      window.open(job.apply_url, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    router.push(`${href}/apply`);
+  };
+
+  const onSaveClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (saving) return;
+
+    onSave(job.id);
+  };
+
+  return (
+    <article className="rounded-xl border border-border bg-surface p-4 shadow-soft transition-colors hover:border-primary/40">
+      <div className="flex items-start gap-3">
+        <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-secondary text-xs font-bold text-secondary-foreground">
+          {logoInitials}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                {job.company_name}
+              </p>
+
+              <button
+                type="button"
+                onClick={goToDetails}
+                className="mt-1 line-clamp-2 text-left text-sm font-semibold leading-5 text-foreground hover:text-primary"
+              >
+                {job.title}
+              </button>
+            </div>
+
+            <button
+              type="button"
+              aria-label={saved ? "Remove saved job" : "Save job"}
+              aria-pressed={saved}
+              disabled={saving}
+              onClick={onSaveClick}
+              className="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:cursor-wait disabled:opacity-70"
+            >
+              {saving ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Bookmark
+                  className={
+                    saved ? "size-4 fill-current text-accent" : "size-4"
+                  }
+                />
+              )}
+            </button>
+          </div>
+
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <MapPin className="size-3" />
+              <span className="line-clamp-1">{job.location}</span>
+            </span>
+
+            <span className="inline-flex items-center gap-1">
+              <Clock3 className="size-3" />
+              {postedDays === 0 ? "Today" : `${postedDays}d ago`}
+            </span>
+          </div>
+
+          <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
+            {similarSummary(job)}
+          </p>
+
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <Badge variant="soft" className="text-[10px]">
+              {job.work_mode}
+            </Badge>
+
+            <Badge variant="secondary" className="text-[10px]">
+              {job.employment_type}
+            </Badge>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between border-t border-border/60 pt-3">
+            <button
+              type="button"
+              onClick={goToDetails}
+              className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:text-primary"
+            >
+              Details <ArrowRight className="size-3" />
+            </button>
+
+            <Button size="sm" onClick={onApply}>
+              Apply
+              {isExternal ? (
+                <ExternalLink className="size-3.5" />
+              ) : (
+                <ArrowRight className="size-3.5" />
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
 }
 
 // ─── component ──────────────────────────────────────────────────────────────
@@ -101,7 +435,6 @@ export default function JobDetailsPage() {
   const [related, setRelated] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch main job
   useEffect(() => {
     if (!slug) return;
 
@@ -113,14 +446,14 @@ export default function JobDetailsPage() {
         return res.json();
       })
       .then((data: Job) => {
-        setJob(data);
+        const cleanedJob = cleanJob(data);
+        setJob(cleanedJob);
 
-        // Fetch related jobs in same category
-        if (data.category) {
+        if (cleanedJob.category) {
           const params = new URLSearchParams({
-            category: data.category,
+            category: cleanedJob.category,
             pageSize: "3",
-            excludeId: data.id,
+            excludeId: cleanedJob.id,
           });
 
           return fetch(`/api/jobs?${params}`).then((res) => res.json());
@@ -130,14 +463,21 @@ export default function JobDetailsPage() {
       })
       .then((res) => {
         if (res?.data) {
-          setRelated(
-            res.data.filter((relatedJob: Job) => relatedJob.id !== slug),
-          );
+          const cleanedRelated = (res.data as Job[])
+            .map(cleanJob)
+            .filter((relatedJob) => relatedJob.slug !== slug);
+
+          setRelated(cleanedRelated);
         }
       })
       .catch(() => setJob(null))
       .finally(() => setLoading(false));
   }, [slug]);
+
+  const sections = useMemo(() => {
+    if (!job) return null;
+    return deriveDescriptionSections(job);
+  }, [job]);
 
   // ── Loading state ──
   if (loading) {
@@ -151,17 +491,20 @@ export default function JobDetailsPage() {
   }
 
   // ── Not found ──
-  if (!job) {
+  if (!job || !sections) {
     return (
       <main className="min-h-screen bg-background">
         <section className="mx-auto max-w-3xl px-4 py-24 text-center">
           <Badge variant="soft">Job not found</Badge>
+
           <h1 className="mt-5 text-3xl font-bold tracking-tight">
             This listing is no longer available
           </h1>
+
           <p className="mt-3 text-muted-foreground">
             The role you&apos;re looking for may have been filled or removed.
           </p>
+
           <Button variant="hero" className="mt-6" asChild>
             <Link href="/jobs">Back to all jobs</Link>
           </Button>
@@ -176,6 +519,7 @@ export default function JobDetailsPage() {
     job.salary_max,
     job.salary_currency,
   );
+
   const postedDays = daysAgoLabel(job.posted_at);
   const isExternal = Boolean(job.apply_url);
   const logoInitials = job.company_name.slice(0, 2).toUpperCase();
@@ -250,6 +594,7 @@ export default function JobDetailsPage() {
                 <p className="text-sm font-medium text-muted-foreground">
                   {job.company_name}
                 </p>
+
                 <h1 className="mt-1 text-balance text-3xl font-bold tracking-tight md:text-4xl">
                   {job.title}
                 </h1>
@@ -259,15 +604,18 @@ export default function JobDetailsPage() {
                     <MapPin className="size-4" />
                     {job.location}
                   </span>
+
                   <span className="inline-flex items-center gap-1.5">
                     <BriefcaseBusiness className="size-4" />
                     {job.employment_type}
                   </span>
+
                   <span className="inline-flex items-center gap-1.5">
                     <Clock3 className="size-4" />
                     Posted{" "}
                     {postedDays === 0 ? "today" : `${postedDays} days ago`}
                   </span>
+
                   <span className="inline-flex items-center gap-1.5">
                     <Users className="size-4" />
                     {job.applicant_count ?? 0} applicants
@@ -276,7 +624,9 @@ export default function JobDetailsPage() {
 
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   {salary && <Badge variant="success">{salary}</Badge>}
+
                   <Badge variant="soft">{job.work_mode}</Badge>
+
                   {job.experience_level && (
                     <Badge variant="soft">{job.experience_level}</Badge>
                   )}
@@ -325,23 +675,27 @@ export default function JobDetailsPage() {
       <section className="mx-auto grid max-w-7xl gap-8 px-4 py-10 lg:grid-cols-[1fr_340px]">
         <article className="space-y-8">
           {/* About */}
-          <div className="rounded-xl border border-border bg-surface p-6 shadow-soft md:p-8">
-            <h2 className="text-2xl font-bold tracking-tight">
-              About the role
-            </h2>
-            <p className="mt-4 text-base leading-7 text-muted-foreground">
-              {job.description}
-            </p>
-          </div>
+          {sections.about && (
+            <div className="rounded-xl border border-border bg-surface p-6 shadow-soft md:p-8">
+              <h2 className="text-2xl font-bold tracking-tight">
+                About the role
+              </h2>
+
+              <p className="mt-4 text-base leading-7 text-muted-foreground">
+                {sections.about}
+              </p>
+            </div>
+          )}
 
           {/* Responsibilities */}
-          {job.responsibilities.length > 0 && (
+          {sections.responsibilities.length > 0 && (
             <div className="rounded-xl border border-border bg-surface p-6 shadow-soft md:p-8">
               <h2 className="text-2xl font-bold tracking-tight">
                 What you&apos;ll do
               </h2>
+
               <ul className="mt-5 space-y-3">
-                {job.responsibilities.map((item) => (
+                {sections.responsibilities.map((item) => (
                   <li
                     key={item}
                     className="flex items-start gap-3 text-sm leading-6 text-muted-foreground"
@@ -355,13 +709,14 @@ export default function JobDetailsPage() {
           )}
 
           {/* Requirements */}
-          {job.requirements.length > 0 && (
+          {sections.requirements.length > 0 && (
             <div className="rounded-xl border border-border bg-surface p-6 shadow-soft md:p-8">
               <h2 className="text-2xl font-bold tracking-tight">
                 What we&apos;re looking for
               </h2>
+
               <ul className="mt-5 space-y-3">
-                {job.requirements.map((item) => (
+                {sections.requirements.map((item) => (
                   <li
                     key={item}
                     className="flex items-start gap-3 text-sm leading-6 text-muted-foreground"
@@ -375,11 +730,12 @@ export default function JobDetailsPage() {
           )}
 
           {/* Benefits */}
-          {job.benefits.length > 0 && (
+          {sections.benefits.length > 0 && (
             <div className="rounded-xl border border-border bg-surface p-6 shadow-soft md:p-8">
               <h2 className="text-2xl font-bold tracking-tight">Benefits</h2>
+
               <div className="mt-5 grid gap-3 md:grid-cols-2">
-                {job.benefits.map((item) => (
+                {sections.benefits.map((item) => (
                   <div
                     key={item}
                     className="flex items-start gap-3 rounded-lg border border-border bg-background p-4 text-sm text-muted-foreground"
@@ -392,10 +748,26 @@ export default function JobDetailsPage() {
             </div>
           )}
 
+          {/* Additional info */}
+          {sections.extra.length > 0 && (
+            <div className="rounded-xl border border-border bg-surface p-6 shadow-soft md:p-8">
+              <h2 className="text-2xl font-bold tracking-tight">
+                Additional details
+              </h2>
+
+              <div className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground">
+                {sections.extra.map((item) => (
+                  <p key={item}>{item}</p>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Skills */}
           {job.skills.length > 0 && (
             <div className="rounded-xl border border-border bg-surface p-6 shadow-soft md:p-8">
               <h2 className="text-2xl font-bold tracking-tight">Skills</h2>
+
               <div className="mt-4 flex flex-wrap gap-2">
                 {job.skills.map((skill) => (
                   <Badge key={skill} variant="secondary" className="gap-1">
@@ -412,11 +784,13 @@ export default function JobDetailsPage() {
             <h2 className="text-2xl font-bold tracking-tight">
               Ready to apply?
             </h2>
+
             <p className="mt-3 max-w-xl text-sm leading-6 text-primary-foreground/80">
               {isExternal
                 ? `Applications are reviewed directly by the ${job.company_name} hiring team. You'll be redirected to their careers page.`
                 : "Submit your HireGeneral profile and resume to apply in one click."}
             </p>
+
             <div className="mt-5 flex flex-wrap gap-2">
               <Button variant="warm" size="lg" onClick={onApply}>
                 {isExternal ? (
@@ -540,7 +914,7 @@ export default function JobDetailsPage() {
               {job.category && (
                 <div className="flex justify-between gap-4">
                   <dt className="text-muted-foreground">Category</dt>
-                  <dd className="font-medium">{job.category}</dd>
+                  <dd className="text-right font-medium">{job.category}</dd>
                 </div>
               )}
             </dl>
@@ -553,9 +927,9 @@ export default function JobDetailsPage() {
               </h3>
 
               {related.map((item) => (
-                <JobCard
+                <SimilarRoleCard
                   key={item.id}
-                  job={toCardShape(item)}
+                  job={item}
                   saved={isSaved(item.id)}
                   saving={pendingId === item.id}
                   onSave={toggleSaved}

@@ -1,8 +1,16 @@
 // app/api/jobs/[slug]/route.ts
-import { createClient } from "@/lib/supabase/server";
+
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { htmlToText, cleanTextArray } from "@/lib/text/html";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+);
 
 type JobApplicantCountRow = {
   applicant_count: number | null;
@@ -14,71 +22,140 @@ type JobRow = {
   company_id: string | null;
   company_name: string;
   company_logo_url: string | null;
-  company_tagline: string | null;
-  company_size: string | null;
-  company_website: string | null;
   title: string;
   description: string;
-  responsibilities: string[];
-  requirements: string[];
-  benefits: string[];
   location: string;
+  latitude: number | null;
+  longitude: number | null;
   employment_type: string;
   work_mode: string;
-  experience_level: string | null;
-  category: string | null;
   salary_min: number | null;
   salary_max: number | null;
   salary_currency: string;
   skills: string[];
   status: string;
-  slug: string | null;
-  apply_url: string | null;
-  source_name: string | null;
   posted_at: string;
   expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+  slug: string | null;
+  source_name: string | null;
+  source_id: string | null;
+  apply_url: string | null;
+  responsibilities: string[];
+  requirements: string[];
+  benefits: string[];
+  experience_level: string | null;
+  category: string | null;
+  company_tagline: string | null;
+  company_size: string | null;
+  company_website: string | null;
   job_applicant_counts?: JobApplicantCountRow[] | null;
 };
 
-type JobResponse = Omit<JobRow, "job_applicant_counts"> & {
-  applicant_count: number;
-};
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
+function cleanJob(job: JobRow) {
+  const { job_applicant_counts, ...rest } = job;
+
+  return {
+    ...rest,
+    title: htmlToText(rest.title),
+    description: htmlToText(rest.description),
+    company_tagline: rest.company_tagline
+      ? htmlToText(rest.company_tagline)
+      : rest.company_tagline,
+    responsibilities: cleanTextArray(rest.responsibilities),
+    requirements: cleanTextArray(rest.requirements),
+    benefits: cleanTextArray(rest.benefits),
+    skills: rest.skills ?? [],
+    applicant_count: job_applicant_counts?.[0]?.applicant_count ?? 0,
+  };
+}
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ slug: string }> },
+  context: { params: Promise<{ slug: string }> },
 ) {
-  const { slug } = await params;
-  const supabase = await createClient();
+  try {
+    const { slug } = await context.params;
 
-  const { data, error } = await supabase
-    .from("jobs")
-    .select(
-      `
-      id, recruiter_id, company_id,
-      company_name, company_logo_url, company_tagline, company_size, company_website,
-      title, description, responsibilities, requirements, benefits,
-      location, employment_type, work_mode, experience_level, category,
-      salary_min, salary_max, salary_currency, skills,
-      status, slug, apply_url, source_name,
-      posted_at, expires_at,
-      job_applicant_counts ( applicant_count )
-    `,
-    )
-    .eq("slug", slug)
-    .eq("status", "published")
-    .single();
+    if (!slug) {
+      return NextResponse.json({ error: "Missing job slug" }, { status: 400 });
+    }
 
-  if (error || !data) {
-    return NextResponse.json({ error: "Job not found" }, { status: 404 });
+    let query = supabaseAdmin
+      .from("jobs")
+      .select(
+        `
+        id,
+        recruiter_id,
+        company_id,
+        company_name,
+        company_logo_url,
+        company_tagline,
+        company_size,
+        company_website,
+        title,
+        description,
+        responsibilities,
+        requirements,
+        benefits,
+        location,
+        latitude,
+        longitude,
+        employment_type,
+        work_mode,
+        experience_level,
+        category,
+        salary_min,
+        salary_max,
+        salary_currency,
+        skills,
+        status,
+        slug,
+        apply_url,
+        source_name,
+        source_id,
+        posted_at,
+        expires_at,
+        created_at,
+        updated_at,
+        job_applicant_counts ( applicant_count )
+      `,
+      )
+      .eq("status", "published")
+      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
+
+    query = isUuid(slug)
+      ? query.or(`slug.eq.${slug},id.eq.${slug}`)
+      : query.eq("slug", slug);
+
+    const { data, error } = await query.maybeSingle();
+
+    if (error) {
+      console.error("[GET /api/jobs/[slug]] Supabase error:", error);
+
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (!data) {
+      return NextResponse.json({ error: "Job not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(cleanJob(data as JobRow));
+  } catch (error) {
+    console.error("[GET /api/jobs/[slug]] Fatal error:", error);
+
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "Unknown server error",
+      },
+      { status: 500 },
+    );
   }
-
-  const { job_applicant_counts, ...jobData } = data as JobRow;
-
-  const job: JobResponse = {
-    ...jobData,
-    applicant_count: job_applicant_counts?.[0]?.applicant_count ?? 0,
-  };
-
-  return NextResponse.json(job);
 }

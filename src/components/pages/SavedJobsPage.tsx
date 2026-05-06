@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -18,27 +18,167 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
-import { featuredJobs } from "@/data/jobPlatform";
-import {
-  ApplicationRecord,
-  SavedJobRecord,
-  demoApplications,
-  demoSavedJobs,
-  formatPrettyDate,
-} from "@/data/savedJobsDemo";
 
 const PAGE_SIZE = 8;
 const INACTIVE_DAYS = 60;
+
+type SavedJobRecord = {
+  id: string;
+  jobId: string;
+  title: string;
+  company: string;
+  logo: string;
+  location: string;
+  salary?: string;
+  savedAt: string;
+  active: boolean;
+  slug: string;
+};
+
+type ApplicationRecord = {
+  id: string;
+  jobId: string;
+  title: string;
+  company: string;
+  logo: string;
+  location: string;
+  resumeName: string;
+  resumeUrl: string;
+  appliedAt: string;
+  receivedAt: string;
+  status:
+    | "submitted"
+    | "reviewed"
+    | "reviewing"
+    | "interview"
+    | "offer"
+    | "closed"
+    | "rejected"
+    | "withdrawn";
+  slug: string;
+};
+
+type ApiJob = {
+  id: string;
+  title: string;
+  company_name: string;
+  company_logo_url: string | null;
+  location: string;
+  salary_min?: number | null;
+  salary_max?: number | null;
+  salary_currency?: string | null;
+  status?: string | null;
+  slug: string | null;
+};
+
+type SavedApiRow = {
+  id: string;
+  created_at: string;
+  jobs: ApiJob | null;
+};
+
+type ApplicationApiRow = {
+  id: string;
+  status: string;
+  created_at: string;
+  resume_url: string | null;
+  jobs: ApiJob | null;
+};
 
 const isWithin = (iso: string, days: number) => {
   const diff = (Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24);
   return diff <= days;
 };
 
+function formatPrettyDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
+function formatSalary(
+  min: number | null | undefined,
+  max: number | null | undefined,
+  currency = "USD",
+) {
+  if (!min && !max) return undefined;
+
+  const fmt = (n: number) =>
+    Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 0,
+    }).format(n);
+
+  if (min && max) return `${fmt(min)} - ${fmt(max)}`;
+  if (min) return `From ${fmt(min)}`;
+
+  return `Up to ${fmt(max!)}`;
+}
+
+function logoFor(job: ApiJob) {
+  return job.company_logo_url ?? job.company_name.slice(0, 2).toUpperCase();
+}
+
+function resumeName(path: string | null) {
+  if (!path) return "Submitted resume";
+
+  return path.split("/").pop() ?? "Submitted resume";
+}
+
+function toSavedRecord(row: SavedApiRow): SavedJobRecord | null {
+  if (!row.jobs) return null;
+
+  return {
+    id: row.id,
+    jobId: row.jobs.id,
+    slug: row.jobs.slug ?? row.jobs.id,
+    title: row.jobs.title,
+    company: row.jobs.company_name,
+    logo: logoFor(row.jobs),
+    location: row.jobs.location,
+    salary: formatSalary(
+      row.jobs.salary_min,
+      row.jobs.salary_max,
+      row.jobs.salary_currency ?? "USD",
+    ),
+    savedAt: row.created_at,
+    active: row.jobs.status !== "closed",
+  };
+}
+
+function toApplicationRecord(row: ApplicationApiRow): ApplicationRecord | null {
+  if (!row.jobs) return null;
+
+  return {
+    id: row.id,
+    jobId: row.jobs.id,
+    slug: row.jobs.slug ?? row.jobs.id,
+    title: row.jobs.title,
+    company: row.jobs.company_name,
+    logo: logoFor(row.jobs),
+    location: row.jobs.location,
+    resumeName: resumeName(row.resume_url),
+    resumeUrl: row.resume_url ?? "#",
+    appliedAt: row.created_at,
+    receivedAt: row.created_at,
+    status: row.status as ApplicationRecord["status"],
+  };
+}
+
 function CompanyAvatar({ logo }: { logo: string }) {
+  const isUrl = logo.startsWith("http");
+
   return (
-    <div className="flex size-12 shrink-0 items-center justify-center rounded-md bg-secondary text-sm font-semibold text-secondary-foreground">
-      {logo}
+    <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-secondary text-sm font-semibold text-secondary-foreground">
+      {isUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={logo} alt="" className="size-full object-contain" />
+      ) : (
+        logo
+      )}
     </div>
   );
 }
@@ -131,8 +271,12 @@ const statusColor: Record<
 > = {
   submitted: "soft",
   reviewed: "secondary",
+  reviewing: "secondary",
   interview: "warm",
+  offer: "success",
   closed: "soft",
+  rejected: "soft",
+  withdrawn: "soft",
 };
 
 function ApplicationCard({
@@ -163,7 +307,10 @@ function ApplicationCard({
               </button>
             </div>
 
-            <Badge variant={statusColor[item.status]} className="capitalize">
+            <Badge
+              variant={statusColor[item.status] ?? "soft"}
+              className="capitalize"
+            >
               {item.status}
             </Badge>
           </div>
@@ -209,50 +356,103 @@ export default function SavedJobsPage() {
 
   const [savedVisible, setSavedVisible] = useState(PAGE_SIZE);
   const [appsVisible, setAppsVisible] = useState(PAGE_SIZE);
+  const [savedRows, setSavedRows] = useState<SavedApiRow[]>([]);
+  const [applicationRows, setApplicationRows] = useState<ApplicationApiRow[]>(
+    [],
+  );
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const { savedIds, toggleSaved, pendingId } = useSavedJobs();
+  const { toggleSaved, pendingId } = useSavedJobs();
 
-  const liveSaved: SavedJobRecord[] = useMemo(() => {
-    const fromUser: SavedJobRecord[] = savedIds
-      .map((id) => featuredJobs.find((job) => job.id === id))
-      .filter((job): job is NonNullable<typeof job> => Boolean(job))
-      .map((job) => ({
-        id: `live-${job.id}`,
-        jobId: job.id,
-        slug: job.slug,
-        title: job.title,
-        company: job.company,
-        logo: job.logo,
-        location: job.location,
-        salary: job.salary,
-        savedAt: new Date().toISOString(),
-        active: true,
-      }));
+  useEffect(() => {
+    let active = true;
 
-    if (fromUser.length > 0) return fromUser;
+    async function loadActivity() {
+      setLoading(true);
+      setLoadError(null);
 
-    return demoSavedJobs;
-  }, [savedIds]);
+      try {
+        const [savedResponse, applicationsResponse] = await Promise.all([
+          fetch("/api/saved-jobs", { cache: "no-store" }),
+          fetch("/api/applications", { cache: "no-store" }),
+        ]);
+
+        if (
+          savedResponse.status === 401 ||
+          applicationsResponse.status === 401
+        ) {
+          router.replace("/signin?next=/saved-jobs");
+          return;
+        }
+
+        if (!savedResponse.ok) throw new Error("Could not load saved jobs.");
+        if (!applicationsResponse.ok) {
+          throw new Error("Could not load applications.");
+        }
+
+        const [savedBody, applicationsBody] = await Promise.all([
+          savedResponse.json(),
+          applicationsResponse.json(),
+        ]);
+
+        if (!active) return;
+
+        setSavedRows(Array.isArray(savedBody.data) ? savedBody.data : []);
+        setApplicationRows(
+          Array.isArray(applicationsBody.data) ? applicationsBody.data : [],
+        );
+      } catch (error) {
+        if (!active) return;
+
+        setLoadError(
+          error instanceof Error ? error.message : "Could not load activity.",
+        );
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    loadActivity();
+
+    return () => {
+      active = false;
+    };
+  }, [router]);
 
   const savedFiltered = useMemo(
     () =>
-      liveSaved.filter(
-        (savedJob) =>
-          savedJob.active && isWithin(savedJob.savedAt, INACTIVE_DAYS),
-      ),
-    [liveSaved],
+      savedRows
+        .map(toSavedRecord)
+        .filter((item): item is SavedJobRecord => Boolean(item))
+        .filter(
+          (savedJob) =>
+            savedJob.active && isWithin(savedJob.savedAt, INACTIVE_DAYS),
+        ),
+    [savedRows],
   );
 
   const appsFiltered = useMemo(
     () =>
-      demoApplications.filter((application) =>
-        isWithin(application.appliedAt, INACTIVE_DAYS),
-      ),
-    [],
+      applicationRows
+        .map(toApplicationRecord)
+        .filter((item): item is ApplicationRecord => Boolean(item))
+        .filter((application) =>
+          isWithin(application.appliedAt, INACTIVE_DAYS),
+        ),
+    [applicationRows],
   );
 
   const openJob = (slug: string) => {
     router.push(`/jobs/${slug}`);
+  };
+
+  const onUnsave = async (jobId: string) => {
+    const saved = await toggleSaved(jobId);
+
+    if (!saved) {
+      setSavedRows((rows) => rows.filter((row) => row.jobs?.id !== jobId));
+    }
   };
 
   return (
@@ -271,98 +471,116 @@ export default function SavedJobsPage() {
           </p>
         </div>
 
-        <Tabs defaultValue="saved" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 sm:w-80">
-            <TabsTrigger value="saved">
-              Saved jobs ({savedFiltered.length})
-            </TabsTrigger>
+        {loading ? (
+          <div className="flex items-center justify-center rounded-lg border border-border bg-card p-12 text-muted-foreground">
+            <Loader2 className="mr-2 size-5 animate-spin" />
+            Loading your activity...
+          </div>
+        ) : loadError ? (
+          <EmptyState
+            title="Could not load your activity"
+            description={loadError}
+            action={
+              <Button onClick={() => window.location.reload()}>
+                Try again
+              </Button>
+            }
+          />
+        ) : (
+          <Tabs defaultValue="saved" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 sm:w-80">
+              <TabsTrigger value="saved">
+                Saved jobs ({savedFiltered.length})
+              </TabsTrigger>
 
-            <TabsTrigger value="applications">
-              Applications ({appsFiltered.length})
-            </TabsTrigger>
-          </TabsList>
+              <TabsTrigger value="applications">
+                Applications ({appsFiltered.length})
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="saved" className="mt-6">
-            {savedFiltered.length === 0 ? (
-              <EmptyState
-                title="No saved jobs yet"
-                description="Tap the bookmark on any job to save it for later."
-                action={
-                  <Button asChild>
-                    <Link href="/jobs">Browse jobs</Link>
-                  </Button>
-                }
-              />
-            ) : (
-              <>
-                <div className="grid gap-3">
-                  {savedFiltered.slice(0, savedVisible).map((item) => (
-                    <SavedCard
-                      key={item.id}
-                      item={item}
-                      onOpen={openJob}
-                      onUnsave={toggleSaved}
-                      unsaving={pendingId === item.jobId}
-                    />
-                  ))}
-                </div>
-
-                {savedVisible < savedFiltered.length && (
-                  <div className="mt-6 flex justify-center">
-                    <Button
-                      variant="outline"
-                      onClick={() =>
-                        setSavedVisible((count) => count + PAGE_SIZE)
-                      }
-                    >
-                      Load more ({savedFiltered.length - savedVisible}{" "}
-                      remaining)
+            <TabsContent value="saved" className="mt-6">
+              {savedFiltered.length === 0 ? (
+                <EmptyState
+                  title="No saved jobs yet"
+                  description="Tap the bookmark on any job to save it for later."
+                  action={
+                    <Button asChild>
+                      <Link href="/jobs">Browse jobs</Link>
                     </Button>
+                  }
+                />
+              ) : (
+                <>
+                  <div className="grid gap-3">
+                    {savedFiltered.slice(0, savedVisible).map((item) => (
+                      <SavedCard
+                        key={item.id}
+                        item={item}
+                        onOpen={openJob}
+                        onUnsave={onUnsave}
+                        unsaving={pendingId === item.jobId}
+                      />
+                    ))}
                   </div>
-                )}
-              </>
-            )}
-          </TabsContent>
 
-          <TabsContent value="applications" className="mt-6">
-            {appsFiltered.length === 0 ? (
-              <EmptyState
-                title="No applications sent"
-                description="When you apply to a role, it will show up here with the resume you submitted."
-                action={
-                  <Button asChild>
-                    <Link href="/jobs">Find roles</Link>
-                  </Button>
-                }
-              />
-            ) : (
-              <>
-                <div className="grid gap-3">
-                  {appsFiltered.slice(0, appsVisible).map((item) => (
-                    <ApplicationCard
-                      key={item.id}
-                      item={item}
-                      onOpen={openJob}
-                    />
-                  ))}
-                </div>
+                  {savedVisible < savedFiltered.length && (
+                    <div className="mt-6 flex justify-center">
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          setSavedVisible((count) => count + PAGE_SIZE)
+                        }
+                      >
+                        Load more ({savedFiltered.length - savedVisible}{" "}
+                        remaining)
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+            </TabsContent>
 
-                {appsVisible < appsFiltered.length && (
-                  <div className="mt-6 flex justify-center">
-                    <Button
-                      variant="outline"
-                      onClick={() =>
-                        setAppsVisible((count) => count + PAGE_SIZE)
-                      }
-                    >
-                      Load more ({appsFiltered.length - appsVisible} remaining)
+            <TabsContent value="applications" className="mt-6">
+              {appsFiltered.length === 0 ? (
+                <EmptyState
+                  title="No applications sent"
+                  description="When you apply to a role, it will show up here with the resume you submitted."
+                  action={
+                    <Button asChild>
+                      <Link href="/jobs">Find roles</Link>
                     </Button>
+                  }
+                />
+              ) : (
+                <>
+                  <div className="grid gap-3">
+                    {appsFiltered.slice(0, appsVisible).map((item) => (
+                      <ApplicationCard
+                        key={item.id}
+                        item={item}
+                        onOpen={openJob}
+                      />
+                    ))}
                   </div>
-                )}
-              </>
-            )}
-          </TabsContent>
-        </Tabs>
+
+                  {appsVisible < appsFiltered.length && (
+                    <div className="mt-6 flex justify-center">
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          setAppsVisible((count) => count + PAGE_SIZE)
+                        }
+                      >
+                        Load more ({appsFiltered.length - appsVisible}{" "}
+                        remaining)
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+            </TabsContent>
+          </Tabs>
+        )}
       </section>
     </main>
   );
