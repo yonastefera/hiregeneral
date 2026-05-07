@@ -70,7 +70,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const sources = getEnabledJobSources();
+    const sources = await getEnabledJobSources();
     const sourcesResult: SourceResult[] = [];
 
     for (const source of sources) {

@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   CalendarDays,
-  Loader2,
   MapPin,
   Search,
   SlidersHorizontal,
@@ -25,89 +24,28 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { JobCard } from "@/components/jobs/JobCard";
+import { JobCardSkeleton } from "@/components/jobs/JobLoadingSkeletons";
 import { keywordSuggestions, locationSuggestions } from "@/data/suggestions";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
+import { toJobCardShape } from "@/lib/jobs/card-shape";
 import { cn } from "@/lib/utils";
 import type { Job } from "@/lib/db/types";
 
 const DEFAULT_POSTED = "30";
 const DEFAULT_DISTANCE = "100";
 const PAGE_SIZE = 10;
+const SEARCH_DEBOUNCE_MS = 300;
 
-type JobCardJob = React.ComponentProps<typeof JobCard>["job"];
+function useDebouncedValue(value: string, delay: number) {
+  const [debounced, setDebounced] = useState(value);
 
-function formatSalary(
-  min: number | null,
-  max: number | null,
-  currency = "USD",
-) {
-  if (!min && !max) return undefined;
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebounced(value), delay);
 
-  const fmt = (n: number) =>
-    Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 0,
-    }).format(n);
+    return () => window.clearTimeout(timeout);
+  }, [value, delay]);
 
-  if (min && max) return `${fmt(min)} – ${fmt(max)}`;
-  if (min) return `From ${fmt(min)}`;
-
-  return `Up to ${fmt(max!)}`;
-}
-
-function daysAgoLabel(postedAt: string | null | undefined) {
-  if (!postedAt) return 0;
-
-  const postedTime = new Date(postedAt).getTime();
-
-  if (Number.isNaN(postedTime)) return 0;
-
-  const days = Math.floor((Date.now() - postedTime) / 86_400_000);
-
-  return Math.max(days, 0);
-}
-
-function toCardShape(job: Job): JobCardJob {
-  return {
-    id: job.id,
-    slug: job.slug ?? job.id,
-
-    company: job.company_name,
-    logo: job.company_logo_url ?? job.company_name.slice(0, 2).toUpperCase(),
-
-    title: job.title,
-    location: job.location,
-    postedDaysAgo: daysAgoLabel(job.posted_at),
-    employmentType: job.employment_type,
-
-    summary: job.description ? job.description.slice(0, 180) : "",
-    description: job.description ?? "",
-
-    salary: formatSalary(
-      job.salary_min,
-      job.salary_max,
-      job.salary_currency ?? "USD",
-    ),
-
-    workMode: job.work_mode,
-    distance: 0,
-
-    skills: job.skills ?? [],
-    applicants: job.applicant_count ?? 0,
-
-    applyUrl: job.apply_url ?? undefined,
-
-    companyTagline: job.company_tagline ?? "",
-    companySize: job.company_size ?? "",
-    companyWebsite: job.company_website ?? "",
-    experienceLevel: job.experience_level ?? "",
-    category: job.category ?? "",
-
-    responsibilities: job.responsibilities ?? [],
-    requirements: job.requirements ?? [],
-    benefits: job.benefits ?? [],
-  };
+  return debounced;
 }
 
 export default function JobsPage() {
@@ -129,15 +67,22 @@ export default function JobsPage() {
   const [totalJobs, setTotalJobs] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const hasLoadedOnceRef = useRef(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const debouncedQuery = useDebouncedValue(query.trim(), SEARCH_DEBOUNCE_MS);
+  const debouncedLocation = useDebouncedValue(
+    location.trim(),
+    SEARCH_DEBOUNCE_MS,
+  );
 
   const { isSaved, toggleSaved, pendingId } = useSavedJobs();
 
   useEffect(() => {
     const next = new URLSearchParams();
 
-    if (query) next.set("q", query);
-    if (location) next.set("location", location);
+    if (debouncedQuery) next.set("q", debouncedQuery);
+    if (debouncedLocation) next.set("location", debouncedLocation);
     if (dateFilter !== DEFAULT_POSTED) next.set("posted", dateFilter);
     if (distance !== DEFAULT_DISTANCE) next.set("distance", distance);
     if (page > 1) next.set("page", String(page));
@@ -151,8 +96,8 @@ export default function JobsPage() {
       });
     }
   }, [
-    query,
-    location,
+    debouncedQuery,
+    debouncedLocation,
     dateFilter,
     distance,
     page,
@@ -179,12 +124,12 @@ export default function JobsPage() {
           daysAgo: dateFilter,
         });
 
-        if (query.trim()) {
-          params.set("query", query.trim());
+        if (debouncedQuery) {
+          params.set("query", debouncedQuery);
         }
 
-        if (location.trim()) {
-          params.set("location", location.trim());
+        if (debouncedLocation) {
+          params.set("location", debouncedLocation);
         }
 
         const response = await fetch(`/api/jobs?${params.toString()}`, {
@@ -209,12 +154,17 @@ export default function JobsPage() {
         setJobs(nextJobs);
         setTotalJobs(Number(body.total ?? nextJobs.length));
         setTotalPages(Number(body.totalPages ?? 1));
+        hasLoadedOnceRef.current = true;
+        setHasLoadedOnce(true);
       } catch (error) {
         if (!active) return;
 
-        setJobs([]);
-        setTotalJobs(0);
-        setTotalPages(1);
+        if (!hasLoadedOnceRef.current) {
+          setJobs([]);
+          setTotalJobs(0);
+          setTotalPages(1);
+        }
+
         setLoadError(
           error instanceof Error ? error.message : "Could not load jobs.",
         );
@@ -230,9 +180,9 @@ export default function JobsPage() {
     return () => {
       active = false;
     };
-  }, [page, query, location, dateFilter]);
+  }, [page, debouncedQuery, debouncedLocation, dateFilter]);
 
-  const cardJobs = useMemo(() => jobs.map(toCardShape), [jobs]);
+  const cardJobs = useMemo(() => jobs.map(toJobCardShape), [jobs]);
 
   const filteredJobs = useMemo(
     () =>
@@ -409,7 +359,7 @@ export default function JobsPage() {
           <div className="flex items-end justify-between gap-4">
             <div>
               <p className="text-sm text-muted-foreground">
-                {loading ? (
+                {loading && !hasLoadedOnce ? (
                   "Loading jobs..."
                 ) : (
                   <>
@@ -423,6 +373,9 @@ export default function JobsPage() {
                           {Math.min(currentPage * PAGE_SIZE, totalJobs)}
                         </span>
                       </>
+                    )}
+                    {loading && hasLoadedOnce && (
+                      <span className="ml-2 text-primary">Updating...</span>
                     )}
                   </>
                 )}
@@ -438,10 +391,11 @@ export default function JobsPage() {
             </Button>
           </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center rounded-xl border border-border bg-card p-10 text-muted-foreground">
-              <Loader2 className="mr-2 size-5 animate-spin" />
-              Loading jobs...
+          {loading && !hasLoadedOnce ? (
+            <div className="space-y-4" aria-label="Loading jobs">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <JobCardSkeleton key={index} />
+              ))}
             </div>
           ) : loadError ? (
             <div className="rounded-xl border border-dashed border-destructive/40 bg-card p-10 text-center">
@@ -479,8 +433,8 @@ export default function JobsPage() {
                 ))}
               </div>
 
-              {totalPages > 1 && (
-                <Pagination className="pt-2">
+              <div className="flex flex-col items-center gap-3 pt-2">
+                <Pagination>
                   <PaginationContent>
                     <PaginationItem>
                       <PaginationPrevious
@@ -529,7 +483,11 @@ export default function JobsPage() {
                     </PaginationItem>
                   </PaginationContent>
                 </Pagination>
-              )}
+
+                <p className="text-xs text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </p>
+              </div>
             </>
           )}
         </div>

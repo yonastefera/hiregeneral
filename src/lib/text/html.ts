@@ -14,7 +14,13 @@ function decodeHtmlEntities(value: string) {
     .replace(/&lsquo;/gi, "‘")
     .replace(/&rdquo;/gi, "”")
     .replace(/&ldquo;/gi, "“")
-    .replace(/&bull;/gi, "•");
+    .replace(/&bull;/gi, "•")
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) =>
+      String.fromCodePoint(Number.parseInt(hex, 16)),
+    )
+    .replace(/&#(\d+);/g, (_, decimal: string) =>
+      String.fromCodePoint(Number.parseInt(decimal, 10)),
+    );
 }
 
 export function htmlToText(input: string | null | undefined) {

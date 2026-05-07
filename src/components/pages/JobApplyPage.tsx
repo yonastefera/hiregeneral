@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/lib/supabase/client";
+import { isSupportedLogoUrl } from "@/lib/logos";
 import { cn } from "@/lib/utils";
 import type { Job } from "@/lib/db/types";
 
@@ -62,14 +63,11 @@ function formatSalary(
   return `Up to ${fmt(max!)}`;
 }
 
-// ─── component ──────────────────────────────────────────────────────────────
-
 export default function JobApplyPage() {
   const router = useRouter();
   const params = useParams<{ slug: string }>();
   const slug = params?.slug;
 
-  // ── Job data ──
   const [job, setJob] = useState<Job | null>(null);
   const [jobLoading, setJobLoading] = useState(true);
 
@@ -351,6 +349,11 @@ export default function JobApplyPage() {
     job.salary_max,
     job.salary_currency,
   );
+  const logoUrl = job.company_logo_url
+    ? isSupportedLogoUrl(job.company_logo_url)
+      ? job.company_logo_url
+      : null
+    : null;
 
   return (
     <main className="min-h-screen bg-background">
@@ -795,9 +798,9 @@ export default function JobApplyPage() {
         <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
           <div className="rounded-lg border border-border bg-card p-5">
             <div className="flex items-center gap-3">
-              {job.company_logo_url ? (
+              {logoUrl ? (
                 <Image
-                  src={job.company_logo_url}
+                  src={logoUrl}
                   alt={`${job.company_name} logo`}
                   width={40}
                   height={40}

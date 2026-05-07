@@ -31,9 +31,10 @@ type LeverPosting = {
 
 export async function fetchLeverJobs(params: {
   companyName: string;
+  companyLogoUrl?: string;
   sourceSlug: string;
 }): Promise<ImportedJob[]> {
-  const { companyName, sourceSlug } = params;
+  const { companyLogoUrl, companyName, sourceSlug } = params;
 
   const recruiterId = process.env.SYSTEM_RECRUITER_ID;
 
@@ -76,7 +77,7 @@ export async function fetchLeverJobs(params: {
 
       companyId: null,
       companyName,
-      companyLogoUrl: null,
+      companyLogoUrl: companyLogoUrl ?? null,
 
       title: job.text,
       description: safeDescription({

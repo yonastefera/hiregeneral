@@ -19,7 +19,6 @@ function write(ids: string[]) {
 
 export function useSavedJobs() {
   const [ids, setIds] = useState<string[]>([]);
-  const [pendingId, setPendingId] = useState<string | null>(null);
 
   useEffect(() => {
     const sync = () => setIds(read());
@@ -56,7 +55,13 @@ export function useSavedJobs() {
   const isSaved = useCallback((jobId: string) => ids.includes(jobId), [ids]);
 
   const toggleSaved = useCallback(async (jobId: string) => {
-    setPendingId(jobId);
+    const previous = read();
+    const next = previous.includes(jobId)
+      ? previous.filter((id) => id !== jobId)
+      : [...previous, jobId];
+
+    write(next);
+    setIds(next);
 
     try {
       const response = await fetch("/api/saved-jobs", {
@@ -68,27 +73,19 @@ export function useSavedJobs() {
       if (!response.ok) throw new Error("Could not update saved job.");
 
       const body = (await response.json()) as { saved: boolean };
-      const current = read();
-      const next = body.saved
-        ? Array.from(new Set([...current, jobId]))
-        : current.filter((id) => id !== jobId);
+      const confirmed = body.saved
+        ? Array.from(new Set([...read(), jobId]))
+        : read().filter((id) => id !== jobId);
 
-      write(next);
-      setIds(next);
+      write(confirmed);
+      setIds(confirmed);
       return body.saved;
     } catch {
-      const current = read();
-      const next = current.includes(jobId)
-        ? current.filter((id) => id !== jobId)
-        : [...current, jobId];
-
-      write(next);
-      setIds(next);
-      return next.includes(jobId);
-    } finally {
-      setPendingId(null);
+      write(previous);
+      setIds(previous);
+      return previous.includes(jobId);
     }
   }, []);
 
-  return { savedIds: ids, isSaved, toggleSaved, pendingId };
+  return { savedIds: ids, isSaved, toggleSaved, pendingId: null };
 }

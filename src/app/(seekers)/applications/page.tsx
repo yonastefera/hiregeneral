@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { isSupportedLogoUrl } from "@/lib/logos";
 import { supabase } from "@/lib/supabase/client";
 
 type ApplicationStatus =
@@ -154,6 +155,10 @@ export default function ApplicationsPage() {
               if (!job) return null;
 
               const logoInitials = job.company_name.slice(0, 2).toUpperCase();
+              const logoUrl =
+                job.company_logo_url && isSupportedLogoUrl(job.company_logo_url)
+                  ? job.company_logo_url
+                  : null;
 
               const daysAgo = Math.floor(
                 (Date.now() - new Date(app.created_at).getTime()) / 86_400_000,
@@ -165,9 +170,9 @@ export default function ApplicationsPage() {
                   className="rounded-2xl border border-border bg-surface p-5 shadow-soft"
                 >
                   <div className="flex items-start gap-4">
-                    {job.company_logo_url ? (
+                    {logoUrl ? (
                       <Image
-                        src={job.company_logo_url}
+                        src={logoUrl}
                         alt={job.company_name}
                         width={48}
                         height={48}

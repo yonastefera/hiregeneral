@@ -1,47 +1,78 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Crosshair, MapPin, Search, Sparkles } from "lucide-react";
-import { toast } from "sonner";
+import { MapPin, Search, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { JobCard } from "@/components/jobs/JobCard";
-import { featuredJobs, flowCards, platformStats } from "@/data/jobPlatform";
+import { JobCardSkeleton } from "@/components/jobs/JobLoadingSkeletons";
+import { flowCards, platformStats } from "@/data/jobPlatform";
 import { keywordSuggestions, locationSuggestions } from "@/data/suggestions";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
+import type { Job } from "@/lib/db/types";
+import { toJobCardShape, type JobCardJob } from "@/lib/jobs/card-shape";
 
 const Index = () => {
   const router = useRouter();
 
   const [query, setQuery] = useState("");
   const [location, setLocation] = useState("");
+  const [highlightedJobs, setHighlightedJobs] = useState<JobCardJob[]>([]);
+  const [jobsLoading, setJobsLoading] = useState(true);
 
   const { isSaved, toggleSaved, pendingId } = useSavedJobs();
 
-  const highlightedJobs = useMemo(() => featuredJobs.slice(0, 3), []);
   const publicFlows = useMemo(
     () => flowCards.filter((flow) => flow.role !== "admin"),
     [],
   );
 
-  const useMyLocation = () => {
-    if (!navigator.geolocation) {
-      toast.error("Geolocation is not available in this browser.");
-      return;
+  useEffect(() => {
+    let active = true;
+
+    async function loadHighlightedJobs() {
+      setJobsLoading(true);
+
+      try {
+        const params = new URLSearchParams({
+          page: "1",
+          pageSize: "3",
+          daysAgo: "3650",
+        });
+
+        const response = await fetch(`/api/jobs?${params.toString()}`, {
+          cache: "no-store",
+        });
+
+        if (!response.ok) throw new Error("Could not load jobs.");
+
+        const body = await response.json();
+        const jobs: Job[] = Array.isArray(body.data) ? body.data : [];
+
+        if (!active) return;
+
+        setHighlightedJobs(jobs.map(toJobCardShape));
+      } catch {
+        if (active) {
+          setHighlightedJobs([]);
+        }
+      } finally {
+        if (active) {
+          setJobsLoading(false);
+        }
+      }
     }
 
-    navigator.geolocation.getCurrentPosition(
-      () => {
-        setLocation("Current location");
-        toast.success("Location detected for nearby job matches.");
-      },
-      () => toast.error("Location permission was not granted."),
-    );
-  };
+    loadHighlightedJobs();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const searchJobs = () => {
     const params = new URLSearchParams();
@@ -113,15 +144,6 @@ const Index = () => {
                     className="h-12 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
                   />
 
-                  <button
-                    type="button"
-                    aria-label="Use my location"
-                    onClick={useMyLocation}
-                    className="rounded-md p-2 text-primary transition hover:bg-secondary"
-                  >
-                    <Crosshair className="size-4" />
-                  </button>
-
                   <datalist id="home-location-suggestions">
                     {locationSuggestions.map((suggestion) => (
                       <option key={suggestion} value={suggestion} />
@@ -152,15 +174,25 @@ const Index = () => {
               </div>
 
               <div className="mt-4 space-y-3">
-                {highlightedJobs.map((job) => (
-                  <JobCard
-                    key={job.id}
-                    job={job}
-                    saved={isSaved(job.id)}
-                    saving={pendingId === job.id}
-                    onSave={toggleSaved}
-                  />
-                ))}
+                {jobsLoading ? (
+                  Array.from({ length: 3 }).map((_, index) => (
+                    <JobCardSkeleton key={index} />
+                  ))
+                ) : highlightedJobs.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border bg-background p-5 text-sm text-muted-foreground">
+                    Featured roles will appear after ingestion runs.
+                  </div>
+                ) : (
+                  highlightedJobs.map((job) => (
+                    <JobCard
+                      key={job.id}
+                      job={job}
+                      saved={isSaved(job.id)}
+                      saving={pendingId === job.id}
+                      onSave={toggleSaved}
+                    />
+                  ))
+                )}
               </div>
             </div>
           </div>

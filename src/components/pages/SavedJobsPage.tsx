@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
-  BookmarkCheck,
+  Bookmark,
   Calendar,
   ExternalLink,
   FileText,
@@ -18,6 +19,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
+import { listingTitle } from "@/lib/jobs/display";
+import { companyInitials, isSupportedLogoUrl } from "@/lib/logos";
+import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 8;
 const INACTIVE_DAYS = 60;
@@ -119,7 +123,7 @@ function formatSalary(
 }
 
 function logoFor(job: ApiJob) {
-  return job.company_logo_url ?? job.company_name.slice(0, 2).toUpperCase();
+  return job.company_logo_url ?? companyInitials(job.company_name);
 }
 
 function resumeName(path: string | null) {
@@ -135,7 +139,7 @@ function toSavedRecord(row: SavedApiRow): SavedJobRecord | null {
     id: row.id,
     jobId: row.jobs.id,
     slug: row.jobs.slug ?? row.jobs.id,
-    title: row.jobs.title,
+    title: listingTitle(row.jobs.title),
     company: row.jobs.company_name,
     logo: logoFor(row.jobs),
     location: row.jobs.location,
@@ -156,7 +160,7 @@ function toApplicationRecord(row: ApplicationApiRow): ApplicationRecord | null {
     id: row.id,
     jobId: row.jobs.id,
     slug: row.jobs.slug ?? row.jobs.id,
-    title: row.jobs.title,
+    title: listingTitle(row.jobs.title),
     company: row.jobs.company_name,
     logo: logoFor(row.jobs),
     location: row.jobs.location,
@@ -168,16 +172,26 @@ function toApplicationRecord(row: ApplicationApiRow): ApplicationRecord | null {
   };
 }
 
-function CompanyAvatar({ logo }: { logo: string }) {
-  const isUrl = logo.startsWith("http");
+function CompanyAvatar({ company, logo }: { company: string; logo: string }) {
+  const logoUrl = isSupportedLogoUrl(logo) ? logo : null;
+  const logoText = logoUrl
+    ? null
+    : logo.startsWith("http")
+      ? companyInitials(company)
+      : logo;
 
   return (
-    <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-secondary text-sm font-semibold text-secondary-foreground">
-      {isUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={logo} alt="" className="size-full object-contain" />
+    <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-transparent text-sm font-semibold text-secondary-foreground">
+      {logoUrl ? (
+        <Image
+          src={logoUrl}
+          alt={`${company} logo`}
+          width={48}
+          height={48}
+          className="size-full object-contain p-1.5"
+        />
       ) : (
-        logo
+        logoText
       )}
     </div>
   );
@@ -203,20 +217,18 @@ function SavedCard({
         (event.key === "Enter" || event.key === " ") &&
         (event.preventDefault(), onOpen(item.slug))
       }
-      className="group flex cursor-pointer items-start gap-4 rounded-xl border border-border/80 bg-card p-5 transition-all hover:border-primary/40 hover:shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      className="group cursor-pointer rounded-xl border border-border/80 bg-card p-5 transition-all hover:border-primary/40 hover:shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
     >
-      <CompanyAvatar logo={item.logo} />
+      <div className="min-w-0">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-4">
+            <CompanyAvatar company={item.company} logo={item.logo} />
 
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-              {item.company}
-            </p>
-
-            <h3 className="mt-1 truncate text-base font-semibold tracking-tight text-foreground transition-colors group-hover:text-primary md:text-lg">
-              {item.title}
-            </h3>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-foreground">
+                {item.company}
+              </p>
+            </div>
           </div>
 
           <button
@@ -228,17 +240,23 @@ function SavedCard({
               event.stopPropagation();
               onUnsave(item.jobId);
             }}
-            className="grid size-9 shrink-0 place-items-center rounded-lg text-accent transition-colors hover:bg-secondary/60 disabled:cursor-wait disabled:opacity-80"
+            className={cn(
+              "grid size-12 shrink-0 place-items-center rounded-lg border border-primary/40 bg-primary/10 text-primary transition-colors hover:bg-primary/10 hover:text-primary disabled:cursor-wait disabled:opacity-80",
+            )}
           >
             {unsaving ? (
-              <Loader2 className="size-4 animate-spin" />
+              <Loader2 className="size-6 animate-spin" />
             ) : (
-              <BookmarkCheck className="size-4 fill-accent/20" />
+              <Bookmark className="size-6 fill-current" />
             )}
           </button>
         </div>
 
-        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <h3 className="mt-4 truncate text-base font-semibold tracking-tight text-foreground transition-colors group-hover:text-primary md:text-lg">
+          {item.title}
+        </h3>
+
+        <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
             <MapPin className="size-3.5" />
             {item.location}
@@ -289,7 +307,7 @@ function ApplicationCard({
   return (
     <article className="rounded-lg border border-border bg-card p-5 transition-all hover:border-primary/40 hover:shadow-soft">
       <div className="flex items-start gap-4">
-        <CompanyAvatar logo={item.logo} />
+        <CompanyAvatar company={item.company} logo={item.logo} />
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-2">

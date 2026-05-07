@@ -16,6 +16,7 @@ import {
   UsersRound,
 } from "lucide-react";
 
+import { FeaturedJobRowSkeleton } from "@/components/jobs/JobLoadingSkeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { Job } from "@/lib/db/types";
@@ -229,21 +230,21 @@ export default function DashboardPage() {
           description:
             "Create a listing with role details, requirements, salary, and application settings.",
           icon: Plus,
-          href: "/post-job",
+          href: "/employers/post-job",
         },
         {
           title: "Manage listings",
           description:
             "Review published jobs, update roles, and track listing health.",
           icon: BriefcaseBusiness,
-          href: "/employer/jobs",
+          href: "/employers/dashboard",
         },
         {
           title: "Review applicants",
           description:
             "See new applications, candidate profiles, resumes, and application status.",
           icon: UsersRound,
-          href: "/employer/applicants",
+          href: "/employers/candidates",
         },
       ];
 
@@ -270,7 +271,11 @@ export default function DashboardPage() {
 
           <Button asChild>
             <Link
-              href={isAdminRoute ? "/admin-control-center/jobs" : "/post-job"}
+              href={
+                isAdminRoute
+                  ? "/admin-control-center/jobs"
+                  : "/employers/post-job"
+              }
             >
               <Plus className="size-4" />
               {isAdminRoute ? "Review jobs" : "Post a job"}
@@ -342,9 +347,10 @@ export default function DashboardPage() {
             </div>
 
             {jobsLoading ? (
-              <div className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" />
-                Loading featured jobs...
+              <div className="mt-5 divide-y divide-border/70">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <FeaturedJobRowSkeleton key={index} />
+                ))}
               </div>
             ) : jobsError ? (
               <div className="mt-6 rounded-lg border border-dashed border-destructive/40 bg-background p-5 text-sm text-muted-foreground">

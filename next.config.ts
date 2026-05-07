@@ -25,6 +25,14 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   devIndicators: false,
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "img.logo.dev",
+      },
+    ],
+  },
   poweredByHeader: false,
   turbopack: {
     root: __dirname,

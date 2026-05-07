@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
 import type { Job } from "@/lib/db/types";
+import { isSupportedLogoUrl } from "@/lib/logos";
 import { htmlToText, cleanTextArray } from "@/lib/text/html";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -59,6 +60,10 @@ function daysAgoLabel(postedAt: string | null | undefined) {
   if (Number.isNaN(postedTime)) return 0;
 
   return Math.max(Math.floor((Date.now() - postedTime) / 86_400_000), 0);
+}
+
+function supportedLogoUrl(value: string | null | undefined) {
+  return value && isSupportedLogoUrl(value) ? value : null;
 }
 
 function cleanJob(job: Job): Job {
@@ -145,7 +150,7 @@ function deriveDescriptionSections(job: Job): DerivedSections {
   const existingBenefits = cleanTextArray(job.benefits);
 
   const sectionPattern =
-    /(Who we are|About the role|About Stripe|About the team|About this role|What you’ll do|What you'll do|Responsibilities|What we’re looking for|What we're looking for|Who you are|Minimum requirements|Preferred qualifications|Requirements|Qualifications|Benefits|Pay and benefits|Compensation|Salary)/gi;
+    /(Who we are|About the role|About Stripe|About the team|About this role|In this role, you will|What you’ll do|What you'll do|Responsibilities|What we’re looking for|What we're looking for|Who you are|Required qualifications|Desired qualifications|Minimum requirements|Preferred qualifications|Job expectations|Requirements|Qualifications|Benefits|Pay range|Pay and benefits|Compensation|Salary|Posting end date|We value equal opportunity|Applicants with disabilities|Drug and alcohol policy|Recruitment and hiring requirements)/gi;
 
   const markers = [...fullText.matchAll(sectionPattern)].map((match) => ({
     label: match[0],
@@ -198,9 +203,14 @@ function deriveDescriptionSections(job: Job): DerivedSections {
       continue;
     }
 
-    if (label.includes("what you") || label.includes("responsibilities")) {
+    if (
+      label.includes("in this role") ||
+      label.includes("what you") ||
+      label.includes("responsibilities")
+    ) {
       responsibilityChunks.push(
         removeSectionHeading(chunk.text, [
+          "In this role, you will",
           "What you’ll do",
           "What you'll do",
           "Responsibilities",
@@ -213,15 +223,19 @@ function deriveDescriptionSections(job: Job): DerivedSections {
       label.includes("looking for") ||
       label.includes("who you are") ||
       label.includes("requirements") ||
-      label.includes("qualifications")
+      label.includes("qualifications") ||
+      label.includes("job expectations")
     ) {
       requirementChunks.push(
         removeSectionHeading(chunk.text, [
           "What we’re looking for",
           "What we're looking for",
           "Who you are",
+          "Required qualifications",
+          "Desired qualifications",
           "Minimum requirements",
           "Preferred qualifications",
+          "Job expectations",
           "Requirements",
           "Qualifications",
         ]),
@@ -242,6 +256,16 @@ function deriveDescriptionSections(job: Job): DerivedSections {
           "Salary",
         ]),
       );
+      continue;
+    }
+
+    if (
+      label.includes("posting end date") ||
+      label.includes("equal opportunity") ||
+      label.includes("disabilities") ||
+      label.includes("drug and alcohol") ||
+      label.includes("recruitment and hiring")
+    ) {
       continue;
     }
 
@@ -285,7 +309,48 @@ function similarSummary(job: Job) {
   return `${text.slice(0, 110).trim()}...`;
 }
 
-// ─── compact sidebar card ───────────────────────────────────────────────────
+async function fetchRelatedJobs(job: Job, slug: string) {
+  const searches = [
+    job.category
+      ? new URLSearchParams({
+          category: job.category,
+          pageSize: "3",
+          excludeId: job.id,
+        })
+      : null,
+    new URLSearchParams({
+      company: job.company_name,
+      pageSize: "3",
+      excludeId: job.id,
+    }),
+    new URLSearchParams({
+      query: job.title.split(/\s+/).slice(0, 2).join(" "),
+      pageSize: "3",
+      excludeId: job.id,
+    }),
+  ].filter((params): params is URLSearchParams => Boolean(params));
+
+  for (const params of searches) {
+    const response = await fetch(`/api/jobs?${params.toString()}`);
+
+    if (!response.ok) continue;
+
+    const body = await response.json();
+    const jobs = Array.isArray(body.data) ? (body.data as Job[]) : [];
+    const cleanedRelated = jobs
+      .map(cleanJob)
+      .filter((relatedJob) => relatedJob.id !== job.id)
+      .filter((relatedJob) => relatedJob.slug !== slug);
+
+    if (cleanedRelated.length > 0) {
+      return cleanedRelated.slice(0, 3);
+    }
+  }
+
+  return [];
+}
+
+// ─── similar role card ──────────────────────────────────────────────────────
 
 function SimilarRoleCard({
   job,
@@ -304,6 +369,12 @@ function SimilarRoleCard({
   const logoInitials = job.company_name.slice(0, 2).toUpperCase();
   const postedDays = daysAgoLabel(job.posted_at);
   const isExternal = Boolean(job.apply_url);
+  const salary = formatSalary(
+    job.salary_min,
+    job.salary_max,
+    job.salary_currency,
+  );
+  const logoUrl = supportedLogoUrl(job.company_logo_url);
 
   const goToDetails = () => {
     router.push(href);
@@ -330,93 +401,95 @@ function SimilarRoleCard({
   };
 
   return (
-    <article className="rounded-xl border border-border bg-surface p-4 shadow-soft transition-colors hover:border-primary/40">
-      <div className="flex items-start gap-3">
-        <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-secondary text-xs font-bold text-secondary-foreground">
-          {logoInitials}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                {job.company_name}
-              </p>
-
-              <button
-                type="button"
-                onClick={goToDetails}
-                className="mt-1 line-clamp-2 text-left text-sm font-semibold leading-5 text-foreground hover:text-primary"
-              >
-                {job.title}
-              </button>
+    <article className="rounded-xl border border-border bg-card p-6 shadow-soft transition-colors hover:border-primary/40 hover:shadow-lift">
+      <div className="flex items-start justify-between gap-5">
+        <div className="flex min-w-0 items-center gap-4">
+          {logoUrl ? (
+            <Image
+              src={logoUrl}
+              alt={`${job.company_name} logo`}
+              width={56}
+              height={56}
+              className="size-14 shrink-0 rounded-lg object-contain"
+            />
+          ) : (
+            <div className="grid size-14 shrink-0 place-items-center rounded-lg bg-secondary text-sm font-bold text-secondary-foreground">
+              {logoInitials}
             </div>
+          )}
 
-            <button
-              type="button"
-              aria-label={saved ? "Remove saved job" : "Save job"}
-              aria-pressed={saved}
-              disabled={saving}
-              onClick={onSaveClick}
-              className="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:cursor-wait disabled:opacity-70"
-            >
-              {saving ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Bookmark
-                  className={
-                    saved ? "size-4 fill-current text-accent" : "size-4"
-                  }
-                />
-              )}
-            </button>
-          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-primary">
+              {job.company_name}
+            </p>
 
-          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-            <span className="inline-flex items-center gap-1">
-              <MapPin className="size-3" />
-              <span className="line-clamp-1">{job.location}</span>
-            </span>
-
-            <span className="inline-flex items-center gap-1">
-              <Clock3 className="size-3" />
-              {postedDays === 0 ? "Today" : `${postedDays}d ago`}
-            </span>
-          </div>
-
-          <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
-            {similarSummary(job)}
-          </p>
-
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            <Badge variant="soft" className="text-[10px]">
-              {job.work_mode}
-            </Badge>
-
-            <Badge variant="secondary" className="text-[10px]">
-              {job.employment_type}
-            </Badge>
-          </div>
-
-          <div className="mt-3 flex items-center justify-between border-t border-border/60 pt-3">
             <button
               type="button"
               onClick={goToDetails}
-              className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:text-primary"
+              className="mt-4 line-clamp-2 text-left text-2xl font-bold leading-tight tracking-tight text-foreground transition-colors hover:text-primary"
             >
-              Details <ArrowRight className="size-3" />
+              {job.title}
             </button>
-
-            <Button size="sm" onClick={onApply}>
-              Apply
-              {isExternal ? (
-                <ExternalLink className="size-3.5" />
-              ) : (
-                <ArrowRight className="size-3.5" />
-              )}
-            </Button>
           </div>
         </div>
+
+        <button
+          type="button"
+          aria-label={saved ? "Remove saved job" : "Save job"}
+          aria-pressed={saved}
+          disabled={saving}
+          onClick={onSaveClick}
+          className="grid size-12 shrink-0 place-items-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:cursor-wait disabled:opacity-70 aria-pressed:border-primary/40 aria-pressed:bg-primary/10 aria-pressed:text-primary"
+        >
+          {saving ? (
+            <Loader2 className="size-5 animate-spin" />
+          ) : (
+            <Bookmark className={saved ? "size-6 fill-current" : "size-6"} />
+          )}
+        </button>
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
+        <span className="inline-flex min-w-0 items-center gap-1.5">
+          <MapPin className="size-4 shrink-0" />
+          <span className="line-clamp-1">{job.location}</span>
+        </span>
+
+        <span className="inline-flex items-center gap-1.5">
+          <Clock3 className="size-4" />
+          {postedDays === 0 ? "Today" : `${postedDays}d ago`}
+        </span>
+      </div>
+
+      <div className="mt-6 border-t border-dashed border-border" />
+
+      <p className="mt-5 line-clamp-3 text-base leading-7 text-muted-foreground">
+        {similarSummary(job)}
+      </p>
+
+      <div className="mt-5 flex flex-wrap items-center gap-2">
+        <Badge variant="secondary">{job.employment_type}</Badge>
+        <Badge variant="soft">{job.work_mode}</Badge>
+        {salary && <Badge variant="secondary">{salary}</Badge>}
+      </div>
+
+      <div className="mt-6 flex items-center justify-between gap-3 border-t border-border/60 pt-5">
+        <button
+          type="button"
+          onClick={goToDetails}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-foreground transition-colors hover:text-primary"
+        >
+          Details <ArrowRight className="size-4" />
+        </button>
+
+        <Button size="lg" onClick={onApply}>
+          Apply
+          {isExternal ? (
+            <ExternalLink className="size-4" />
+          ) : (
+            <ArrowRight className="size-4" />
+          )}
+        </Button>
       </div>
     </article>
   );
@@ -448,29 +521,15 @@ export default function JobDetailsPage() {
       .then((data: Job) => {
         const cleanedJob = cleanJob(data);
         setJob(cleanedJob);
-
-        if (cleanedJob.category) {
-          const params = new URLSearchParams({
-            category: cleanedJob.category,
-            pageSize: "3",
-            excludeId: cleanedJob.id,
-          });
-
-          return fetch(`/api/jobs?${params}`).then((res) => res.json());
-        }
-
-        return null;
+        return fetchRelatedJobs(cleanedJob, slug);
       })
-      .then((res) => {
-        if (res?.data) {
-          const cleanedRelated = (res.data as Job[])
-            .map(cleanJob)
-            .filter((relatedJob) => relatedJob.slug !== slug);
-
-          setRelated(cleanedRelated);
-        }
+      .then((nextRelated) => {
+        setRelated(nextRelated);
       })
-      .catch(() => setJob(null))
+      .catch(() => {
+        setJob(null);
+        setRelated([]);
+      })
       .finally(() => setLoading(false));
   }, [slug]);
 
@@ -523,6 +582,7 @@ export default function JobDetailsPage() {
   const postedDays = daysAgoLabel(job.posted_at);
   const isExternal = Boolean(job.apply_url);
   const logoInitials = job.company_name.slice(0, 2).toUpperCase();
+  const logoUrl = supportedLogoUrl(job.company_logo_url);
   const saved = isSaved(job.id);
   const saving = pendingId === job.id;
 
@@ -576,9 +636,9 @@ export default function JobDetailsPage() {
 
           <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
             <div className="flex items-start gap-4">
-              {job.company_logo_url ? (
+              {logoUrl ? (
                 <Image
-                  src={job.company_logo_url}
+                  src={logoUrl}
                   alt={`${job.company_name} logo`}
                   width={64}
                   height={64}
@@ -634,7 +694,7 @@ export default function JobDetailsPage() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 md:flex-col md:items-stretch">
+            <div className="flex flex-wrap items-center gap-2">
               <Button variant="hero" size="lg" onClick={onApply}>
                 {isExternal ? (
                   <>
@@ -649,22 +709,31 @@ export default function JobDetailsPage() {
                 )}
               </Button>
 
-              <Button
-                variant={saved ? "warm" : "glass"}
-                size="lg"
+              <button
+                type="button"
+                aria-label={saved ? "Remove saved job" : "Save job"}
+                aria-pressed={saved}
                 onClick={onSave}
                 disabled={saving}
+                className="grid size-12 shrink-0 place-items-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:cursor-wait disabled:opacity-70 aria-pressed:border-primary/40 aria-pressed:bg-primary/10 aria-pressed:text-primary"
               >
                 {saving ? (
-                  <Loader2 className="size-4 animate-spin" />
+                  <Loader2 className="size-6 animate-spin" />
                 ) : (
-                  <Bookmark className={saved ? "fill-current" : ""} />
+                  <Bookmark
+                    className={saved ? "size-6 fill-current" : "size-6"}
+                  />
                 )}
-                {saving ? "Saving…" : saved ? "Saved" : "Save job"}
-              </Button>
+              </button>
 
-              <Button variant="ghost" size="lg" onClick={onShare}>
-                <Share2 className="size-4" /> Share
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onShare}
+                aria-label="Share job"
+                className="size-12 rounded-lg"
+              >
+                <Share2 className="size-5" />
               </Button>
             </div>
           </div>
@@ -807,7 +876,7 @@ export default function JobDetailsPage() {
               </Button>
 
               <Button
-                variant="glass"
+                variant={saved ? "warm" : "glass"}
                 size="lg"
                 onClick={onSave}
                 disabled={saving}
@@ -821,15 +890,35 @@ export default function JobDetailsPage() {
               </Button>
             </div>
           </div>
+
+          {related.length > 0 && (
+            <section className="space-y-4 pt-2">
+              <h2 className="text-2xl font-bold tracking-tight">
+                Similar roles
+              </h2>
+
+              <div className="space-y-5">
+                {related.map((item) => (
+                  <SimilarRoleCard
+                    key={item.id}
+                    job={item}
+                    saved={isSaved(item.id)}
+                    saving={pendingId === item.id}
+                    onSave={toggleSaved}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
         </article>
 
         {/* ── Sidebar ── */}
         <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
           <div className="rounded-xl border border-border bg-surface p-6 shadow-soft">
             <div className="flex items-center gap-3">
-              {job.company_logo_url ? (
+              {logoUrl ? (
                 <Image
-                  src={job.company_logo_url}
+                  src={logoUrl}
                   alt={`${job.company_name} logo`}
                   width={40}
                   height={40}
@@ -919,24 +1008,6 @@ export default function JobDetailsPage() {
               )}
             </dl>
           </div>
-
-          {related.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Similar roles
-              </h3>
-
-              {related.map((item) => (
-                <SimilarRoleCard
-                  key={item.id}
-                  job={item}
-                  saved={isSaved(item.id)}
-                  saving={pendingId === item.id}
-                  onSave={toggleSaved}
-                />
-              ))}
-            </div>
-          )}
         </aside>
       </section>
     </main>

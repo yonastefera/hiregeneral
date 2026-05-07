@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 const PROTECTED_ROUTES = ["/profile", "/saved", "/applications"];
 
 // Routes that require the recruiter or admin role
-const RECRUITER_ROUTES = ["/employer", "/dashboard"];
+const RECRUITER_ROUTES = ["/employers", "/dashboard"];
 
 // Routes that require admin role only
 const ADMIN_ROUTES = ["/admin-control-center"];

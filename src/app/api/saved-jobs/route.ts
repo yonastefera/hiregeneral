@@ -25,7 +25,7 @@ export async function GET() {
         id, title, company_name, company_logo_url,
         location, employment_type, work_mode,
         salary_min, salary_max, salary_currency,
-        skills, slug, apply_url, posted_at
+        skills, status, slug, apply_url, posted_at
       )
     `,
     )

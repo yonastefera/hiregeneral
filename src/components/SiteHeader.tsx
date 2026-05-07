@@ -253,7 +253,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
             <>
               {isRecruiter && (
                 <Button variant="default" size="sm" asChild>
-                  <Link href="/employer/post-job">Post a job</Link>
+                  <Link href="/employers/post-job">Post a job</Link>
                 </Button>
               )}
 
@@ -405,7 +405,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
               </Button>
 
               <Button variant="default" size="sm" asChild>
-                <Link href="/employer/post-job">Post a job</Link>
+                <Link href="/employers/post-job">Post a job</Link>
               </Button>
             </>
           )}
@@ -548,7 +548,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
 
                 {isRecruiter && (
                   <Button asChild>
-                    <Link href="/employer/post-job">Post a job</Link>
+                    <Link href="/employers/post-job">Post a job</Link>
                   </Button>
                 )}
 
@@ -568,7 +568,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
                 </Button>
 
                 <Button asChild>
-                  <Link href="/employer/post-job">Post a job</Link>
+                  <Link href="/employers/post-job">Post a job</Link>
                 </Button>
               </div>
             )}

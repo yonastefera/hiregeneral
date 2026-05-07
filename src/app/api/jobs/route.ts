@@ -11,6 +11,8 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
+const DEFAULT_BROWSE_COMPANY_LIMIT = 25;
+
 type JobRow = {
   id: string;
   recruiter_id: string;
@@ -45,6 +47,9 @@ type JobRow = {
   company_tagline: string | null;
   company_size: string | null;
   company_website: string | null;
+  job_applicant_counts?: Array<{
+    applicant_count: number | null;
+  }> | null;
 };
 
 type JobResponse = JobRow & {
@@ -162,6 +167,22 @@ function isNorthAmericaLocation(location: string | null | undefined) {
   return included.some((term) => value.includes(term));
 }
 
+function limitJobsPerCompany(jobs: JobResponse[], limit: number) {
+  if (limit <= 0) return jobs;
+
+  const seen = new Map<string, number>();
+
+  return jobs.filter((job) => {
+    const key = job.company_name.toLowerCase();
+    const count = seen.get(key) ?? 0;
+
+    if (count >= limit) return false;
+
+    seen.set(key, count + 1);
+    return true;
+  });
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = req.nextUrl;
@@ -172,7 +193,12 @@ export async function GET(req: NextRequest) {
     const workMode = searchParams.get("workMode") ?? "";
     const employmentType = searchParams.get("employmentType") ?? "";
     const category = searchParams.get("category") ?? "";
+    const company = searchParams.get("company") ?? "";
     const excludeId = searchParams.get("excludeId") ?? "";
+    const companyLimit = Math.max(
+      0,
+      Number(searchParams.get("companyLimit") ?? DEFAULT_BROWSE_COMPANY_LIMIT),
+    );
 
     const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
     const pageSize = Math.min(25, Number(searchParams.get("pageSize") ?? "10"));
@@ -215,7 +241,8 @@ export async function GET(req: NextRequest) {
         posted_at,
         expires_at,
         created_at,
-        updated_at
+        updated_at,
+        job_applicant_counts ( applicant_count )
       `,
         { count: "exact" },
       )
@@ -254,6 +281,10 @@ export async function GET(req: NextRequest) {
       dbQuery = dbQuery.eq("category", category);
     }
 
+    if (company.trim()) {
+      dbQuery = dbQuery.eq("company_name", company.trim());
+    }
+
     if (excludeId) {
       dbQuery = dbQuery.neq("id", excludeId);
     }
@@ -277,15 +308,26 @@ export async function GET(req: NextRequest) {
       .map((job) => ({
         ...job,
         description: stripHtml(job.description),
-        applicant_count: 0,
+        applicant_count: job.job_applicant_counts?.[0]?.applicant_count ?? 0,
       }));
 
-    const total = cleanedJobs.length;
+    const shouldBalanceByCompany =
+      !query.trim() &&
+      !location.trim() &&
+      !workMode &&
+      !employmentType &&
+      !category &&
+      !company.trim();
+    const displayJobs = shouldBalanceByCompany
+      ? limitJobsPerCompany(cleanedJobs, companyLimit)
+      : cleanedJobs;
+
+    const total = displayJobs.length;
     const from = (page - 1) * pageSize;
     const to = from + pageSize;
 
     return NextResponse.json({
-      data: cleanedJobs.slice(from, to),
+      data: displayJobs.slice(from, to),
       total,
       page,
       pageSize,

@@ -6,6 +6,12 @@ import {
   safeDescription,
   type ImportedJob,
 } from "./normalize";
+import {
+  dedupeBySourceKey,
+  isEngineeringText,
+  isInternshipText,
+  isUsText,
+} from "./filters";
 import type { JobSourceAdapter } from "./source";
 
 type GreenhouseJob = {
@@ -29,11 +35,43 @@ type GreenhouseResponse = {
   jobs: GreenhouseJob[];
 };
 
+function searchableJobText(job: GreenhouseJob) {
+  return [
+    job.title,
+    job.location?.name,
+    ...(job.departments ?? []).map((department) => department.name),
+    ...(job.offices ?? []).map((office) => office.name),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function isUsJob(job: GreenhouseJob) {
+  return isUsText(searchableJobText(job));
+}
+
+function isEngineeringJob(job: GreenhouseJob) {
+  const departmentText = (job.departments ?? [])
+    .map((department) => department.name ?? "")
+    .join(" ")
+    .toLowerCase();
+
+  if (departmentText.includes("engineering")) return true;
+
+  return isEngineeringText(job.title);
+}
+
+function isInternshipJob(job: GreenhouseJob) {
+  return isInternshipText(searchableJobText(job));
+}
+
 export async function fetchGreenhouseJobs(params: {
   companyName: string;
+  companyLogoUrl?: string;
   sourceSlug: string;
 }): Promise<ImportedJob[]> {
-  const { companyName, sourceSlug } = params;
+  const { companyLogoUrl, companyName, sourceSlug } = params;
 
   const recruiterId = process.env.SYSTEM_RECRUITER_ID;
 
@@ -63,7 +101,14 @@ export async function fetchGreenhouseJobs(params: {
     throw new Error(`Invalid Greenhouse response for ${companyName}`);
   }
 
-  return data.jobs.map((job) => {
+  const filteredJobs = dedupeBySourceKey(
+    data.jobs.filter(
+      (job) => isUsJob(job) && isEngineeringJob(job) && !isInternshipJob(job),
+    ),
+    (job) => String(job.id),
+  );
+
+  return filteredJobs.map((job) => {
     const location = job.location?.name || "Not specified";
     const plainDescription = htmlToText(job.content);
 
@@ -71,7 +116,7 @@ export async function fetchGreenhouseJobs(params: {
       recruiterId,
       companyId: null,
       companyName,
-      companyLogoUrl: null,
+      companyLogoUrl: companyLogoUrl ?? null,
       title: job.title,
       description: safeDescription({
         description: plainDescription,
