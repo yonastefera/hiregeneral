@@ -105,11 +105,6 @@ type JobDetailRow = Pick<
   "id" | "description" | "responsibilities" | "requirements" | "benefits"
 >;
 
-type JobResponse = JobCandidateRow &
-  JobDetailRow & {
-  applicant_count: number;
-};
-
 function stripHtml(input: string | null | undefined) {
   if (!input) return "";
 
@@ -179,10 +174,9 @@ function balanceJobsByCompany<T extends { company_name: string }>(jobs: T[]) {
   return balanced;
 }
 
-function searchRank<T extends { company_name: string; title: string; category: string | null }>(
-  job: T,
-  query: string,
-) {
+function searchRank<
+  T extends { company_name: string; title: string; category: string | null },
+>(job: T, query: string) {
   const normalizedQuery = query.trim().toLowerCase();
 
   if (!normalizedQuery) return 0;
@@ -230,12 +224,12 @@ function hasSearchIntent(params: {
 }) {
   return Boolean(
     params.query.trim() ||
-      params.location.trim() ||
-      params.workMode ||
-      params.employmentType ||
-      params.category ||
-      params.company.trim() ||
-      params.excludeId,
+    params.location.trim() ||
+    params.workMode ||
+    params.employmentType ||
+    params.category ||
+    params.company.trim() ||
+    params.excludeId,
   );
 }
 
@@ -381,10 +375,7 @@ export async function GET(req: NextRequest) {
 
       if (Number.isNaN(postedTime)) return false;
 
-      return (
-        postedTime >=
-        Date.now() - NEW_JOBS_WINDOW_DAYS * 86_400_000
-      );
+      return postedTime >= Date.now() - NEW_JOBS_WINDOW_DAYS * 86_400_000;
     }).length;
     const from = (page - 1) * pageSize;
     const to = from + pageSize;

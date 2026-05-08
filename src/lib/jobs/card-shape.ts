@@ -36,7 +36,9 @@ export function postedDaysAgo(postedAt: string | null | undefined) {
 }
 
 function jobSummary(description: string | null) {
-  return description ? description.replace(/\s+/g, " ").trim().slice(0, 180) : "";
+  return description
+    ? description.replace(/\s+/g, " ").trim().slice(0, 180)
+    : "";
 }
 
 export function toJobCardShape(job: Job): JobCardJob {

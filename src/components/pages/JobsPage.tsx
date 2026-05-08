@@ -369,9 +369,7 @@ export default function JobsPage() {
                     {totalJobs} {totalJobs === 1 ? "job" : "jobs"} found
                     {totalJobs > 0 && (
                       <>
-                        {newJobs > 0 && <> ({newJobs} new)</>}
-                        {" "}
-                        · showing{" "}
+                        {newJobs > 0 && <> ({newJobs} new)</>} · showing{" "}
                         <span className="font-medium text-foreground">
                           {(currentPage - 1) * PAGE_SIZE + 1}–
                           {Math.min(currentPage * PAGE_SIZE, totalJobs)}

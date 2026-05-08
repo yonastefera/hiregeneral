@@ -68,9 +68,7 @@ function parseDateParam(value: string | null) {
 
   const [, year, month, day] = match;
 
-  return new Date(
-    Date.UTC(Number(year), Number(month) - 1, Number(day)),
-  );
+  return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
 }
 
 function resolveWindow(searchParams: URLSearchParams) {
@@ -86,7 +84,8 @@ function resolveWindow(searchParams: URLSearchParams) {
   }
 
   const requestedDate = parseDateParam(searchParams.get("date"));
-  const start = requestedDate ?? startOfUtcDay(new Date(now.getTime() - 86_400_000));
+  const start =
+    requestedDate ?? startOfUtcDay(new Date(now.getTime() - 86_400_000));
   const end = new Date(start.getTime() + 86_400_000);
 
   return {
@@ -112,18 +111,23 @@ function isActivePublishedJob(job: JobMonitorRow, nowTime: number) {
   const expiresAt = timeValue(job.expires_at);
 
   return (
-    job.status === "published" &&
-    (expiresAt === null || expiresAt > nowTime)
+    job.status === "published" && (expiresAt === null || expiresAt > nowTime)
   );
 }
 
 function isExpiredPublishedJob(job: JobMonitorRow, nowTime: number) {
   const expiresAt = timeValue(job.expires_at);
 
-  return job.status === "published" && expiresAt !== null && expiresAt < nowTime;
+  return (
+    job.status === "published" && expiresAt !== null && expiresAt < nowTime
+  );
 }
 
-function isWithinWindow(value: string | null, startTime: number, endTime: number) {
+function isWithinWindow(
+  value: string | null,
+  startTime: number,
+  endTime: number,
+) {
   const time = timeValue(value);
 
   return time !== null && time >= startTime && time < endTime;
@@ -157,9 +161,7 @@ async function getExactCount(
   return count ?? 0;
 }
 
-async function getImportedJobMonitorRows(
-  supabase: SupabaseClient,
-) {
+async function getImportedJobMonitorRows(supabase: SupabaseClient) {
   const rows: JobMonitorRow[] = [];
 
   for (let from = 0; ; from += JOB_STATS_PAGE_SIZE) {
@@ -216,35 +218,37 @@ export async function GET(request: Request) {
     const startTime = range.start.getTime();
     const endTime = range.end.getTime();
 
-    const [{ data: sources, error: sourcesError }, { data: runs, error: runsError }] =
-      await Promise.all([
-        supabase
-          .from("job_sources")
-          .select("company_name, source_type, source_slug, enabled")
-          .order("company_name", { ascending: true }),
-        supabase
-          .from("job_ingestion_runs")
-          .select(
-            [
-              "id",
-              "source_name",
-              "source_slug",
-              "company_name",
-              "status",
-              "fetched_jobs",
-              "valid_jobs",
-              "rejected_jobs",
-              "upserted_jobs",
-              "expired_jobs",
-              "error_message",
-              "started_at",
-              "finished_at",
-            ].join(","),
-          )
-          .gte("started_at", startIso)
-          .lt("started_at", endIso)
-          .order("started_at", { ascending: false }),
-      ]);
+    const [
+      { data: sources, error: sourcesError },
+      { data: runs, error: runsError },
+    ] = await Promise.all([
+      supabase
+        .from("job_sources")
+        .select("company_name, source_type, source_slug, enabled")
+        .order("company_name", { ascending: true }),
+      supabase
+        .from("job_ingestion_runs")
+        .select(
+          [
+            "id",
+            "source_name",
+            "source_slug",
+            "company_name",
+            "status",
+            "fetched_jobs",
+            "valid_jobs",
+            "rejected_jobs",
+            "upserted_jobs",
+            "expired_jobs",
+            "error_message",
+            "started_at",
+            "finished_at",
+          ].join(","),
+        )
+        .gte("started_at", startIso)
+        .lt("started_at", endIso)
+        .order("started_at", { ascending: false }),
+    ]);
 
     if (sourcesError) {
       throw new Error(`Could not load job sources: ${sourcesError.message}`);
@@ -278,7 +282,9 @@ export async function GET(request: Request) {
       const runningRuns = sourceRuns.filter(
         (run) => run.status === "running" && !isStaleRunningRun(run, nowTime),
       );
-      const successfulRuns = sourceRuns.filter((run) => run.status === "success");
+      const successfulRuns = sourceRuns.filter(
+        (run) => run.status === "success",
+      );
       const status: SourceMonitorStatus = latestRun
         ? isStaleRunningRun(latestRun, nowTime)
           ? "stale_running"
@@ -313,7 +319,9 @@ export async function GET(request: Request) {
         failedRuns: acc.failedRuns + (run.status === "failed" ? 1 : 0),
         runningRuns:
           acc.runningRuns +
-          (run.status === "running" && !isStaleRunningRun(run, nowTime) ? 1 : 0),
+          (run.status === "running" && !isStaleRunningRun(run, nowTime)
+            ? 1
+            : 0),
         staleRunningRuns:
           acc.staleRunningRuns + (isStaleRunningRun(run, nowTime) ? 1 : 0),
       }),
@@ -330,24 +338,25 @@ export async function GET(request: Request) {
       },
     );
 
-    const [activeImportedJobs, expiredImportedJobs, importedJobs] = await Promise.all([
-      getExactCount(
-        supabase
-          .from("jobs")
-          .select("id", { count: "exact", head: true })
-          .not("source_name", "is", null)
-          .eq("status", "published")
-          .or(`expires_at.is.null,expires_at.gt.${nowIso}`),
-      ),
-      getExactCount(
-        supabase
-          .from("jobs")
-          .select("id", { count: "exact", head: true })
-          .not("source_name", "is", null)
-          .lt("expires_at", nowIso),
-      ),
-      getImportedJobMonitorRows(supabase),
-    ]);
+    const [activeImportedJobs, expiredImportedJobs, importedJobs] =
+      await Promise.all([
+        getExactCount(
+          supabase
+            .from("jobs")
+            .select("id", { count: "exact", head: true })
+            .not("source_name", "is", null)
+            .eq("status", "published")
+            .or(`expires_at.is.null,expires_at.gt.${nowIso}`),
+        ),
+        getExactCount(
+          supabase
+            .from("jobs")
+            .select("id", { count: "exact", head: true })
+            .not("source_name", "is", null)
+            .lt("expires_at", nowIso),
+        ),
+        getImportedJobMonitorRows(supabase),
+      ]);
 
     const companyStats = new Map<
       string,
@@ -363,17 +372,15 @@ export async function GET(request: Request) {
     >();
 
     for (const job of importedJobs) {
-      const current =
-        companyStats.get(job.company_name) ??
-        {
-          companyName: job.company_name,
-          publishedJobs: 0,
-          newJobsInWindow: 0,
-          newJobs24h: 0,
-          newJobs7d: 0,
-          expiredJobs: 0,
-          latestPostedAt: null,
-        };
+      const current = companyStats.get(job.company_name) ?? {
+        companyName: job.company_name,
+        publishedJobs: 0,
+        newJobsInWindow: 0,
+        newJobs24h: 0,
+        newJobs7d: 0,
+        expiredJobs: 0,
+        latestPostedAt: null,
+      };
 
       if (isActivePublishedJob(job, nowTime)) {
         current.publishedJobs += 1;
@@ -442,14 +449,13 @@ export async function GET(request: Request) {
             a.companyName.localeCompare(b.companyName),
         )
         .slice(0, 10),
-      failures: unhealthySources
-        .map((source) => ({
-          companyName: source.companyName,
-          sourceType: source.sourceType,
-          sourceSlug: source.sourceSlug,
-          status: source.status,
-          error: source.lastError,
-        })),
+      failures: unhealthySources.map((source) => ({
+        companyName: source.companyName,
+        sourceType: source.sourceType,
+        sourceSlug: source.sourceSlug,
+        status: source.status,
+        error: source.lastError,
+      })),
       staleRunningRuns: sourceHealth
         .filter((source) => source.staleRunningCount > 0)
         .map((source) => ({

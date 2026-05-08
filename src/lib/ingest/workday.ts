@@ -129,7 +129,11 @@ async function fetchWorkdaySearchPage(
   offset: number,
   signal?: AbortSignal,
 ) {
-  for (let attempt = 0; attempt <= SEARCH_RETRY_DELAYS_MS.length; attempt += 1) {
+  for (
+    let attempt = 0;
+    attempt <= SEARCH_RETRY_DELAYS_MS.length;
+    attempt += 1
+  ) {
     const response = await postWorkdaySearch(config, offset, signal);
 
     if (response.status >= 200 && response.status < 300) {

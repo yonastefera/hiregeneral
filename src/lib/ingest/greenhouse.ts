@@ -116,7 +116,10 @@ function duplicateRoleSourceId(sourceSlug: string, job: GreenhouseJob) {
     : `${sourceSlug}:${job.id}`;
 }
 
-function mergeDuplicateGreenhouseRoles(sourceSlug: string, jobs: GreenhouseJob[]) {
+function mergeDuplicateGreenhouseRoles(
+  sourceSlug: string,
+  jobs: GreenhouseJob[],
+) {
   const grouped = new Map<
     string,
     {

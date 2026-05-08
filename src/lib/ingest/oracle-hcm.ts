@@ -6,11 +6,7 @@ import {
   safeDescription,
   type ImportedJob,
 } from "./normalize";
-import {
-  isEngineeringText,
-  isInternshipText,
-  isUsText,
-} from "./filters";
+import { isEngineeringText, isInternshipText, isUsText } from "./filters";
 import type { JobSource } from "./job-sources";
 import type { JobSourceAdapter } from "./source";
 
@@ -120,7 +116,9 @@ function searchUrl(config: OracleHcmConfig, offset: number) {
   }
 
   if (config.countryCode) {
-    finderParts.push(`workLocationCountryCode=${finderValue(config.countryCode)}`);
+    finderParts.push(
+      `workLocationCountryCode=${finderValue(config.countryCode)}`,
+    );
   }
 
   const url = new URL(`${config.apiBase}/recruitingCEJobRequisitions`);
@@ -319,15 +317,15 @@ export async function fetchOracleHcmJobs(
         status: "published",
 
         postedAt: postedAt(requisition.PostedDate),
-        expiresAt: isoDateOrNull(requisition.PostingEndDate) ?? defaultExpiryDate(30),
+        expiresAt:
+          isoDateOrNull(requisition.PostingEndDate) ?? defaultExpiryDate(30),
 
         sourceName: "oracle_hcm",
         sourceId: `${source.sourceSlug}:${requisition.Id}`,
         applyUrl: detailsUrl(config, requisition),
 
         experienceLevel: null,
-        category:
-          requisition.JobFamily ?? requisition.JobFunction ?? null,
+        category: requisition.JobFamily ?? requisition.JobFunction ?? null,
 
         companyTagline: null,
         companySize: null,
