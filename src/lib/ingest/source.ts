@@ -3,7 +3,12 @@ import { importedJobSchema, type ImportedJob } from "./normalize";
 
 export type JobSourceAdapter = {
   type: JobSourceType;
-  fetchJobs(source: JobSource): Promise<ImportedJob[]>;
+  fetchJobs(
+    source: JobSource,
+    context?: {
+      signal?: AbortSignal;
+    },
+  ): Promise<ImportedJob[]>;
 };
 
 export type ValidatedJobsResult = {

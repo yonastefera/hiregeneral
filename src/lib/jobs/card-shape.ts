@@ -35,6 +35,10 @@ export function postedDaysAgo(postedAt: string | null | undefined) {
   return Math.max(days, 0);
 }
 
+function jobSummary(description: string | null) {
+  return description ? description.replace(/\s+/g, " ").trim().slice(0, 180) : "";
+}
+
 export function toJobCardShape(job: Job): JobCardJob {
   return {
     id: job.id,
@@ -48,7 +52,7 @@ export function toJobCardShape(job: Job): JobCardJob {
     postedDaysAgo: postedDaysAgo(job.posted_at),
     employmentType: job.employment_type,
 
-    summary: job.description ? job.description.slice(0, 180) : "",
+    summary: jobSummary(job.description),
     description: job.description ?? "",
 
     salary: formatSalary(

@@ -5,6 +5,7 @@ export type JobSourceType =
   | "greenhouse"
   | "lever"
   | "workday"
+  | "oracle_hcm"
   | "ashby"
   | "rss"
   | "csv"

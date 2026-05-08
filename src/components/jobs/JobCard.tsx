@@ -14,7 +14,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { listingTitle } from "@/lib/jobs/display";
+import { listingLocation, listingTitle } from "@/lib/jobs/display";
 import { companyInitials, isSupportedLogoUrl } from "@/lib/logos";
 import { cn } from "@/lib/utils";
 import type { JobListing } from "@/data/jobPlatform";
@@ -30,6 +30,7 @@ export function JobCard({ job, saved, saving = false, onSave }: JobCardProps) {
   const router = useRouter();
   const isExternal = Boolean(job.applyUrl);
   const displayTitle = listingTitle(job.title);
+  const displayLocation = listingLocation(job.location);
   const logoUrl = isSupportedLogoUrl(job.logo) ? job.logo : null;
   const logoText = logoUrl
     ? null
@@ -121,7 +122,7 @@ export function JobCard({ job, saved, saving = false, onSave }: JobCardProps) {
         <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
             <MapPin className="size-3.5" />
-            {job.location}
+            <span className="line-clamp-1">{displayLocation}</span>
           </span>
 
           <span className="inline-flex items-center gap-1.5">

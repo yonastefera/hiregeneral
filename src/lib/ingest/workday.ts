@@ -1,3 +1,5 @@
+import { request as httpsRequest } from "node:https";
+
 import {
   defaultExpiryDate,
   detectWorkMode,
@@ -7,16 +9,18 @@ import {
   type ImportedJob,
 } from "./normalize";
 import {
-  dedupeBySourceKey,
   isEngineeringText,
   isInternshipText,
   isUsText,
+  normalizedJobTitleKey,
 } from "./filters";
 import type { JobSource } from "./job-sources";
 import type { JobSourceAdapter } from "./source";
 
 const PAGE_SIZE = 20;
 const MAX_PAGES = 10;
+const DETAIL_CONCURRENCY = 5;
+const SEARCH_RETRY_DELAYS_MS = [500, 1500];
 
 type WorkdaySearchPosting = {
   title?: string;
@@ -54,11 +58,39 @@ type WorkdayConfig = {
   searchText: string;
   tenant: string;
   site: string;
+  appliedFacets: Record<string, string[]>;
+};
+
+type WorkdaySearchHttpResponse = {
+  status: number;
+  body: string;
 };
 
 function metadataString(source: JobSource, key: string) {
   const value = source.metadata[key];
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function metadataStringArrayMap(source: JobSource, key: string) {
+  const value = source.metadata[key];
+
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([facet, facetValue]) => [
+        facet,
+        Array.isArray(facetValue)
+          ? facetValue
+              .filter((item): item is string => typeof item === "string")
+              .map((item) => item.trim())
+              .filter(Boolean)
+          : [],
+      ])
+      .filter(([, facetValues]) => facetValues.length > 0),
+  );
 }
 
 function workdayConfig(source: JobSource): WorkdayConfig {
@@ -88,47 +120,110 @@ function workdayConfig(source: JobSource): WorkdayConfig {
     searchText: metadataString(source, "searchText") ?? "",
     tenant,
     site,
+    appliedFacets: metadataStringArrayMap(source, "appliedFacets"),
   };
 }
 
-async function fetchWorkdaySearchPage(config: WorkdayConfig, offset: number) {
-  const response = await fetch(`${config.apiBase}/jobs`, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      "User-Agent": "HireGeneralJobBoard/1.0",
-    },
-    body: JSON.stringify({
-      appliedFacets: {},
-      limit: PAGE_SIZE,
-      offset,
-      searchText: config.searchText,
-    }),
-    cache: "no-store",
-  });
+async function fetchWorkdaySearchPage(
+  config: WorkdayConfig,
+  offset: number,
+  signal?: AbortSignal,
+) {
+  for (let attempt = 0; attempt <= SEARCH_RETRY_DELAYS_MS.length; attempt += 1) {
+    const response = await postWorkdaySearch(config, offset, signal);
 
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    const detail = body ? ` ${body.slice(0, 500)}` : "";
+    if (response.status >= 200 && response.status < 300) {
+      try {
+        return JSON.parse(response.body) as WorkdaySearchResponse;
+      } catch {
+        throw new Error(
+          `Workday search returned non-JSON response: ${response.body.slice(
+            0,
+            300,
+          )}`,
+        );
+      }
+    }
+
+    const retryable = response.status === 429 || response.status >= 500;
+    const retryDelay = SEARCH_RETRY_DELAYS_MS[attempt];
+
+    if (retryable && retryDelay) {
+      await new Promise((resolve) => setTimeout(resolve, retryDelay));
+      continue;
+    }
+
+    const detail = response.body ? ` ${response.body.slice(0, 500)}` : "";
 
     throw new Error(`Workday search failed: ${response.status}${detail}`);
   }
 
-  const body = await response.text();
+  throw new Error("Workday search failed after retries");
+}
 
-  try {
-    return JSON.parse(body) as WorkdaySearchResponse;
-  } catch {
-    throw new Error(
-      `Workday search returned non-JSON response: ${body.slice(0, 300)}`,
-    );
-  }
+function postWorkdaySearch(
+  config: WorkdayConfig,
+  offset: number,
+  signal?: AbortSignal,
+) {
+  const body = JSON.stringify({
+    appliedFacets: config.appliedFacets,
+    limit: PAGE_SIZE,
+    offset,
+    searchText: config.searchText,
+  });
+
+  return new Promise<WorkdaySearchHttpResponse>((resolve, reject) => {
+    const req = httpsRequest(`${config.apiBase}/jobs`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Length": Buffer.byteLength(body),
+        "Content-Type": "application/json",
+        "User-Agent": "HireGeneralJobBoard/1.0",
+      },
+    });
+
+    const abort = () => {
+      req.destroy(new DOMException("The operation was aborted.", "AbortError"));
+    };
+
+    if (signal?.aborted) {
+      abort();
+      return;
+    }
+
+    signal?.addEventListener("abort", abort, { once: true });
+
+    req.on("response", (res) => {
+      let responseBody = "";
+
+      res.setEncoding("utf8");
+      res.on("data", (chunk) => {
+        responseBody += chunk;
+      });
+      res.on("end", () => {
+        signal?.removeEventListener("abort", abort);
+        resolve({
+          status: res.statusCode ?? 0,
+          body: responseBody,
+        });
+      });
+    });
+
+    req.on("error", (error) => {
+      signal?.removeEventListener("abort", abort);
+      reject(error);
+    });
+
+    req.end(body);
+  });
 }
 
 async function fetchWorkdayDetail(
   config: WorkdayConfig,
   posting: WorkdaySearchPosting,
+  signal?: AbortSignal,
 ) {
   if (!posting.externalPath) return null;
 
@@ -138,6 +233,7 @@ async function fetchWorkdayDetail(
       "User-Agent": "HireGeneralJobBoard/1.0",
     },
     cache: "no-store",
+    signal,
   });
 
   const body = await response.text().catch(() => "");
@@ -167,6 +263,32 @@ function sourceId(sourceSlug: string, posting: WorkdaySearchPosting) {
   return `${sourceSlug}:${fromPath ?? fallback}`;
 }
 
+function duplicateRoleKey(
+  source: JobSource,
+  posting: WorkdaySearchPosting,
+  detail: WorkdayDetailResponse | null,
+) {
+  const title = detail?.jobPostingInfo?.title ?? posting.title ?? "";
+  const normalizedTitle = normalizedJobTitleKey(title);
+
+  return normalizedTitle
+    ? `${source.sourceSlug}:${normalizedTitle}`
+    : sourceId(source.sourceSlug, posting);
+}
+
+function duplicateRoleSourceId(
+  source: JobSource,
+  posting: WorkdaySearchPosting,
+  detail: WorkdayDetailResponse | null,
+) {
+  const title = detail?.jobPostingInfo?.title ?? posting.title ?? "";
+  const normalizedTitle = normalizedJobTitleKey(title).replace(/\s+/g, "-");
+
+  return normalizedTitle
+    ? `${source.sourceSlug}:role:${normalizedTitle}`
+    : sourceId(source.sourceSlug, posting);
+}
+
 function searchableWorkdayText(
   posting: WorkdaySearchPosting,
   detail: WorkdayDetailResponse | null,
@@ -184,6 +306,22 @@ function searchableWorkdayText(
     info?.jobFamily,
     info?.timeType,
     info?.jobDescription,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function searchableWorkdayLocationText(
+  posting: WorkdaySearchPosting,
+  detail: WorkdayDetailResponse | null,
+) {
+  const info = detail?.jobPostingInfo;
+
+  return [
+    posting.locationsText,
+    info?.location,
+    info?.locationsText,
+    ...(info?.additionalLocations ?? []),
   ]
     .filter(Boolean)
     .join(" ");
@@ -359,11 +497,11 @@ function parsedDescriptionSections(descriptionHtml: string | undefined) {
   };
 }
 
-function workdayLocation(
+function workdayLocations(
   posting: WorkdaySearchPosting,
   info: WorkdayDetailResponse["jobPostingInfo"] | undefined,
 ) {
-  const locations = uniqueItems(
+  return uniqueItems(
     [
       info?.location,
       ...(info?.additionalLocations ?? []),
@@ -375,15 +513,64 @@ function workdayLocation(
       .map((value) => value.trim())
       .filter(Boolean),
   );
-
-  return locations.length > 0 ? locations.join(", ") : "United States";
 }
 
-async function fetchWorkdayPostings(config: WorkdayConfig) {
+function mergeDuplicateWorkdayRoles(
+  source: JobSource,
+  jobs: Array<{
+    posting: WorkdaySearchPosting;
+    detail: WorkdayDetailResponse | null;
+  }>,
+) {
+  const grouped = new Map<
+    string,
+    {
+      posting: WorkdaySearchPosting;
+      detail: WorkdayDetailResponse | null;
+      sourceId: string;
+      locations: string[];
+    }
+  >();
+
+  for (const job of jobs) {
+    const key = duplicateRoleKey(source, job.posting, job.detail);
+    const info = job.detail?.jobPostingInfo;
+    const locations = workdayLocations(job.posting, info);
+    const current = grouped.get(key);
+
+    if (!current) {
+      grouped.set(key, {
+        ...job,
+        sourceId: duplicateRoleSourceId(source, job.posting, job.detail),
+        locations: locations.length > 0 ? locations : ["United States"],
+      });
+      continue;
+    }
+
+    current.locations = uniqueItems([
+      ...current.locations,
+      ...(locations.length > 0 ? locations : ["United States"]),
+    ]);
+  }
+
+  return [...grouped.values()].map((job) => ({
+    ...job,
+    location: job.locations.join(", "),
+  }));
+}
+
+async function fetchWorkdayPostings(
+  config: WorkdayConfig,
+  signal?: AbortSignal,
+) {
   const postings: WorkdaySearchPosting[] = [];
 
   for (let page = 0; page < MAX_PAGES; page += 1) {
-    const response = await fetchWorkdaySearchPage(config, page * PAGE_SIZE);
+    const response = await fetchWorkdaySearchPage(
+      config,
+      page * PAGE_SIZE,
+      signal,
+    );
     const pagePostings = response.jobPostings ?? [];
 
     postings.push(...pagePostings);
@@ -395,8 +582,34 @@ async function fetchWorkdayPostings(config: WorkdayConfig) {
   return postings;
 }
 
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>,
+) {
+  const results: R[] = [];
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await mapper(items[currentIndex]);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, () => worker()),
+  );
+
+  return results;
+}
+
 export async function fetchWorkdayJobs(
   source: JobSource,
+  context?: {
+    signal?: AbortSignal;
+  },
 ): Promise<ImportedJob[]> {
   const recruiterId = process.env.SYSTEM_RECRUITER_ID;
 
@@ -405,33 +618,39 @@ export async function fetchWorkdayJobs(
   }
 
   const config = workdayConfig(source);
-  const postings = await fetchWorkdayPostings(config);
+  const postings = await fetchWorkdayPostings(config, context?.signal);
   const jobs: Array<{
     posting: WorkdaySearchPosting;
     detail: WorkdayDetailResponse | null;
   }> = [];
 
-  for (const posting of postings) {
-    const detail = await fetchWorkdayDetail(config, posting);
-    const text = searchableWorkdayText(posting, detail);
+  const detailedPostings = await mapWithConcurrency(
+    postings,
+    DETAIL_CONCURRENCY,
+    async (posting) => ({
+      posting,
+      detail: await fetchWorkdayDetail(config, posting, context?.signal),
+    }),
+  );
 
-    if (!isUsText(text)) continue;
+  for (const { posting, detail } of detailedPostings) {
+    const text = searchableWorkdayText(posting, detail);
+    const locationText = searchableWorkdayLocationText(posting, detail);
+
+    if (!isUsText(locationText)) continue;
     if (!isEngineeringText(text)) continue;
     if (isInternshipText(text)) continue;
 
     jobs.push({ posting, detail });
   }
 
-  const dedupedJobs = dedupeBySourceKey(jobs, ({ posting }) =>
-    sourceId(source.sourceSlug, posting),
-  );
+  const dedupedJobs = mergeDuplicateWorkdayRoles(source, jobs);
 
-  return dedupedJobs.map(({ posting, detail }) => {
+  return dedupedJobs.map(({ posting, detail, location, sourceId }) => {
     const info = detail?.jobPostingInfo;
     const title = (info?.title ?? posting.title ?? "Untitled Workday job")
       .replace(/\s+/g, " ")
       .trim();
-    const location = workdayLocation(posting, info);
     const parsedDescription = parsedDescriptionSections(info?.jobDescription);
     const description =
       parsedDescription.about || parsedDescription.plainText || "";
@@ -470,7 +689,7 @@ export async function fetchWorkdayJobs(
       expiresAt: isoDateOrNull(info?.endDate) ?? defaultExpiryDate(30),
 
       sourceName: "workday",
-      sourceId: sourceId(source.sourceSlug, posting),
+      sourceId,
       applyUrl: info?.externalUrl ?? applyUrl(config, posting),
 
       experienceLevel: null,

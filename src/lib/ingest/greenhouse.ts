@@ -7,12 +7,14 @@ import {
   type ImportedJob,
 } from "./normalize";
 import {
-  dedupeBySourceKey,
   isEngineeringText,
   isInternshipText,
   isUsText,
+  normalizedJobTitleKey,
 } from "./filters";
 import type { JobSourceAdapter } from "./source";
+
+const MAX_GREENHOUSE_JOBS_PER_SOURCE = 100;
 
 type GreenhouseJob = {
   id: number;
@@ -35,20 +37,29 @@ type GreenhouseResponse = {
   jobs: GreenhouseJob[];
 };
 
+function searchableJobLocationText(job: GreenhouseJob) {
+  return [
+    job.location?.name,
+    ...(job.offices ?? []).map((office) => office.name),
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 function searchableJobText(job: GreenhouseJob) {
   return [
     job.title,
     job.location?.name,
     ...(job.departments ?? []).map((department) => department.name),
     ...(job.offices ?? []).map((office) => office.name),
+    job.content,
   ]
     .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
+    .join(" ");
 }
 
 function isUsJob(job: GreenhouseJob) {
-  return isUsText(searchableJobText(job));
+  return isUsText(searchableJobLocationText(job));
 }
 
 function isEngineeringJob(job: GreenhouseJob) {
@@ -66,12 +77,88 @@ function isInternshipJob(job: GreenhouseJob) {
   return isInternshipText(searchableJobText(job));
 }
 
+function greenhouseLocations(job: GreenhouseJob) {
+  return [
+    job.location?.name,
+    ...(job.offices ?? []).map((office) => office.name),
+  ]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function uniqueItems(items: string[]) {
+  const seen = new Set<string>();
+
+  return items.filter((item) => {
+    const key = item.toLowerCase();
+
+    if (!key || seen.has(key)) return false;
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function duplicateRoleKey(sourceSlug: string, job: GreenhouseJob) {
+  const normalizedTitle = normalizedJobTitleKey(job.title);
+
+  return normalizedTitle
+    ? `${sourceSlug}:${normalizedTitle}`
+    : `${sourceSlug}:${job.id}`;
+}
+
+function duplicateRoleSourceId(sourceSlug: string, job: GreenhouseJob) {
+  const normalizedTitle = normalizedJobTitleKey(job.title).replace(/\s+/g, "-");
+
+  return normalizedTitle
+    ? `${sourceSlug}:role:${normalizedTitle}`
+    : `${sourceSlug}:${job.id}`;
+}
+
+function mergeDuplicateGreenhouseRoles(sourceSlug: string, jobs: GreenhouseJob[]) {
+  const grouped = new Map<
+    string,
+    {
+      job: GreenhouseJob;
+      sourceId: string;
+      locations: string[];
+    }
+  >();
+
+  for (const job of jobs) {
+    const key = duplicateRoleKey(sourceSlug, job);
+    const locations = greenhouseLocations(job);
+    const current = grouped.get(key);
+
+    if (!current) {
+      grouped.set(key, {
+        job,
+        sourceId: duplicateRoleSourceId(sourceSlug, job),
+        locations: locations.length > 0 ? locations : ["United States"],
+      });
+      continue;
+    }
+
+    current.locations = uniqueItems([
+      ...current.locations,
+      ...(locations.length > 0 ? locations : ["United States"]),
+    ]);
+  }
+
+  return [...grouped.values()].map((item) => ({
+    ...item,
+    location: item.locations.join(", "),
+  }));
+}
+
 export async function fetchGreenhouseJobs(params: {
   companyName: string;
   companyLogoUrl?: string;
   sourceSlug: string;
+  signal?: AbortSignal;
 }): Promise<ImportedJob[]> {
-  const { companyLogoUrl, companyName, sourceSlug } = params;
+  const { companyLogoUrl, companyName, signal, sourceSlug } = params;
 
   const recruiterId = process.env.SYSTEM_RECRUITER_ID;
 
@@ -87,6 +174,7 @@ export async function fetchGreenhouseJobs(params: {
       "User-Agent": "YourJobBoard/1.0",
     },
     cache: "no-store",
+    signal,
   });
 
   if (!response.ok) {
@@ -101,15 +189,16 @@ export async function fetchGreenhouseJobs(params: {
     throw new Error(`Invalid Greenhouse response for ${companyName}`);
   }
 
-  const filteredJobs = dedupeBySourceKey(
-    data.jobs.filter(
-      (job) => isUsJob(job) && isEngineeringJob(job) && !isInternshipJob(job),
-    ),
-    (job) => String(job.id),
+  const filteredJobs = mergeDuplicateGreenhouseRoles(
+    sourceSlug,
+    data.jobs
+      .filter(
+        (job) => isUsJob(job) && isEngineeringJob(job) && !isInternshipJob(job),
+      )
+      .slice(0, MAX_GREENHOUSE_JOBS_PER_SOURCE),
   );
 
-  return filteredJobs.map((job) => {
-    const location = job.location?.name || "Not specified";
+  return filteredJobs.map(({ job, location, sourceId }) => {
     const plainDescription = htmlToText(job.content);
 
     return {
@@ -146,7 +235,7 @@ export async function fetchGreenhouseJobs(params: {
       expiresAt: defaultExpiryDate(30),
 
       sourceName: "greenhouse",
-      sourceId: `${sourceSlug}:${job.id}`,
+      sourceId,
       applyUrl: job.absolute_url,
 
       experienceLevel: null,
@@ -161,5 +250,11 @@ export async function fetchGreenhouseJobs(params: {
 
 export const greenhouseAdapter: JobSourceAdapter = {
   type: "greenhouse",
-  fetchJobs: fetchGreenhouseJobs,
+  fetchJobs: (source, context) =>
+    fetchGreenhouseJobs({
+      companyName: source.companyName,
+      companyLogoUrl: source.companyLogoUrl,
+      sourceSlug: source.sourceSlug,
+      signal: context?.signal,
+    }),
 };

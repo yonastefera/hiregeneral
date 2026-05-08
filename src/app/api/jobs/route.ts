@@ -11,7 +11,50 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
-const DEFAULT_BROWSE_COMPANY_LIMIT = 25;
+const MAX_CANDIDATE_JOBS = 5000;
+const NEW_JOBS_WINDOW_DAYS = 7;
+const DEFAULT_COMPANY_BALANCE = "company";
+
+const JOB_CANDIDATE_SELECT = `
+  id,
+  recruiter_id,
+  company_id,
+  company_name,
+  company_logo_url,
+  company_tagline,
+  company_size,
+  company_website,
+  title,
+  location,
+  latitude,
+  longitude,
+  employment_type,
+  work_mode,
+  experience_level,
+  category,
+  salary_min,
+  salary_max,
+  salary_currency,
+  skills,
+  status,
+  slug,
+  apply_url,
+  source_name,
+  source_id,
+  posted_at,
+  expires_at,
+  created_at,
+  updated_at,
+  job_applicant_counts ( applicant_count )
+`;
+
+const JOB_DETAIL_SELECT = `
+  id,
+  description,
+  responsibilities,
+  requirements,
+  benefits
+`;
 
 type JobRow = {
   id: string;
@@ -52,7 +95,18 @@ type JobRow = {
   }> | null;
 };
 
-type JobResponse = JobRow & {
+type JobCandidateRow = Omit<
+  JobRow,
+  "description" | "responsibilities" | "requirements" | "benefits"
+>;
+
+type JobDetailRow = Pick<
+  JobRow,
+  "id" | "description" | "responsibilities" | "requirements" | "benefits"
+>;
+
+type JobResponse = JobCandidateRow &
+  JobDetailRow & {
   applicant_count: number;
 };
 
@@ -90,96 +144,136 @@ function stripHtml(input: string | null | undefined) {
     .trim();
 }
 
-function isNorthAmericaLocation(location: string | null | undefined) {
-  if (!location) return false;
+function balanceJobsByCompany<T extends { company_name: string }>(jobs: T[]) {
+  const groups = new Map<string, T[]>();
+  const order: string[] = [];
 
-  const value = location.toLowerCase();
+  for (const job of jobs) {
+    const key = job.company_name.toLowerCase();
+    const group = groups.get(key);
 
-  const excluded = [
-    "london",
-    "united kingdom",
-    "uk",
-    "ireland",
-    "germany",
-    "france",
-    "spain",
-    "italy",
-    "netherlands",
-    "sweden",
-    "poland",
-    "romania",
-    "europe",
-    "emea",
-    "india",
-    "bengaluru",
-    "bangalore",
-    "singapore",
-    "japan",
-    "tokyo",
-    "australia",
-    "sydney",
-    "melbourne",
-    "new zealand",
-    "brazil",
-    "argentina",
-  ];
-
-  if (excluded.some((term) => value.includes(term))) {
-    return false;
+    if (group) {
+      group.push(job);
+    } else {
+      groups.set(key, [job]);
+      order.push(key);
+    }
   }
 
-  const included = [
-    "remote",
-    "united states",
-    "usa",
-    "u.s.",
-    "us",
-    "canada",
-    "mexico",
-    "north america",
-    "san francisco",
-    "new york",
-    "nyc",
-    "seattle",
-    "chicago",
-    "austin",
-    "boston",
-    "atlanta",
-    "miami",
-    "denver",
-    "dallas",
-    "los angeles",
-    "la ",
-    "california",
-    "texas",
-    "washington",
-    "oregon",
-    "colorado",
-    "florida",
-    "georgia",
-    "illinois",
-    "massachusetts",
-    "toronto",
-    "vancouver",
-    "montreal",
-  ];
+  const balanced: T[] = [];
+  let added = true;
 
-  return included.some((term) => value.includes(term));
+  while (added) {
+    added = false;
+
+    for (const key of order) {
+      const job = groups.get(key)?.shift();
+
+      if (job) {
+        balanced.push(job);
+        added = true;
+      }
+    }
+  }
+
+  return balanced;
 }
 
-function limitJobsPerCompany(jobs: JobResponse[], limit: number) {
-  if (limit <= 0) return jobs;
+function searchRank<T extends { company_name: string; title: string; category: string | null }>(
+  job: T,
+  query: string,
+) {
+  const normalizedQuery = query.trim().toLowerCase();
 
-  const seen = new Map<string, number>();
+  if (!normalizedQuery) return 0;
 
-  return jobs.filter((job) => {
-    const key = job.company_name.toLowerCase();
-    const count = seen.get(key) ?? 0;
+  const company = job.company_name.toLowerCase();
+  const title = job.title.toLowerCase();
+  const category = job.category?.toLowerCase() ?? "";
 
-    if (count >= limit) return false;
+  if (company === normalizedQuery) return 0;
+  if (company.includes(normalizedQuery)) return 1;
+  if (title === normalizedQuery) return 2;
+  if (title.includes(normalizedQuery)) return 3;
+  if (category.includes(normalizedQuery)) return 4;
 
-    seen.set(key, count + 1);
-    return true;
+  return 5;
+}
+
+function rankSearchResults<
+  T extends {
+    company_name: string;
+    title: string;
+    category: string | null;
+    posted_at: string;
+  },
+>(jobs: T[], query: string) {
+  if (!query.trim()) return jobs;
+
+  return [...jobs].sort((a, b) => {
+    const rankDiff = searchRank(a, query) - searchRank(b, query);
+
+    if (rankDiff !== 0) return rankDiff;
+
+    return new Date(b.posted_at).getTime() - new Date(a.posted_at).getTime();
+  });
+}
+
+function hasSearchIntent(params: {
+  query: string;
+  location: string;
+  workMode: string;
+  employmentType: string;
+  category: string;
+  company: string;
+  excludeId: string;
+}) {
+  return Boolean(
+    params.query.trim() ||
+      params.location.trim() ||
+      params.workMode ||
+      params.employmentType ||
+      params.category ||
+      params.company.trim() ||
+      params.excludeId,
+  );
+}
+
+function locationSearchTerm(value: string) {
+  return value
+    .split(",")
+    .map((part) => part.trim())
+    .find(Boolean);
+}
+
+async function hydrateJobDetails(candidates: JobCandidateRow[]) {
+  if (candidates.length === 0) return [];
+
+  const ids = candidates.map((job) => job.id);
+  const { data, error } = await supabaseAdmin
+    .from("jobs")
+    .select(JOB_DETAIL_SELECT)
+    .in("id", ids);
+
+  if (error) {
+    throw new Error(`Could not load job details: ${error.message}`);
+  }
+
+  const detailsById = new Map(
+    ((data ?? []) as JobDetailRow[]).map((job) => [job.id, job]),
+  );
+
+  return candidates.map((job) => {
+    const details = detailsById.get(job.id);
+
+    return {
+      ...job,
+      description: stripHtml(details?.description),
+      responsibilities: details?.responsibilities ?? [],
+      requirements: details?.requirements ?? [],
+      benefits: details?.benefits ?? [],
+      applicant_count: job.job_applicant_counts?.[0]?.applicant_count ?? 0,
+    };
   });
 }
 
@@ -195,57 +289,16 @@ export async function GET(req: NextRequest) {
     const category = searchParams.get("category") ?? "";
     const company = searchParams.get("company") ?? "";
     const excludeId = searchParams.get("excludeId") ?? "";
-    const companyLimit = Math.max(
-      0,
-      Number(searchParams.get("companyLimit") ?? DEFAULT_BROWSE_COMPANY_LIMIT),
-    );
-
+    const balance = searchParams.get("balance") ?? DEFAULT_COMPANY_BALANCE;
     const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
     const pageSize = Math.min(25, Number(searchParams.get("pageSize") ?? "10"));
 
-    // Fetch a larger candidate set, then filter North America in JS.
-    // Later, add location_country/location_region columns and move this into SQL.
+    // Fetch a lightweight candidate set, then hydrate only the jobs returned on
+    // this page. This keeps tiny dashboard requests from downloading every full
+    // job description in the table.
     let dbQuery = supabaseAdmin
       .from("jobs")
-      .select(
-        `
-        id,
-        recruiter_id,
-        company_id,
-        company_name,
-        company_logo_url,
-        company_tagline,
-        company_size,
-        company_website,
-        title,
-        description,
-        responsibilities,
-        requirements,
-        benefits,
-        location,
-        latitude,
-        longitude,
-        employment_type,
-        work_mode,
-        experience_level,
-        category,
-        salary_min,
-        salary_max,
-        salary_currency,
-        skills,
-        status,
-        slug,
-        apply_url,
-        source_name,
-        source_id,
-        posted_at,
-        expires_at,
-        created_at,
-        updated_at,
-        job_applicant_counts ( applicant_count )
-      `,
-        { count: "exact" },
-      )
+      .select(JOB_CANDIDATE_SELECT, { count: "exact" })
       .eq("status", "published")
       .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
       .gte(
@@ -253,7 +306,7 @@ export async function GET(req: NextRequest) {
         new Date(Date.now() - daysAgo * 86_400_000).toISOString(),
       )
       .order("posted_at", { ascending: false })
-      .limit(1000);
+      .limit(MAX_CANDIDATE_JOBS);
 
     if (query.trim()) {
       const q = `%${query.trim()}%`;
@@ -264,9 +317,11 @@ export async function GET(req: NextRequest) {
     }
 
     if (location.trim()) {
-      const loc = `%${location.trim()}%`;
+      const loc = locationSearchTerm(location);
 
-      dbQuery = dbQuery.or(`location.ilike.${loc},work_mode.ilike.${loc}`);
+      if (loc) {
+        dbQuery = dbQuery.ilike("location", `%${loc}%`);
+      }
     }
 
     if (workMode) {
@@ -289,7 +344,7 @@ export async function GET(req: NextRequest) {
       dbQuery = dbQuery.neq("id", excludeId);
     }
 
-    const { data, error } = await dbQuery;
+    const { count, data, error } = await dbQuery;
 
     if (error) {
       console.error("[GET /api/jobs] Supabase error:", error);
@@ -303,32 +358,44 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const cleanedJobs: JobResponse[] = ((data ?? []) as JobRow[])
-      .filter((job) => isNorthAmericaLocation(job.location))
-      .map((job) => ({
-        ...job,
-        description: stripHtml(job.description),
-        applicant_count: job.job_applicant_counts?.[0]?.applicant_count ?? 0,
-      }));
+    const candidateJobs = (data ?? []) as JobCandidateRow[];
 
     const shouldBalanceByCompany =
-      !query.trim() &&
-      !location.trim() &&
-      !workMode &&
-      !employmentType &&
-      !category &&
-      !company.trim();
-    const displayJobs = shouldBalanceByCompany
-      ? limitJobsPerCompany(cleanedJobs, companyLimit)
-      : cleanedJobs;
+      balance === "company" &&
+      !hasSearchIntent({
+        query,
+        location,
+        workMode,
+        employmentType,
+        category,
+        company,
+        excludeId,
+      });
+    const displayCandidates = shouldBalanceByCompany
+      ? balanceJobsByCompany(candidateJobs)
+      : rankSearchResults(candidateJobs, query);
 
-    const total = displayJobs.length;
+    const total = count ?? displayCandidates.length;
+    const newJobs = displayCandidates.filter((job) => {
+      const postedTime = new Date(job.posted_at).getTime();
+
+      if (Number.isNaN(postedTime)) return false;
+
+      return (
+        postedTime >=
+        Date.now() - NEW_JOBS_WINDOW_DAYS * 86_400_000
+      );
+    }).length;
     const from = (page - 1) * pageSize;
     const to = from + pageSize;
+    const pageJobs = await hydrateJobDetails(displayCandidates.slice(from, to));
 
     return NextResponse.json({
-      data: displayJobs.slice(from, to),
+      data: pageJobs,
       total,
+      newJobs,
+      newJobsWindowDays: NEW_JOBS_WINDOW_DAYS,
+      balance: shouldBalanceByCompany ? "company" : "none",
       page,
       pageSize,
       totalPages: Math.max(1, Math.ceil(total / pageSize)),

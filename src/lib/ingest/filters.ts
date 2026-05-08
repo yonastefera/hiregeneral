@@ -134,3 +134,12 @@ export function dedupeBySourceKey<T>(jobs: T[], getKey: (job: T) => string) {
     return true;
   });
 }
+
+export function normalizedJobTitleKey(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}

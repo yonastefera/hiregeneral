@@ -14,6 +14,8 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const DEFAULT_SOURCE_TIMEOUT_MS = 90_000;
+
 type SourceResult = {
   companyName: string;
   sourceType: string;
@@ -43,6 +45,14 @@ function missingEnvVars() {
   ].filter((name) => !process.env[name]);
 }
 
+function sourceTimeoutMs() {
+  const value = Number(process.env.INGEST_SOURCE_TIMEOUT_MS);
+
+  return Number.isFinite(value) && value > 0
+    ? value
+    : DEFAULT_SOURCE_TIMEOUT_MS;
+}
+
 export async function POST(request: Request) {
   try {
     const missing = missingEnvVars();
@@ -70,7 +80,21 @@ export async function POST(request: Request) {
       );
     }
 
-    const sources = await getEnabledJobSources();
+    const url = new URL(request.url);
+    const requestedSourceSlug = url.searchParams.get("sourceSlug");
+    const requestedSourceType = url.searchParams.get("sourceType");
+    const allSources = await getEnabledJobSources();
+    const sources = allSources.filter((source) => {
+      if (requestedSourceSlug && source.sourceSlug !== requestedSourceSlug) {
+        return false;
+      }
+
+      if (requestedSourceType && source.sourceType !== requestedSourceType) {
+        return false;
+      }
+
+      return true;
+    });
     const sourcesResult: SourceResult[] = [];
 
     for (const source of sources) {
@@ -113,7 +137,21 @@ export async function POST(request: Request) {
         const runId = await startIngestionRun(source);
         sourceResult.runId = runId;
 
-        const rawJobs = await adapter.fetchJobs(source);
+        const abortController = new AbortController();
+        const timeout = setTimeout(
+          () => abortController.abort(),
+          sourceTimeoutMs(),
+        );
+
+        let rawJobs;
+
+        try {
+          rawJobs = await adapter.fetchJobs(source, {
+            signal: abortController.signal,
+          });
+        } finally {
+          clearTimeout(timeout);
+        }
         const validation = validateImportedJobs(rawJobs);
 
         sourceResult.fetchedJobs = rawJobs.length;

@@ -33,8 +33,9 @@ export async function fetchLeverJobs(params: {
   companyName: string;
   companyLogoUrl?: string;
   sourceSlug: string;
+  signal?: AbortSignal;
 }): Promise<ImportedJob[]> {
-  const { companyLogoUrl, companyName, sourceSlug } = params;
+  const { companyLogoUrl, companyName, signal, sourceSlug } = params;
 
   const recruiterId = process.env.SYSTEM_RECRUITER_ID;
 
@@ -50,6 +51,7 @@ export async function fetchLeverJobs(params: {
       "User-Agent": "YourJobBoard/1.0",
     },
     cache: "no-store",
+    signal,
   });
 
   if (!response.ok) {
@@ -125,5 +127,11 @@ export async function fetchLeverJobs(params: {
 
 export const leverAdapter: JobSourceAdapter = {
   type: "lever",
-  fetchJobs: fetchLeverJobs,
+  fetchJobs: (source, context) =>
+    fetchLeverJobs({
+      companyName: source.companyName,
+      companyLogoUrl: source.companyLogoUrl,
+      sourceSlug: source.sourceSlug,
+      signal: context?.signal,
+    }),
 };

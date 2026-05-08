@@ -180,7 +180,7 @@ const Index = () => {
                   ))
                 ) : highlightedJobs.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-border bg-background p-5 text-sm text-muted-foreground">
-                    Featured roles will appear after ingestion runs.
+                    Featured roles will appear after ingestion runs or please check your network connection. 
                   </div>
                 ) : (
                   highlightedJobs.map((job) => (

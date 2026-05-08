@@ -31,9 +31,9 @@ import { toJobCardShape } from "@/lib/jobs/card-shape";
 import { cn } from "@/lib/utils";
 import type { Job } from "@/lib/db/types";
 
-const DEFAULT_POSTED = "30";
+const DEFAULT_POSTED = "3650";
 const DEFAULT_DISTANCE = "100";
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
 
 function useDebouncedValue(value: string, delay: number) {
@@ -65,6 +65,7 @@ export default function JobsPage() {
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [totalJobs, setTotalJobs] = useState(0);
+  const [newJobs, setNewJobs] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -153,6 +154,7 @@ export default function JobsPage() {
 
         setJobs(nextJobs);
         setTotalJobs(Number(body.total ?? nextJobs.length));
+        setNewJobs(Number(body.newJobs ?? 0));
         setTotalPages(Number(body.totalPages ?? 1));
         hasLoadedOnceRef.current = true;
         setHasLoadedOnce(true);
@@ -162,6 +164,7 @@ export default function JobsPage() {
         if (!hasLoadedOnceRef.current) {
           setJobs([]);
           setTotalJobs(0);
+          setNewJobs(0);
           setTotalPages(1);
         }
 
@@ -366,6 +369,7 @@ export default function JobsPage() {
                     {totalJobs} {totalJobs === 1 ? "job" : "jobs"} found
                     {totalJobs > 0 && (
                       <>
+                        {newJobs > 0 && <> ({newJobs} new)</>}
                         {" "}
                         · showing{" "}
                         <span className="font-medium text-foreground">
