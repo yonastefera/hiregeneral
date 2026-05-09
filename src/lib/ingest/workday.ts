@@ -449,7 +449,7 @@ function parsedDescriptionSections(descriptionHtml: string | undefined) {
     .trim();
 
   const markerPattern =
-    /^(About this role|About the role|In this role, you will|What you(?:'|’)ll do|Responsibilities|Required Qualifications|Minimum Qualifications|Basic Qualifications|Desired Qualifications|Preferred Qualifications|Qualifications|Requirements|Job Expectations|Pay Range|Benefits|Posting End Date|We Value Equal Opportunity|Applicants with Disabilities|Drug and Alcohol Policy|Wells Fargo Recruitment and Hiring Requirements):?$/gim;
+    /^(About this role|About the role|About Accenture|In this role, you will|As an? [^.\n]{3,160}?, you will|What you(?:'|’)ll do|Responsibilities|Here(?:'|’)s What You Need|What You Need|Nice to Have|Required Qualifications|Minimum Qualifications|Basic Qualifications|Desired Qualifications|Preferred Qualifications|Qualifications|Requirements|Job Expectations|Pay Range|Benefits|Posting End Date|We Value Equal Opportunity|Applicants with Disabilities|Drug and Alcohol Policy|Wells Fargo Recruitment and Hiring Requirements):?$/gim;
 
   const markers = [...text.matchAll(markerPattern)].map((match) => ({
     label: match[1].toLowerCase(),
@@ -473,11 +473,14 @@ function parsedDescriptionSections(descriptionHtml: string | undefined) {
   const about = section(["about this role", "about the role"]);
   const responsibilities = section([
     "in this role",
+    "you will",
     "what you'll do",
     "what you’ll do",
     "responsibilities",
   ]);
   const qualifications = section([
+    "what you need",
+    "nice to have",
     "required qualifications",
     "minimum qualifications",
     "basic qualifications",
@@ -656,9 +659,6 @@ export async function fetchWorkdayJobs(
       .replace(/\s+/g, " ")
       .trim();
     const parsedDescription = parsedDescriptionSections(info?.jobDescription);
-    const description =
-      parsedDescription.about || parsedDescription.plainText || "";
-
     return {
       recruiterId,
       companyId: null,
@@ -666,7 +666,7 @@ export async function fetchWorkdayJobs(
       companyLogoUrl: source.companyLogoUrl ?? null,
       title,
       description: safeDescription({
-        description,
+        description: parsedDescription.plainText || parsedDescription.about,
         title,
         companyName: source.companyName,
       }),

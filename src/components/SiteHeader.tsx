@@ -201,13 +201,13 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 w-full will-change-transform",
+        "sticky top-0 z-40 w-full transition-all duration-300",
         elevated
-          ? "border-b border-border/60 bg-background/80 backdrop-blur-xl supports-backdrop-filter:bg-background/60"
+          ? "border-b border-border/40 bg-background shadow-xs"
           : "border-b border-transparent bg-transparent",
       )}
     >
-      <nav className="mx-auto grid h-16 max-w-7xl grid-cols-[auto_1fr_auto] items-center gap-6 px-4 md:px-6">
+      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 md:px-6">
         <Link
           href="/"
           aria-label="HireGeneral home"
@@ -216,7 +216,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
           <BrandLogo />
         </Link>
 
-        <div className="hidden min-w-0 items-center justify-center gap-1 md:flex">
+        <div className="hidden items-center gap-0.5 rounded-full border border-border/50 bg-background/40 p-1 backdrop-blur-xl md:flex">
           {navLinks.map((link) => {
             const active =
               pathname === link.href ||
@@ -227,26 +227,19 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  "relative rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  "relative rounded-full px-3.5 py-1.5 text-sm font-medium tracking-tight transition-colors",
                   active
-                    ? "text-foreground"
-                    : "text-muted-foreground hover:text-foreground",
+                    ? "bg-foreground text-background shadow-xs"
+                    : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
                 )}
               >
                 {link.label}
-
-                <span
-                  className={cn(
-                    "absolute inset-x-3 -bottom-5.5 h-px bg-primary transition-opacity duration-150",
-                    active ? "opacity-100" : "opacity-0",
-                  )}
-                />
               </Link>
             );
           })}
         </div>
 
-        <div className="hidden min-w-55 items-center justify-end gap-1 md:flex">
+        <div className="hidden items-center gap-1 md:flex">
           {authLoading ? (
             <div className="h-9 w-45" aria-hidden="true" />
           ) : user ? (
@@ -258,7 +251,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
               )}
 
               <IconLink href="/messages" label="Messages">
-                <MessageSquare className="size-4.5" />
+                <MessageSquare className="size-[18px]" />
               </IconLink>
 
               <IconLink
@@ -266,7 +259,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
                 label="Notifications"
                 badge={unreadCount}
               >
-                <Bell className="size-4.5" />
+                <Bell className="size-[18px]" />
               </IconLink>
 
               <div className="relative">
@@ -293,13 +286,13 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
                 <div
                   role="menu"
                   className={cn(
-                    "absolute right-0 top-full z-20 mt-3 w-60 origin-top-right rounded-lg border border-border bg-background shadow-lg transition-all duration-150",
+                    "absolute right-0 top-full z-20 mt-3 w-60 origin-top-right rounded-xl border border-border/70 bg-background shadow-lift transition-all duration-150",
                     accountMenuOpen
                       ? "translate-y-0 scale-100 opacity-100"
                       : "pointer-events-none -translate-y-1 scale-95 opacity-0",
                   )}
                 >
-                  <div className="border-b border-border px-4 py-3">
+                  <div className="border-b border-border/60 px-4 py-3">
                     <p className="truncate text-sm font-medium text-foreground">
                       {displayName}
                     </p>
@@ -359,7 +352,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
                     )}
                   </div>
 
-                  <div className="border-t border-border p-1">
+                  <div className="border-t border-border/60 p-1">
                     <AccountMenuLink
                       href="/settings/account"
                       onClick={() => setAccountMenuOpen(false)}
@@ -385,11 +378,11 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
                     </AccountMenuLink>
                   </div>
 
-                  <div className="border-t border-border p-1">
+                  <div className="border-t border-border/60 p-1">
                     <button
                       type="button"
                       onClick={handleSignOut}
-                      className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10"
+                      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10"
                     >
                       <LogOut className="size-4" />
                       Sign out
@@ -411,21 +404,15 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
           )}
         </div>
 
-        <div className="flex items-center gap-1 justify-self-end md:hidden">
+        <div className="flex items-center gap-1 md:hidden">
           {!authLoading && user && (
-            <>
-              <IconLink href="/messages" label="Messages">
-                <MessageSquare className="size-4.5" />
-              </IconLink>
-
-              <IconLink
-                href="/notifications"
-                label="Notifications"
-                badge={unreadCount}
-              >
-                <Bell className="size-4.5" />
-              </IconLink>
-            </>
+            <IconLink
+              href="/notifications"
+              label="Notifications"
+              badge={unreadCount}
+            >
+              <Bell className="size-4.5" />
+            </IconLink>
           )}
 
           <button
@@ -433,7 +420,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
             aria-label={open ? "Close menu" : "Open menu"}
             aria-expanded={open}
             onClick={() => setOpen((value) => !value)}
-            className="relative grid size-10 place-items-center rounded-md text-foreground transition-colors hover:bg-secondary md:hidden"
+            className="relative grid size-10 place-items-center rounded-full border border-border/60 bg-background/60 text-foreground backdrop-blur-xl transition-colors hover:bg-secondary"
           >
             <span className="sr-only">Toggle menu</span>
 
@@ -594,12 +581,12 @@ function IconLink({
     <Link
       href={href}
       aria-label={label}
-      className="relative grid size-9 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+      className="relative grid size-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
     >
       {children}
 
       {badge && badge > 0 ? (
-        <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground">
+        <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] font-semibold leading-none text-accent-foreground ring-2 ring-background">
           {badge > 9 ? "9+" : badge}
         </span>
       ) : null}
@@ -620,7 +607,7 @@ function AccountMenuLink({
     <Link
       href={href}
       onClick={onClick}
-      className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm text-foreground transition-colors hover:bg-secondary"
+      className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-secondary"
     >
       {children}
     </Link>

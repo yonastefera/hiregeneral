@@ -39,6 +39,26 @@ export interface Job {
   updated_at: string;
   // joined from job_applicant_counts view
   applicant_count?: number;
+  enrichment?: JobEnrichment | null;
+}
+
+export interface JobEnrichment {
+  job_id: string;
+  display_title: string;
+  display_location: string;
+  location_count: number;
+  summary: string;
+  about_role: string;
+  responsibilities: string[];
+  requirements: string[];
+  benefits: string[];
+  quality_flags: string[];
+  confidence: number;
+  status: "ready" | "failed";
+  error_message: string | null;
+  model: string;
+  prompt_version: string;
+  enriched_at: string | null;
 }
 
 export interface JobsResponse {

@@ -5,30 +5,30 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98]",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-medium tracking-tight ring-offset-background transition-[transform,background,box-shadow,color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.97]",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm",
+          "bg-foreground text-background hover:bg-foreground/90 shadow-xs",
         destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm",
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-xs",
         outline:
-          "border border-input bg-background hover:bg-secondary hover:text-foreground hover:border-primary/30",
+          "border border-border bg-background/60 text-foreground backdrop-blur hover:bg-secondary hover:border-foreground/20",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-secondary hover:text-foreground",
+        ghost: "text-foreground hover:bg-secondary",
         link: "text-primary underline-offset-4 hover:underline",
-        hero: "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow-md",
-        warm: "bg-accent text-accent-foreground shadow-sm hover:bg-accent/90",
+        hero: "bg-primary-gradient text-primary-foreground shadow-pop hover:shadow-lift hover:brightness-110",
+        warm: "bg-warm-gradient text-accent-foreground shadow-warm hover:brightness-110",
         glass:
-          "border border-border bg-surface text-foreground hover:bg-secondary hover:border-primary/30",
+          "border border-border/70 bg-background/60 text-foreground backdrop-blur-xl hover:bg-background/80",
       },
       size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-md px-3 text-xs",
-        lg: "h-11 rounded-md px-6",
-        xl: "h-12 rounded-md px-7 text-sm",
+        default: "h-10 px-5",
+        sm: "h-8 px-3.5 text-xs",
+        lg: "h-11 px-6",
+        xl: "h-12 px-7 text-[15px]",
         icon: "h-10 w-10",
       },
     },

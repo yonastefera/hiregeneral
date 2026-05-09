@@ -2,6 +2,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import {
+  JOB_ENRICHMENT_SELECT,
+  mapJobEnrichments,
+} from "@/lib/jobs/enrichment";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -244,18 +248,32 @@ async function hydrateJobDetails(candidates: JobCandidateRow[]) {
   if (candidates.length === 0) return [];
 
   const ids = candidates.map((job) => job.id);
-  const { data, error } = await supabaseAdmin
-    .from("jobs")
-    .select(JOB_DETAIL_SELECT)
-    .in("id", ids);
+  const [{ data, error }, { data: enrichmentRows, error: enrichmentError }] =
+    await Promise.all([
+      supabaseAdmin.from("jobs").select(JOB_DETAIL_SELECT).in("id", ids),
+      supabaseAdmin
+        .from("job_enrichments")
+        .select(JOB_ENRICHMENT_SELECT)
+        .in("job_id", ids)
+        .eq("status", "ready"),
+    ]);
 
   if (error) {
     throw new Error(`Could not load job details: ${error.message}`);
   }
 
+  if (enrichmentError && enrichmentError.code !== "42P01") {
+    throw new Error(
+      `Could not load job enrichments: ${enrichmentError.message}`,
+    );
+  }
+
   const detailsById = new Map(
     ((data ?? []) as JobDetailRow[]).map((job) => [job.id, job]),
   );
+  const enrichmentsByJobId = enrichmentError
+    ? new Map()
+    : mapJobEnrichments(enrichmentRows ?? []);
 
   return candidates.map((job) => {
     const details = detailsById.get(job.id);
@@ -267,6 +285,7 @@ async function hydrateJobDetails(candidates: JobCandidateRow[]) {
       requirements: details?.requirements ?? [],
       benefits: details?.benefits ?? [],
       applicant_count: job.job_applicant_counts?.[0]?.applicant_count ?? 0,
+      enrichment: enrichmentsByJobId.get(job.id) ?? null,
     };
   });
 }

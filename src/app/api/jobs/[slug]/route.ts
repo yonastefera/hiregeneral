@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { htmlToText, cleanTextArray } from "@/lib/text/html";
+import { JOB_ENRICHMENT_SELECT, mapJobEnrichment } from "@/lib/jobs/enrichment";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,8 +60,26 @@ function isUuid(value: string) {
   );
 }
 
-function cleanJob(job: JobRow) {
+async function loadJobEnrichment(jobId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("job_enrichments")
+    .select(JOB_ENRICHMENT_SELECT)
+    .eq("job_id", jobId)
+    .eq("status", "ready")
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === "42P01") return null;
+
+    throw new Error(`Could not load job enrichment: ${error.message}`);
+  }
+
+  return mapJobEnrichment(data);
+}
+
+async function cleanJob(job: JobRow) {
   const { job_applicant_counts, ...rest } = job;
+  const enrichment = await loadJobEnrichment(rest.id);
 
   return {
     ...rest,
@@ -74,6 +93,7 @@ function cleanJob(job: JobRow) {
     benefits: cleanTextArray(rest.benefits),
     skills: rest.skills ?? [],
     applicant_count: job_applicant_counts?.[0]?.applicant_count ?? 0,
+    enrichment,
   };
 }
 
@@ -147,7 +167,7 @@ export async function GET(
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
 
-    return NextResponse.json(cleanJob(data as JobRow));
+    return NextResponse.json(await cleanJob(data as JobRow));
   } catch (error) {
     console.error("[GET /api/jobs/[slug]] Fatal error:", error);
 

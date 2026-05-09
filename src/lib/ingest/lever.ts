@@ -6,6 +6,13 @@ import {
   safeDescription,
   type ImportedJob,
 } from "./normalize";
+import {
+  dedupeBySourceKey,
+  isEngineeringText,
+  isInternshipText,
+  isUsText,
+  normalizedJobTitleKey,
+} from "./filters";
 import type { JobSourceAdapter } from "./source";
 
 type LeverPosting = {
@@ -28,6 +35,30 @@ type LeverPosting = {
     currency?: string;
   };
 };
+
+function getLeverLocation(job: LeverPosting) {
+  return job.categories?.location || "Not specified";
+}
+
+function getLeverDescription(job: LeverPosting) {
+  return job.descriptionPlain || htmlToText(job.description);
+}
+
+function getLeverSearchText(job: LeverPosting) {
+  return [
+    job.text,
+    job.categories?.department,
+    job.categories?.team,
+    getLeverLocation(job),
+    getLeverDescription(job),
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function getLeverDedupeKey(job: LeverPosting) {
+  return `${normalizedJobTitleKey(job.text)}:${getLeverLocation(job).toLowerCase()}`;
+}
 
 export async function fetchLeverJobs(params: {
   companyName: string;
@@ -66,11 +97,23 @@ export async function fetchLeverJobs(params: {
     throw new Error(`Invalid Lever response for ${companyName}`);
   }
 
-  return jobs.map((job) => {
-    const location = job.categories?.location || "Not specified";
+  const filteredJobs = dedupeBySourceKey(
+    jobs.filter((job) => {
+      const location = getLeverLocation(job);
+      const searchText = getLeverSearchText(job);
 
-    const plainDescription =
-      job.descriptionPlain || htmlToText(job.description);
+      return (
+        isUsText(location) &&
+        isEngineeringText(searchText) &&
+        !isInternshipText(searchText)
+      );
+    }),
+    getLeverDedupeKey,
+  );
+
+  return filteredJobs.map((job) => {
+    const location = getLeverLocation(job);
+    const plainDescription = getLeverDescription(job);
 
     const applyUrl = job.applyUrl || job.hostedUrl;
 

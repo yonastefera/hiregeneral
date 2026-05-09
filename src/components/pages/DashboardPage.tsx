@@ -207,7 +207,7 @@ export default function DashboardPage() {
           description:
             "Review listings, monitor imported sources, and keep marketplace data clean.",
           icon: ShieldCheck,
-          href: "/admin-control-center",
+          href: "/admin-control-center/sources",
         },
         {
           title: "User management",

@@ -4,9 +4,9 @@ import tailwindcssAnimate from "tailwindcss-animate";
 export default {
   darkMode: "class",
   content: [
+    "./app/**/*.{ts,tsx}",
     "./pages/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
-    "./app/**/*.{ts,tsx}",
     "./src/**/*.{ts,tsx}",
   ],
   prefix: "",
@@ -25,6 +25,7 @@ export default {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
@@ -45,19 +46,23 @@ export default {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
         },
+
         surface: {
           DEFAULT: "hsl(var(--surface))",
           strong: "hsl(var(--surface-strong))",
           "strong-foreground": "hsl(var(--surface-strong-foreground))",
         },
+
         success: {
           DEFAULT: "hsl(var(--success))",
           foreground: "hsl(var(--success-foreground))",
         },
+
         warning: {
           DEFAULT: "hsl(var(--warning))",
           foreground: "hsl(var(--warning-foreground))",
         },
+
         popover: {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
@@ -66,6 +71,7 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -77,14 +83,17 @@ export default {
           ring: "hsl(var(--sidebar-ring))",
         },
       },
+
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+
       fontFamily: {
         sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
       },
+
       keyframes: {
         "accordion-down": {
           from: {
@@ -103,14 +112,25 @@ export default {
           },
         },
         float: {
-          "0%, 100%": { transform: "translate3d(0, 0, 0)" },
-          "50%": { transform: "translate3d(0, -10px, 0)" },
+          "0%, 100%": {
+            transform: "translate3d(0, 0, 0)",
+          },
+          "50%": {
+            transform: "translate3d(0, -10px, 0)",
+          },
         },
         reveal: {
-          from: { opacity: "0", transform: "translateY(14px)" },
-          to: { opacity: "1", transform: "translateY(0)" },
+          from: {
+            opacity: "0",
+            transform: "translateY(14px)",
+          },
+          to: {
+            opacity: "1",
+            transform: "translateY(0)",
+          },
         },
       },
+
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",

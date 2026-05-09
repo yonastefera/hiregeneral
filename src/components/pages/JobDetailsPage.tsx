@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
 import type { Job } from "@/lib/db/types";
+import { listingLocation } from "@/lib/jobs/display";
 import { isSupportedLogoUrl } from "@/lib/logos";
 import { htmlToText, cleanTextArray } from "@/lib/text/html";
 
@@ -120,6 +121,82 @@ function splitBullets(value: string, maxItems = 10) {
   return splitSentences(cleaned, maxItems);
 }
 
+function splitParagraphs(value: string, maxItems = 8) {
+  return htmlToText(value)
+    .split(/\n{2,}/)
+    .map((item) => compactText(item))
+    .filter((item) => item.length > 20)
+    .slice(0, maxItems);
+}
+
+function trimDynamicHeading(value: string) {
+  return value
+    .replace(/^(?:As an?|As a)\s+[^.\n]{3,160}?,\s+you will:?\s*/i, "")
+    .replace(
+      /^(?:Here(?:'|’)s what you need|What you need|Nice to have):?\s*/i,
+      "",
+    )
+    .trim();
+}
+
+function sanitizeSectionItems(items: string[], maxLength = 260) {
+  const blockedPatterns = [
+    /\b(equal opportunity|applicants with disabilities|drug and alcohol|posting end date|interview practices)\b/i,
+    /\b(accommodation|pay transparency|specific office location|local law|recruitment process)\b/i,
+    /\b(job posting will be posted|market competitive suite|see more information)\b/i,
+    /\b(annual salary range|role location annual|range california|range colorado)\b/i,
+    /\b(actual base salary offer|compensation range listed|wide array of factors)\b/i,
+  ];
+
+  return items
+    .map((item) => trimDynamicHeading(compactText(item)))
+    .filter((item) => item.length >= 16 && item.length <= maxLength)
+    .filter((item) => !blockedPatterns.some((pattern) => pattern.test(item)))
+    .slice(0, 8);
+}
+
+function sanitizeBenefitItems(items: string[]) {
+  const fragments = [
+    /^[,.;:]/,
+    /^(?:actual|and|are|base|for|range|site|plan|here|though)\b/i,
+    /\b(eligible employees|eligibility for specific|defined benefit pension|available upon request)\b/i,
+    /\b(restricted stock units|advance through the hiring process)\b/i,
+    /\b(compensation range listed|base salary offer|hiring process|recruiter can share)\b/i,
+    /\$[\d,.]+\s*[-–]\s*\$[\d,.]+/,
+  ];
+
+  const cleaned = sanitizeSectionItems(items)
+    .filter((item) => !fragments.some((pattern) => pattern.test(item)))
+    .slice(0, 6);
+
+  return cleaned;
+}
+
+function deriveBenefitItemsFromText(value: string) {
+  const text = htmlToText(value);
+  const match = text.match(
+    /Wolters Kluwer offers[\s\S]*?(?:available upon request\.|$)/i,
+  );
+  const source = match?.[0] ?? text;
+
+  const listedBenefits = source.match(
+    /including but not limited to:\s*([\s\S]*?)(?:\.|Full details|$)/i,
+  );
+
+  if (listedBenefits?.[1]) {
+    const items = listedBenefits[1]
+      .split(/,\s+|,\s*&\s*|\s+and\s+/)
+      .map((item) => compactText(item))
+      .filter((item) => item.length > 3 && item.length <= 80);
+
+    if (items.length > 0) {
+      return items.slice(0, 6);
+    }
+  }
+
+  return sanitizeBenefitItems(splitParagraphs(source, 4));
+}
+
 type DerivedSections = {
   about: string;
   responsibilities: string[];
@@ -140,17 +217,49 @@ function removeSectionHeading(value: string, headings: string[]) {
 }
 
 function deriveDescriptionSections(job: Job): DerivedSections {
+  const enrichment = job.enrichment;
+
+  if (enrichment) {
+    const responsibilities = sanitizeSectionItems(
+      enrichment.responsibilities,
+      320,
+    );
+    const requirements = sanitizeSectionItems(enrichment.requirements, 320);
+    const benefits = sanitizeBenefitItems(enrichment.benefits);
+
+    if (
+      enrichment.about_role ||
+      responsibilities.length > 0 ||
+      requirements.length > 0 ||
+      benefits.length > 0
+    ) {
+      return {
+        about: enrichment.about_role,
+        responsibilities,
+        requirements,
+        benefits,
+        extra: [],
+      };
+    }
+  }
+
   const fullText = htmlToText(job.description)
     .replace(/\r/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
-  const existingResponsibilities = cleanTextArray(job.responsibilities);
-  const existingRequirements = cleanTextArray(job.requirements);
-  const existingBenefits = cleanTextArray(job.benefits);
+  const existingResponsibilities = sanitizeSectionItems(
+    cleanTextArray(job.responsibilities),
+    320,
+  );
+  const existingRequirements = sanitizeSectionItems(
+    cleanTextArray(job.requirements),
+    320,
+  );
+  const existingBenefits = sanitizeBenefitItems(cleanTextArray(job.benefits));
 
   const sectionPattern =
-    /(Who we are|About the role|About Stripe|About the team|About this role|In this role, you will|What you’ll do|What you'll do|Responsibilities|What we’re looking for|What we're looking for|Who you are|Required qualifications|Desired qualifications|Minimum requirements|Preferred qualifications|Job expectations|Requirements|Qualifications|Benefits|Pay range|Pay and benefits|Compensation|Salary|Posting end date|We value equal opportunity|Applicants with disabilities|Drug and alcohol policy|Recruitment and hiring requirements)/gi;
+    /(Who we are|About the role|About Stripe|About Accenture|About the team|About this role|In this role, you will|As an? [^.\n]{3,160}?, you will|What you’ll do|What you'll do|Responsibilities|Other Duties|Job Qualifications|Education and Experience|Here(?:'|’)s what you need|What you need|Nice to have|What we’re looking for|What we're looking for|Who you are|Required qualifications|Desired qualifications|Minimum requirements|Preferred qualifications|Other Knowledge, Skills, Abilities or Certifications|Job expectations|Requirements|Qualifications|Travel requirements|Physical Demands|Benefits|Additional Information|Pay range|Pay and benefits|Compensation|Salary|Our Interview Practices|Posting end date|We value equal opportunity|Applicants with disabilities|Drug and alcohol policy|Recruitment and hiring requirements)/gi;
 
   const markers = [...fullText.matchAll(sectionPattern)].map((match) => ({
     label: match[0],
@@ -196,6 +305,7 @@ function deriveDescriptionSections(job: Job): DerivedSections {
           "Who we are",
           "About the role",
           "About Stripe",
+          "About Accenture",
           "About the team",
           "About this role",
         ]),
@@ -204,24 +314,13 @@ function deriveDescriptionSections(job: Job): DerivedSections {
     }
 
     if (
-      label.includes("in this role") ||
-      label.includes("what you") ||
-      label.includes("responsibilities")
-    ) {
-      responsibilityChunks.push(
-        removeSectionHeading(chunk.text, [
-          "In this role, you will",
-          "What you’ll do",
-          "What you'll do",
-          "Responsibilities",
-        ]),
-      );
-      continue;
-    }
-
-    if (
+      label.includes("what you need") ||
+      label.includes("nice to have") ||
       label.includes("looking for") ||
       label.includes("who you are") ||
+      label.includes("job qualifications") ||
+      label.includes("education and experience") ||
+      label.includes("other knowledge") ||
       label.includes("requirements") ||
       label.includes("qualifications") ||
       label.includes("job expectations")
@@ -235,6 +334,9 @@ function deriveDescriptionSections(job: Job): DerivedSections {
           "Desired qualifications",
           "Minimum requirements",
           "Preferred qualifications",
+          "Job Qualifications",
+          "Education and Experience",
+          "Other Knowledge, Skills, Abilities or Certifications",
           "Job expectations",
           "Requirements",
           "Qualifications",
@@ -244,7 +346,27 @@ function deriveDescriptionSections(job: Job): DerivedSections {
     }
 
     if (
+      label.includes("in this role") ||
+      label.includes("you will") ||
+      label.includes("what you") ||
+      label.includes("responsibilities") ||
+      label.includes("other duties")
+    ) {
+      responsibilityChunks.push(
+        removeSectionHeading(chunk.text, [
+          "In this role, you will",
+          "What you’ll do",
+          "What you'll do",
+          "Responsibilities",
+          "Other Duties",
+        ]),
+      );
+      continue;
+    }
+
+    if (
       label.includes("benefits") ||
+      label.includes("additional information") ||
       label.includes("compensation") ||
       label.includes("salary")
     ) {
@@ -252,6 +374,7 @@ function deriveDescriptionSections(job: Job): DerivedSections {
         removeSectionHeading(chunk.text, [
           "Benefits",
           "Pay and benefits",
+          "Additional Information",
           "Compensation",
           "Salary",
         ]),
@@ -260,6 +383,7 @@ function deriveDescriptionSections(job: Job): DerivedSections {
     }
 
     if (
+      label.includes("our interview practices") ||
       label.includes("posting end date") ||
       label.includes("equal opportunity") ||
       label.includes("disabilities") ||
@@ -280,17 +404,23 @@ function deriveDescriptionSections(job: Job): DerivedSections {
   const responsibilities =
     existingResponsibilities.length > 0
       ? existingResponsibilities
-      : splitBullets(responsibilityChunks.join("\n"), 8);
+      : sanitizeSectionItems(
+          splitBullets(responsibilityChunks.join("\n"), 8),
+          320,
+        );
 
   const requirements =
     existingRequirements.length > 0
       ? existingRequirements
-      : splitBullets(requirementChunks.join("\n"), 8);
+      : sanitizeSectionItems(
+          splitBullets(requirementChunks.join("\n"), 8),
+          320,
+        );
 
   const benefits =
     existingBenefits.length > 0
       ? existingBenefits
-      : splitBullets(benefitChunks.join("\n"), 6);
+      : deriveBenefitItemsFromText(benefitChunks.join("\n"));
 
   return {
     about,
@@ -302,6 +432,8 @@ function deriveDescriptionSections(job: Job): DerivedSections {
 }
 
 function similarSummary(job: Job) {
+  if (job.enrichment?.summary) return job.enrichment.summary;
+
   const text = compactText(job.description);
 
   if (text.length <= 110) return text;
@@ -367,6 +499,7 @@ function SimilarRoleCard({
 
   const href = `/jobs/${job.slug ?? job.id}`;
   const logoInitials = job.company_name.slice(0, 2).toUpperCase();
+  const displayTitle = job.enrichment?.display_title ?? job.title;
   const postedDays = daysAgoLabel(job.posted_at);
   const isExternal = Boolean(job.apply_url);
   const salary = formatSalary(
@@ -375,6 +508,8 @@ function SimilarRoleCard({
     job.salary_currency,
   );
   const logoUrl = supportedLogoUrl(job.company_logo_url);
+  const displayLocation =
+    job.enrichment?.display_location ?? listingLocation(job.location);
 
   const goToDetails = () => {
     router.push(href);
@@ -401,34 +536,34 @@ function SimilarRoleCard({
   };
 
   return (
-    <article className="rounded-xl border border-border bg-card p-6 shadow-soft transition-colors hover:border-primary/40 hover:shadow-lift">
-      <div className="flex items-start justify-between gap-5">
-        <div className="flex min-w-0 items-center gap-4">
+    <article className="rounded-xl border border-border bg-card p-5 shadow-soft transition-colors hover:border-primary/40 hover:shadow-lift">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-4">
           {logoUrl ? (
             <Image
               src={logoUrl}
               alt={`${job.company_name} logo`}
-              width={56}
-              height={56}
-              className="size-14 shrink-0 rounded-lg object-contain"
+              width={40}
+              height={40}
+              className="size-10 shrink-0 rounded-lg object-contain"
             />
           ) : (
-            <div className="grid size-14 shrink-0 place-items-center rounded-lg bg-secondary text-sm font-bold text-secondary-foreground">
+            <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-secondary text-xs font-bold text-secondary-foreground">
               {logoInitials}
             </div>
           )}
 
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-primary">
+            <p className="truncate text-xs font-semibold text-primary">
               {job.company_name}
             </p>
 
             <button
               type="button"
               onClick={goToDetails}
-              className="mt-4 line-clamp-2 text-left text-2xl font-bold leading-tight tracking-tight text-foreground transition-colors hover:text-primary"
+              className="mt-1 line-clamp-2 text-left text-base font-bold leading-snug tracking-tight text-foreground transition-colors hover:text-primary"
             >
-              {job.title}
+              {displayTitle}
             </button>
           </div>
         </div>
@@ -439,31 +574,33 @@ function SimilarRoleCard({
           aria-pressed={saved}
           disabled={saving}
           onClick={onSaveClick}
-          className="grid size-12 shrink-0 place-items-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:cursor-wait disabled:opacity-70 aria-pressed:border-primary/40 aria-pressed:bg-primary/10 aria-pressed:text-primary"
+          className="grid size-10 shrink-0 place-items-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:cursor-wait disabled:opacity-70 aria-pressed:border-primary/40 aria-pressed:bg-primary/10 aria-pressed:text-primary"
         >
           {saving ? (
-            <Loader2 className="size-5 animate-spin" />
+            <Loader2 className="size-4 animate-spin" />
           ) : (
-            <Bookmark className={saved ? "size-6 fill-current" : "size-6"} />
+            <Bookmark className={saved ? "size-5 fill-current" : "size-5"} />
           )}
         </button>
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
+      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
         <span className="inline-flex min-w-0 items-center gap-1.5">
-          <MapPin className="size-4 shrink-0" />
-          <span className="line-clamp-1">{job.location}</span>
+          <MapPin className="size-3.5 shrink-0" />
+          <span className="line-clamp-1" title={job.location}>
+            {displayLocation}
+          </span>
         </span>
 
         <span className="inline-flex items-center gap-1.5">
-          <Clock3 className="size-4" />
+          <Clock3 className="size-3.5" />
           {postedDays === 0 ? "Today" : `${postedDays}d ago`}
         </span>
       </div>
 
-      <div className="mt-6 border-t border-dashed border-border" />
+      <div className="mt-5 border-t border-dashed border-border" />
 
-      <p className="mt-5 line-clamp-3 text-base leading-7 text-muted-foreground">
+      <p className="mt-5 line-clamp-3 text-sm leading-6 text-muted-foreground">
         {similarSummary(job)}
       </p>
 
@@ -473,21 +610,21 @@ function SimilarRoleCard({
         {salary && <Badge variant="secondary">{salary}</Badge>}
       </div>
 
-      <div className="mt-6 flex items-center justify-between gap-3 border-t border-border/60 pt-5">
+      <div className="mt-5 flex items-center justify-between gap-3 border-t border-border/60 pt-4">
         <button
           type="button"
           onClick={goToDetails}
-          className="inline-flex items-center gap-2 text-sm font-semibold text-foreground transition-colors hover:text-primary"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground transition-colors hover:text-primary"
         >
-          Details <ArrowRight className="size-4" />
+          Details <ArrowRight className="size-3.5" />
         </button>
 
-        <Button size="lg" onClick={onApply}>
+        <Button size="sm" onClick={onApply}>
           Apply
           {isExternal ? (
-            <ExternalLink className="size-4" />
+            <ExternalLink className="size-3.5" />
           ) : (
-            <ArrowRight className="size-4" />
+            <ArrowRight className="size-3.5" />
           )}
         </Button>
       </div>
@@ -583,6 +720,9 @@ export default function JobDetailsPage() {
   const isExternal = Boolean(job.apply_url);
   const logoInitials = job.company_name.slice(0, 2).toUpperCase();
   const logoUrl = supportedLogoUrl(job.company_logo_url);
+  const displayLocation = listingLocation(job.location);
+  const displayTitle = job.enrichment?.display_title ?? job.title;
+  const heroLocation = job.enrichment?.display_location ?? displayLocation;
   const saved = isSaved(job.id);
   const saving = pendingId === job.id;
 
@@ -607,7 +747,7 @@ export default function JobDetailsPage() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `${job.title} — ${job.company_name}`,
+          title: `${displayTitle} — ${job.company_name}`,
           url,
         });
         return;
@@ -624,7 +764,7 @@ export default function JobDetailsPage() {
     <main className="min-h-screen bg-background">
       {/* ── Hero ── */}
       <section className="border-b border-border bg-hero-gradient px-4 pb-10 pt-8">
-        <div className="mx-auto max-w-7xl">
+        <div className="mx-auto max-w-416 px-4 md:px-6 xl:px-8">
           <Button
             variant="ghost"
             size="sm"
@@ -656,13 +796,15 @@ export default function JobDetailsPage() {
                 </p>
 
                 <h1 className="mt-1 text-balance text-3xl font-bold tracking-tight md:text-4xl">
-                  {job.title}
+                  {displayTitle}
                 </h1>
 
                 <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
                   <span className="inline-flex items-center gap-1.5">
                     <MapPin className="size-4" />
-                    {job.location}
+                    <span className="line-clamp-2" title={job.location}>
+                      {heroLocation}
+                    </span>
                   </span>
 
                   <span className="inline-flex items-center gap-1.5">
@@ -741,7 +883,7 @@ export default function JobDetailsPage() {
       </section>
 
       {/* ── Body ── */}
-      <section className="mx-auto grid max-w-7xl gap-8 px-4 py-10 lg:grid-cols-[1fr_340px]">
+      <section className="mx-auto grid max-w-416 gap-8 px-4 py-10 md:px-6 lg:grid-cols-[minmax(0,64rem)_minmax(26rem,32rem)] xl:px-8">
         <article className="space-y-8">
           {/* About */}
           {sections.about && (
@@ -803,17 +945,17 @@ export default function JobDetailsPage() {
             <div className="rounded-xl border border-border bg-surface p-6 shadow-soft md:p-8">
               <h2 className="text-2xl font-bold tracking-tight">Benefits</h2>
 
-              <div className="mt-5 grid gap-3 md:grid-cols-2">
+              <ul className="mt-5 grid gap-3 md:grid-cols-2">
                 {sections.benefits.map((item) => (
-                  <div
+                  <li
                     key={item}
-                    className="flex items-start gap-3 rounded-lg border border-border bg-background p-4 text-sm text-muted-foreground"
+                    className="flex items-start gap-3 rounded-lg bg-background/70 p-4 text-sm leading-6 text-muted-foreground ring-1 ring-inset ring-border/70"
                   >
                     <Sparkles className="mt-0.5 size-4 shrink-0 text-accent" />
                     <span>{item}</span>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           )}
 
@@ -890,26 +1032,6 @@ export default function JobDetailsPage() {
               </Button>
             </div>
           </div>
-
-          {related.length > 0 && (
-            <section className="space-y-4 pt-2">
-              <h2 className="text-2xl font-bold tracking-tight">
-                Similar roles
-              </h2>
-
-              <div className="space-y-5">
-                {related.map((item) => (
-                  <SimilarRoleCard
-                    key={item.id}
-                    job={item}
-                    saved={isSaved(item.id)}
-                    saving={pendingId === item.id}
-                    onSave={toggleSaved}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
         </article>
 
         {/* ── Sidebar ── */}
@@ -953,8 +1075,8 @@ export default function JobDetailsPage() {
               )}
 
               <p className="flex items-center gap-2">
-                <MapPin className="size-4" />
-                {job.location}
+                <MapPin className="size-4 shrink-0" />
+                <span title={job.location}>{heroLocation}</span>
               </p>
 
               {job.company_website && (
@@ -1008,6 +1130,26 @@ export default function JobDetailsPage() {
               )}
             </dl>
           </div>
+
+          {related.length > 0 && (
+            <section className="space-y-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Similar roles
+              </h2>
+
+              <div className="space-y-4">
+                {related.map((item) => (
+                  <SimilarRoleCard
+                    key={item.id}
+                    job={item}
+                    saved={isSaved(item.id)}
+                    saving={pendingId === item.id}
+                    onSave={toggleSaved}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
         </aside>
       </section>
     </main>

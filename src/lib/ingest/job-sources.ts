@@ -6,6 +6,8 @@ export type JobSourceType =
   | "lever"
   | "workday"
   | "oracle_hcm"
+  | "successfactors"
+  | "phenom"
   | "ashby"
   | "rss"
   | "csv"

@@ -35,13 +35,132 @@ export function postedDaysAgo(postedAt: string | null | undefined) {
   return Math.max(days, 0);
 }
 
-function jobSummary(description: string | null) {
-  return description
-    ? description.replace(/\s+/g, " ").trim().slice(0, 180)
-    : "";
+const SUMMARY_STOP_WORDS = new Set([
+  "and",
+  "for",
+  "from",
+  "lead",
+  "manager",
+  "principal",
+  "senior",
+  "the",
+  "with",
+]);
+
+const DANGLING_SUMMARY_ENDINGS =
+  /\b(a|an|and|as|at|by|for|from|in|into|of|on|or|our|the|their|to|using|via|with|without)$/i;
+
+function isBoilerplateSummary(sentence: string) {
+  return /\b(equal opportunity|reasonable accommodation|privacy policy|eligible for sponsorship|not eligible for sponsorship|if you already have a profile|log in to check status|click the apply now|complete your application|more than a career|it's a mission|our people are the foundation|pay transparency|benefits eligible|background check|drug test)\b/i.test(
+    sentence,
+  );
+}
+
+function hasCompleteEnding(sentence: string) {
+  const trimmed = sentence.trim();
+
+  return /[.!?)]$/.test(trimmed) && !DANGLING_SUMMARY_ENDINGS.test(trimmed);
+}
+
+function presentSummary(sentence: string) {
+  const trimmed = sentence.trim();
+
+  if (!trimmed) return "";
+  if (hasCompleteEnding(trimmed)) return trimmed;
+
+  return `${trimmed.replace(/[,\s]+$/, "")}...`;
+}
+
+function roleKeywords(title: string, companyName: string) {
+  return `${title} ${companyName}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(/\s+/)
+    .filter((word) => word.length > 3 && !SUMMARY_STOP_WORDS.has(word));
+}
+
+function summaryScore(sentence: string, keywords: string[]) {
+  const lower = sentence.toLowerCase();
+  let score = 0;
+
+  for (const keyword of keywords) {
+    if (lower.includes(keyword)) score += 3;
+  }
+
+  if (
+    /\b(role|position|team|responsible|support|build|design|develop|deliver|drive|partner|leadership|product|software|data|technology|platform|systems|engineering|analyst)\b/i.test(
+      sentence,
+    )
+  ) {
+    score += 4;
+  }
+
+  if (sentence.length >= 90) score += 2;
+  if (sentence.length >= 160) score += 1;
+  if (sentence.length > 420) score -= 2;
+  if (/^(about|company|overview)\b/i.test(sentence)) score -= 2;
+  if (!hasCompleteEnding(sentence)) score -= 6;
+
+  return score;
+}
+
+function jobSummary(
+  description: string | null,
+  title: string,
+  companyName: string,
+) {
+  if (!description) return "";
+
+  const cleaned = description
+    .replace(/\*\*/g, "")
+    .replace(/\s+/g, " ")
+    .replace(
+      /^The position is described below\.\s*If you want to apply, click the Apply Now button at the top or bottom of this page\.\s*/i,
+      "",
+    )
+    .replace(/^After you click Apply Now[^.]*\.\s*/i, "")
+    .replace(
+      /\b(Job Summary|Role Summary|Position Summary|Description)\b\s*/gi,
+      "",
+    )
+    .trim();
+
+  const sentences = cleaned
+    .split(/(?<=[.!?])\s+(?=[A-Z0-9])/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.length >= 40)
+    .filter((sentence) => !isBoilerplateSummary(sentence));
+
+  const keywords = roleKeywords(title, companyName);
+  const [bestSentence] = sentences
+    .map((sentence, index) => ({
+      sentence,
+      index,
+      score: summaryScore(sentence, keywords),
+    }))
+    .sort((a, b) => b.score - a.score || a.index - b.index);
+
+  if (bestSentence) {
+    const candidate = bestSentence.sentence;
+    const following = sentences[bestSentence.index + 1];
+
+    if (
+      candidate.length < 120 &&
+      following &&
+      !isBoilerplateSummary(following)
+    ) {
+      return presentSummary(`${candidate} ${following}`);
+    }
+
+    return presentSummary(candidate);
+  }
+
+  return presentSummary(cleaned);
 }
 
 export function toJobCardShape(job: Job): JobCardJob {
+  const enrichment = job.enrichment;
+
   return {
     id: job.id,
     slug: job.slug ?? job.id,
@@ -49,12 +168,14 @@ export function toJobCardShape(job: Job): JobCardJob {
     company: job.company_name,
     logo: job.company_logo_url ?? job.company_name.slice(0, 2).toUpperCase(),
 
-    title: job.title,
-    location: job.location,
+    title: enrichment?.display_title ?? job.title,
+    location: enrichment?.display_location ?? job.location,
     postedDaysAgo: postedDaysAgo(job.posted_at),
     employmentType: job.employment_type,
 
-    summary: jobSummary(job.description),
+    summary:
+      enrichment?.summary ??
+      jobSummary(job.description, job.title, job.company_name),
     description: job.description ?? "",
 
     salary: formatSalary(

@@ -1,7 +1,3 @@
-// app/auth/callback/route.ts
-// Google (and any OAuth provider) redirects here after sign-in.
-// Supabase exchanges the code for a session, then we redirect the user.
-
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";

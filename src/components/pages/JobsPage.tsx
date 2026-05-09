@@ -5,9 +5,11 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   CalendarDays,
+  ChevronDown,
   MapPin,
   Search,
   SlidersHorizontal,
+  Sparkles,
   X,
 } from "lucide-react";
 
@@ -71,6 +73,7 @@ export default function JobsPage() {
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const hasLoadedOnceRef = useRef(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+
   const debouncedQuery = useDebouncedValue(query.trim(), SEARCH_DEBOUNCE_MS);
   const debouncedLocation = useDebouncedValue(
     location.trim(),
@@ -242,16 +245,26 @@ export default function JobsPage() {
 
   return (
     <main className="min-h-screen bg-background">
-      <section className="bg-hero-gradient px-4 py-10">
-        <div className="mx-auto max-w-7xl">
-          <Badge variant="soft">Search results</Badge>
+      <section className="relative overflow-hidden bg-hero-gradient px-4 py-12">
+        <div className="pointer-events-none absolute -top-24 right-[-10%] size-72 rounded-full bg-accent/15 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 left-[-10%] size-72 rounded-full bg-primary/15 blur-3xl" />
+
+        <div className="relative mx-auto max-w-368 px-4 md:px-6 xl:px-8">
+          <Badge variant="soft" className="gap-1.5">
+            <Sparkles className="size-3" />
+            Search results
+          </Badge>
 
           <h1 className="mt-4 text-balance text-4xl font-bold tracking-tight md:text-5xl">
-            Find the role that moves your career forward.
+            Find the role that moves your{" "}
+            <span className="bg-linear-to-r from-primary to-[hsl(var(--hero-glow))] bg-clip-text text-transparent">
+              career forward
+            </span>
+            .
           </h1>
 
-          <div className="mt-7 grid gap-2 rounded-xl border border-border/80 bg-surface/95 p-2 shadow-lift backdrop-blur md:grid-cols-[1fr_1fr_auto]">
-            <div className="flex items-center gap-2 rounded-lg border border-input bg-background px-3">
+          <div className="mt-7 grid gap-2 rounded-2xl border border-border/70 bg-surface/95 p-2 shadow-lift backdrop-blur md:grid-cols-[1fr_1fr_auto]">
+            <div className="flex items-center gap-2 rounded-xl border border-input bg-background px-3 transition-colors focus-within:border-primary/50">
               <Search className="size-4 text-muted-foreground" />
 
               <Input
@@ -269,7 +282,7 @@ export default function JobsPage() {
               </datalist>
             </div>
 
-            <div className="flex items-center gap-2 rounded-lg border border-input bg-background px-3">
+            <div className="flex items-center gap-2 rounded-xl border border-input bg-background px-3 transition-colors focus-within:border-primary/50">
               <MapPin className="size-4 text-muted-foreground" />
 
               <Input
@@ -294,11 +307,11 @@ export default function JobsPage() {
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-7xl gap-6 px-4 py-8 lg:grid-cols-[280px_1fr]">
-        <aside className="h-fit rounded-xl border border-border/80 bg-surface p-5 shadow-soft">
+      <section className="mx-auto grid max-w-368 gap-8 px-4 py-8 md:px-6 lg:grid-cols-[340px_minmax(0,1fr)] xl:px-8">
+        <aside className="h-fit rounded-2xl border border-border/70 bg-surface p-6 shadow-soft lg:sticky lg:top-24">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 font-semibold">
-              <SlidersHorizontal className="size-4" />
+              <SlidersHorizontal className="size-4 text-primary" />
               Filters
             </div>
 
@@ -314,38 +327,46 @@ export default function JobsPage() {
             )}
           </div>
 
-          <label className="mt-5 block text-sm font-medium">
+          <label className="mt-6 block text-sm font-medium">
             Posted within
-            <select
-              value={dateFilter}
-              onChange={(event) => setDateFilter(event.target.value)}
-              className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm"
-            >
-              <option value="1">Last 24 hours</option>
-              <option value="3">Last 3 days</option>
-              <option value="7">Last 7 days</option>
-              <option value="14">Last 14 days</option>
-              <option value="30">Last 30 days</option>
-              <option value="3650">Any time</option>
-            </select>
+            <div className="relative mt-2">
+              <select
+                value={dateFilter}
+                onChange={(event) => setDateFilter(event.target.value)}
+                className="h-11 w-full appearance-none rounded-lg border border-input bg-background px-3 pr-9 text-sm transition-colors focus:border-primary/50 focus:outline-none"
+              >
+                <option value="1">Last 24 hours</option>
+                <option value="3">Last 3 days</option>
+                <option value="7">Last 7 days</option>
+                <option value="14">Last 14 days</option>
+                <option value="30">Last 30 days</option>
+                <option value="3650">Any time</option>
+              </select>
+
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-primary" />
+            </div>
           </label>
 
-          <label className="mt-5 block text-sm font-medium">
+          <label className="mt-6 block text-sm font-medium">
             Distance
-            <select
-              value={distance}
-              onChange={(event) => setDistance(event.target.value)}
-              className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm"
-            >
-              <option value="5">Within 5 miles</option>
-              <option value="10">Within 10 miles</option>
-              <option value="25">Within 25 miles</option>
-              <option value="50">Within 50 miles</option>
-              <option value="100">Within 100 miles</option>
-            </select>
+            <div className="relative mt-2">
+              <select
+                value={distance}
+                onChange={(event) => setDistance(event.target.value)}
+                className="h-11 w-full appearance-none rounded-lg border border-input bg-background px-3 pr-9 text-sm transition-colors focus:border-primary/50 focus:outline-none"
+              >
+                <option value="5">Within 5 miles</option>
+                <option value="10">Within 10 miles</option>
+                <option value="25">Within 25 miles</option>
+                <option value="50">Within 50 miles</option>
+                <option value="100">Within 100 miles</option>
+              </select>
+
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-primary" />
+            </div>
           </label>
 
-          <div className="mt-5 space-y-2 border-t border-border/60 pt-4 text-xs text-muted-foreground">
+          <div className="mt-6 space-y-2 border-t border-border/60 pt-5 text-xs text-muted-foreground">
             <p className="flex items-center gap-2">
               <CalendarDays className="size-3.5" />
               {dateFilter === "3650" ? "Any time" : `${dateFilter} day window`}
@@ -358,8 +379,8 @@ export default function JobsPage() {
           </div>
         </aside>
 
-        <div className="space-y-4">
-          <div className="flex items-end justify-between gap-4">
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="text-sm text-muted-foreground">
                 {loading && !hasLoadedOnce ? (
@@ -400,13 +421,13 @@ export default function JobsPage() {
               ))}
             </div>
           ) : loadError ? (
-            <div className="rounded-xl border border-dashed border-destructive/40 bg-card p-10 text-center">
+            <div className="rounded-2xl border border-dashed border-destructive/40 bg-card p-10 text-center">
               <h3 className="text-lg font-semibold">Could not load jobs</h3>
 
               <p className="mt-2 text-sm text-muted-foreground">{loadError}</p>
             </div>
           ) : filteredJobs.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
+            <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center">
               <h3 className="text-lg font-semibold">
                 No matches in your filters
               </h3>
