@@ -15,6 +15,8 @@ import {
   UsersRound,
 } from "lucide-react";
 
+import LocationAutocomplete from "@/components/location/LocationAutocomplete";
+import type { LocationSuggestion } from "@/components/location/location-types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +44,13 @@ interface JobSeekerDashboardProps {
   initialJobsError?: string | null;
   initialLocation?: string;
 }
+
+type SelectedLocation = {
+  city: string;
+  state: string;
+  zip_code: string | null;
+  label: string;
+};
 
 function buildStatCards(
   stats: JobSeekerDashboardStats,
@@ -114,6 +123,15 @@ function buildChecklistPanel(): JobSeekerChecklistData {
   };
 }
 
+function toSelectedLocation(location: LocationSuggestion): SelectedLocation {
+  return {
+    city: location.city,
+    state: location.state,
+    zip_code: location.zip_code,
+    label: location.label,
+  };
+}
+
 function JobSeekerDashboardContent({
   initialStats,
   initialJobs,
@@ -124,7 +142,9 @@ function JobSeekerDashboardContent({
   const router = useRouter();
 
   const [query, setQuery] = useState("");
-  const [location, setLocation] = useState(initialLocation);
+  const [locationQuery, setLocationQuery] = useState(initialLocation);
+  const [selectedLocation, setSelectedLocation] =
+    useState<SelectedLocation | null>(null);
 
   const statCards = useMemo(() => buildStatCards(initialStats), [initialStats]);
   const workspaceCards = useMemo(() => buildWorkspaceCards(), []);
@@ -134,10 +154,27 @@ function JobSeekerDashboardContent({
     const params = new URLSearchParams();
 
     const trimmedQuery = query.trim();
-    const trimmedLocation = location.trim();
+    const trimmedLocation = locationQuery.trim();
 
-    if (trimmedQuery) params.set("q", trimmedQuery);
-    if (trimmedLocation) params.set("location", trimmedLocation);
+    if (trimmedQuery) {
+      params.set("q", trimmedQuery);
+    }
+
+    if (selectedLocation) {
+      params.set("city", selectedLocation.city);
+      params.set("state", selectedLocation.state);
+
+      if (selectedLocation.zip_code) {
+        params.set("zip", selectedLocation.zip_code);
+      }
+
+      params.set(
+        "location",
+        `${selectedLocation.city}, ${selectedLocation.state}`,
+      );
+    } else if (trimmedLocation) {
+      params.set("location", trimmedLocation);
+    }
 
     const queryString = params.toString();
 
@@ -217,12 +254,24 @@ function JobSeekerDashboardContent({
                     aria-hidden="true"
                   />
 
-                  <Input
-                    aria-label="Search by location"
-                    placeholder="Location"
-                    value={location}
-                    onChange={(event) => setLocation(event.target.value)}
-                    className="h-12 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+                  <LocationAutocomplete
+                    id="dashboardLocationSearch"
+                    value={locationQuery}
+                    placeholder="City, State, or ZIP"
+                    className="border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+                    onValueChange={(value) => {
+                      setLocationQuery(value);
+
+                      if (!value.trim()) {
+                        setSelectedLocation(null);
+                      }
+                    }}
+                    onLocationSelect={(location) => {
+                      setSelectedLocation(toSelectedLocation(location));
+                    }}
+                    onClear={() => {
+                      setSelectedLocation(null);
+                    }}
                   />
                 </div>
 

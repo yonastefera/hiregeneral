@@ -64,7 +64,7 @@ export default async function JobDetailsPage({ jobId }: JobDetailsPageProps) {
             className="mb-4 -ml-3 text-muted-foreground hover:text-foreground"
             asChild
           >
-            <Link href="/job">
+            <Link href="/jobs">
               <ArrowLeft aria-hidden="true" className="size-4" />
               Back to results
             </Link>

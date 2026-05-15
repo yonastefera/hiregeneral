@@ -34,8 +34,8 @@ interface UserProfile {
 
 const baseNavLinks = [
   { label: "Find jobs", href: "/jobs" },
-  { label: "Salary guide", href: "/salary-guide" },
-  { label: "Career advice", href: "/career-advice" },
+  { label: "Messages", href: "/messages" },
+  { label: "Profile", href: "/profile" },
   { label: "For employers", href: "/employers/dashboard" },
 ];
 
@@ -251,7 +251,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
               )}
 
               <IconLink href="/messages" label="Messages">
-                <MessageSquare className="size-[18px]" />
+                <MessageSquare className="size-4.5" />
               </IconLink>
 
               <IconLink
@@ -259,7 +259,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
                 label="Notifications"
                 badge={unreadCount}
               >
-                <Bell className="size-[18px]" />
+                <Bell className="size-4.5" />
               </IconLink>
 
               <div className="relative">
@@ -354,7 +354,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
 
                   <div className="border-t border-border/60 p-1">
                     <AccountMenuLink
-                      href="/settings/account"
+                      href="/account/settings"
                       onClick={() => setAccountMenuOpen(false)}
                     >
                       <Settings className="size-4 text-muted-foreground" />
@@ -483,7 +483,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
                 </span>
               </MobileMenuLink>
 
-              <MobileMenuLink href="/settings/account">
+              <MobileMenuLink href="/account/settings">
                 <span className="inline-flex items-center gap-2">
                   <Settings className="size-4" />
                   Account settings

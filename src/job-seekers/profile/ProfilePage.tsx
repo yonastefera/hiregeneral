@@ -29,11 +29,9 @@ import type {
   WorkExperience,
 } from "./profile-types";
 import {
-  getProfileUpdate,
   getResumeLabel,
   isPublicUrl,
   validateAvatarFile,
-  validateProfile,
   validateResumeFile,
 } from "./profile-utils";
 
@@ -61,7 +59,6 @@ function getStoredResumeUrl(profile: JobSeekerProfile | null) {
 export default function ProfilePage() {
   const [profile, setProfile] = useState<JobSeekerProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
 
   const [resumeView, setResumeView] = useState<ResumeViewState>({
     label: "No resume uploaded yet.",
@@ -87,6 +84,290 @@ export default function ProfilePage() {
 
   const resumeInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  const handleProfileInfoChange = async (nextProfile: JobSeekerProfile) => {
+    if (!profile) return;
+
+    const nextLocation = [
+      nextProfile.city ?? null,
+      nextProfile.state ?? null,
+      nextProfile.zip_code ?? null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    const updatePayload = {
+      full_name: nextProfile.full_name,
+      headline: nextProfile.headline,
+      phone: nextProfile.phone,
+      city: nextProfile.city ?? null,
+      state: nextProfile.state ?? null,
+      zip_code: nextProfile.zip_code ?? null,
+      location: nextLocation || null,
+      open_to_relocation: Boolean(nextProfile.open_to_relocation),
+      visibility: nextProfile.visibility,
+    };
+
+    const updatedProfile: JobSeekerProfile = {
+      ...profile,
+      ...updatePayload,
+    };
+
+    setProfile(updatedProfile);
+
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .update(updatePayload as never)
+        .eq("user_id", profile.user_id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("[profile] Could not save profile info:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
+
+        throw error;
+      }
+
+      if (data) {
+        setProfile(data as JobSeekerProfile);
+      }
+
+      toast.success("Profile updated.");
+    } catch (error) {
+      console.error("[profile] Profile info save failed:", error);
+      toast.error("Could not save profile.");
+    }
+  };
+
+  const handleEducationChange = async (nextEducation: EducationItem[]) => {
+    if (!profile) return;
+
+    setEducation(nextEducation);
+
+    const nextProfile: JobSeekerProfile = {
+      ...profile,
+      education: nextEducation,
+    };
+
+    setProfile(nextProfile);
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          education: nextEducation,
+        } as never)
+        .eq("user_id", profile.user_id);
+
+      if (error) {
+        console.error("[profile] Could not save education:", error);
+        throw error;
+      }
+
+      toast.success("Education saved.");
+    } catch {
+      toast.error("Could not save education.");
+    }
+  };
+
+  const handleWorkExperienceChange = async (
+    nextWorkExperience: WorkExperience[],
+  ) => {
+    if (!profile) return;
+
+    setWorkExperience(nextWorkExperience);
+
+    const nextProfile: JobSeekerProfile = {
+      ...profile,
+      work_experience: nextWorkExperience,
+    };
+
+    setProfile(nextProfile);
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          work_experience: nextWorkExperience,
+        } as never)
+        .eq("user_id", profile.user_id);
+
+      if (error) {
+        console.error("[profile] Could not save work experience:", error);
+        throw error;
+      }
+
+      toast.success("Work experience saved.");
+    } catch {
+      toast.error("Could not save work experience.");
+    }
+  };
+
+  const handleSummaryObjectiveChange = async (
+    nextProfile: JobSeekerProfile,
+  ) => {
+    if (!profile) return;
+
+    const nextExecutiveSummary = nextProfile.executive_summary ?? null;
+    const nextObjective = nextProfile.objective ?? null;
+
+    const updatedProfile: JobSeekerProfile = {
+      ...profile,
+      executive_summary: nextExecutiveSummary,
+      objective: nextObjective,
+    };
+
+    setProfile(updatedProfile);
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          executive_summary: nextExecutiveSummary,
+          objective: nextObjective,
+        } as never)
+        .eq("user_id", profile.user_id);
+
+      if (error) {
+        console.error("[profile] Could not save summary/objective:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
+
+        throw error;
+      }
+
+      toast.success("Summary and objective saved.");
+    } catch (error) {
+      console.error("[profile] Summary/objective save failed:", error);
+      toast.error("Could not save summary and objective.");
+    }
+  };
+
+  const handleSkillsChange = async (nextProfile: JobSeekerProfile) => {
+    if (!profile) return;
+
+    const nextSkills = Array.isArray(nextProfile.skills)
+      ? nextProfile.skills
+      : [];
+
+    const updatedProfile: JobSeekerProfile = {
+      ...profile,
+      skills: nextSkills,
+    };
+
+    setProfile(updatedProfile);
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          skills: nextSkills,
+        } as never)
+        .eq("user_id", profile.user_id);
+
+      if (error) {
+        console.error("[profile] Could not save skills:", error);
+        throw error;
+      }
+
+      toast.success("Skills saved.");
+    } catch {
+      toast.error("Could not save skills.");
+    }
+  };
+
+  const handleLicensesChange = async (nextLicenses: LicenseCertification[]) => {
+    if (!profile) return;
+
+    setLicenses(nextLicenses);
+
+    const nextProfile = {
+      ...profile,
+      licenses_certifications: nextLicenses,
+    };
+
+    setProfile(nextProfile);
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          licenses_certifications: nextLicenses,
+        } as never)
+        .eq("user_id", profile.user_id);
+
+      if (error) throw error;
+
+      toast.success("Licenses and certifications saved.");
+    } catch {
+      toast.error("Could not save licenses and certifications.");
+    }
+  };
+
+  const handleAchievementsChange = async (nextAchievements: Achievement[]) => {
+    if (!profile) return;
+
+    setAchievements(nextAchievements);
+
+    const nextProfile = {
+      ...profile,
+      achievements: nextAchievements,
+    };
+
+    setProfile(nextProfile);
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          achievements: nextAchievements,
+        } as never)
+        .eq("user_id", profile.user_id);
+
+      if (error) throw error;
+
+      toast.success("Achievements saved.");
+    } catch {
+      toast.error("Could not save achievements.");
+    }
+  };
+
+  const handleLinksChange = async (nextLinks: ProfileLink[]) => {
+    if (!profile) return;
+
+    setLinks(nextLinks);
+
+    const nextProfile = {
+      ...profile,
+      profile_links: nextLinks,
+    };
+
+    setProfile(nextProfile);
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          profile_links: nextLinks,
+        } as never)
+        .eq("user_id", profile.user_id);
+
+      if (error) throw error;
+
+      toast.success("Links saved.");
+    } catch {
+      toast.error("Could not save links.");
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -116,7 +397,17 @@ export default function ProfilePage() {
         }
 
         if (profileData) {
-          if (active) setProfile(profileData as JobSeekerProfile);
+          const loadedProfile = profileData as JobSeekerProfile;
+
+          if (active) {
+            setProfile(loadedProfile);
+            setWorkExperience(loadedProfile.work_experience ?? []);
+            setEducation(loadedProfile.education ?? []);
+            setLinks(loadedProfile.profile_links ?? []);
+            setAchievements(loadedProfile.achievements ?? []);
+            setLicenses(loadedProfile.licenses_certifications ?? []);
+          }
+
           return;
         }
 
@@ -133,6 +424,10 @@ export default function ProfilePage() {
           resume_file_size: null,
           resume_uploaded_at: null,
           resume_scan_status: null,
+          work_experience: [],
+          education: [],
+          profile_links: [],
+          licenses_certifications: [],
         };
 
         const { data: created, error: createError } = await supabase
@@ -244,47 +539,6 @@ export default function ProfilePage() {
     };
   }, [profile?.avatar_url]);
 
-  const saveProfile = async (nextProfile: JobSeekerProfile) => {
-    if (saving) return;
-
-    const nextErrors = validateProfile(nextProfile);
-    setErrors(nextErrors);
-
-    if (Object.keys(nextErrors).length > 0) {
-      toast.error("Please fix the highlighted fields.");
-      return;
-    }
-
-    setSaving(true);
-
-    try {
-      const updates = getProfileUpdate(nextProfile);
-
-      const { error } = await supabase
-        .from("profiles")
-        .update(updates as never)
-        .eq("user_id", nextProfile.user_id);
-
-      if (error) throw error;
-
-      setProfile(nextProfile);
-      toast.success("Profile saved.");
-    } catch {
-      setErrors((current) => ({
-        ...current,
-        form: "Could not save profile.",
-      }));
-      toast.error("Could not save profile.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleProfileChange = (nextProfile: JobSeekerProfile) => {
-    setProfile(nextProfile);
-    saveProfile(nextProfile);
-  };
-
   const handleAvatarUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     if (!profile) return;
 
@@ -316,11 +570,19 @@ export default function ProfilePage() {
       const { error: uploadError } = await supabase.storage
         .from("avatars")
         .upload(filePath, file, {
-          upsert: false,
-          contentType: file.type,
+          upsert: true,
+          contentType: file.type || "image/jpeg",
+          cacheControl: "3600",
         });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("[profile] Avatar storage upload failed:", {
+          message: uploadError.message,
+          name: uploadError.name,
+        });
+
+        throw uploadError;
+      }
 
       const avatarUploadedAt = new Date().toISOString();
 
@@ -333,7 +595,16 @@ export default function ProfilePage() {
         } as never)
         .eq("user_id", profile.user_id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error("[profile] Could not save avatar:", {
+          message: updateError.message,
+          details: updateError.details,
+          hint: updateError.hint,
+          code: updateError.code,
+        });
+
+        throw updateError;
+      }
 
       if (oldAvatarPath) {
         await supabase.storage.from("avatars").remove([oldAvatarPath]);
@@ -556,7 +827,7 @@ export default function ProfilePage() {
         avatarInputRef={avatarInputRef}
         uploadingAvatar={uploadingAvatar}
         onAvatarUpload={handleAvatarUpload}
-        onProfileChange={handleProfileChange}
+        onProfileChange={handleProfileInfoChange}
       />
 
       <ResumeSection
@@ -570,30 +841,33 @@ export default function ProfilePage() {
 
       <SummaryObjectiveSection
         profile={profile}
-        onProfileChange={handleProfileChange}
+        onProfileChange={handleSummaryObjectiveChange}
       />
 
       <WorkExperienceSection
         items={workExperience}
-        onChange={setWorkExperience}
+        onChange={handleWorkExperienceChange}
       />
 
-      <EducationSection items={education} onChange={setEducation} />
+      <EducationSection items={education} onChange={handleEducationChange} />
 
-      <SkillsSection profile={profile} onProfileChange={handleProfileChange} />
+      <SkillsSection profile={profile} onProfileChange={handleSkillsChange} />
 
-      <LicensesCertificationsSection items={licenses} onChange={setLicenses} />
+      <LicensesCertificationsSection
+        items={licenses}
+        onChange={handleLicensesChange}
+      />
 
       <AchievementsSection
         items={achievements}
-        onChange={setAchievements}
+        onChange={handleAchievementsChange}
         open={achievementsDialogOpen}
         onOpenChange={setAchievementsDialogOpen}
       />
 
       <LinksSection
         items={links}
-        onChange={setLinks}
+        onChange={handleLinksChange}
         open={linksDialogOpen}
         onOpenChange={setLinksDialogOpen}
       />

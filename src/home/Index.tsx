@@ -3,14 +3,16 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Crosshair, MapPin, Search, Sparkles } from "lucide-react";
+import { Crosshair, MapPin, Search } from "lucide-react";
 
+import LocationAutocomplete from "@/components/location/LocationAutocomplete";
+import type { LocationSuggestion } from "@/components/location/location-types";
+import KeywordAutocomplete from "@/components/search/KeywordAutocomplete";
+import type { KeywordSuggestion } from "@/components/search/keyword-types";
+import { JobCard } from "@/components/jobs/JobCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { JobCard } from "@/components/jobs/JobCard";
 import { flowCards, platformStats } from "@/data/jobPlatform";
-import { keywordSuggestions, locationSuggestions } from "@/data/suggestions";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
 import type { JobCardJob } from "@/lib/jobs/card-shape";
 
@@ -18,13 +20,48 @@ interface IndexProps {
   initialHighlightedJobs: JobCardJob[];
 }
 
+type SelectedKeyword = {
+  term: string;
+  label: string;
+  category: string | null;
+};
+
+type SelectedLocation = {
+  city: string;
+  state: string;
+  zip_code: string | null;
+  label: string;
+};
+
 const publicFlows = flowCards.filter((flow) => flow.role !== "admin");
+
+function toSelectedKeyword(suggestion: KeywordSuggestion): SelectedKeyword {
+  return {
+    term: suggestion.term,
+    label: suggestion.label,
+    category: suggestion.category,
+  };
+}
+
+function toSelectedLocation(location: LocationSuggestion): SelectedLocation {
+  return {
+    city: location.city,
+    state: location.state,
+    zip_code: location.zip_code,
+    label: location.label,
+  };
+}
 
 const Index = ({ initialHighlightedJobs }: IndexProps) => {
   const router = useRouter();
 
   const [query, setQuery] = useState("");
-  const [location, setLocation] = useState("");
+  const [selectedKeyword, setSelectedKeyword] =
+    useState<SelectedKeyword | null>(null);
+
+  const [locationQuery, setLocationQuery] = useState("");
+  const [selectedLocation, setSelectedLocation] =
+    useState<SelectedLocation | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
 
   const { isSaved, toggleSaved, pendingId } = useSavedJobs();
@@ -44,7 +81,8 @@ const Index = ({ initialHighlightedJobs }: IndexProps) => {
 
     navigator.geolocation.getCurrentPosition(
       () => {
-        setLocation("Current location");
+        setLocationQuery("Current location");
+        setSelectedLocation(null);
       },
       () => {
         setLocationError("Could not access your location.");
@@ -56,10 +94,29 @@ const Index = ({ initialHighlightedJobs }: IndexProps) => {
     const params = new URLSearchParams();
 
     const trimmedQuery = query.trim();
-    const trimmedLocation = location.trim();
+    const trimmedLocation = locationQuery.trim();
 
-    if (trimmedQuery) params.set("q", trimmedQuery);
-    if (trimmedLocation) params.set("location", trimmedLocation);
+    if (selectedKeyword) {
+      params.set("q", selectedKeyword.term);
+    } else if (trimmedQuery) {
+      params.set("q", trimmedQuery);
+    }
+
+    if (selectedLocation) {
+      params.set("city", selectedLocation.city);
+      params.set("state", selectedLocation.state);
+
+      if (selectedLocation.zip_code) {
+        params.set("zip", selectedLocation.zip_code);
+      }
+
+      params.set(
+        "location",
+        `${selectedLocation.city}, ${selectedLocation.state}`,
+      );
+    } else if (trimmedLocation) {
+      params.set("location", trimmedLocation);
+    }
 
     const queryString = params.toString();
 
@@ -70,10 +127,10 @@ const Index = ({ initialHighlightedJobs }: IndexProps) => {
     <main className="min-h-screen bg-background" id="main-content">
       <section
         aria-labelledby="home-hero-heading"
-        className="relative -mt-16 overflow-hidden bg-hero-gradient px-4 pb-20 pt-28 md:pb-28 md:pt-36"
+        className="relative -mt-16 overflow-visible bg-hero-gradient px-4 pb-16 pt-24 md:pb-20 md:pt-28 lg:min-h-175"
       >
         <div
-          className="pointer-events-none absolute -top-32 left-1/2 hidden h-[28rem] w-[28rem] -translate-x-1/2 rounded-full bg-primary/15 blur-[120px] md:block motion-safe:animate-float"
+          className="pointer-events-none absolute -top-32 left-1/2 hidden h-112 w-md -translate-x-1/2 rounded-full bg-primary/15 blur-[120px] md:block motion-safe:animate-float"
           aria-hidden="true"
         />
         <div
@@ -81,16 +138,11 @@ const Index = ({ initialHighlightedJobs }: IndexProps) => {
           aria-hidden="true"
         />
 
-        <div className="relative mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
-          <div className="animate-reveal">
-            <Badge variant="soft" className="gap-2 px-3 py-1">
-              <Sparkles className="size-3.5 text-accent" aria-hidden="true" />
-              Modern hiring marketplace
-            </Badge>
-
+        <div className="relative mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-start lg:pt-24">
+          <div className="animate-reveal lg:pt-2">
             <h1
               id="home-hero-heading"
-              className="mt-6 max-w-3xl text-balance text-5xl font-semibold tracking-[-0.04em] text-foreground md:text-7xl"
+              className="mt-16 max-w-3xl text-balance text-5xl font-semibold tracking-[-0.04em] text-foreground md:text-7xl lg:text-[4.25rem] lg:leading-[0.95]"
             >
               Search smarter.{" "}
               <span className="text-gradient-primary">Hire faster.</span> Move
@@ -110,63 +162,75 @@ const Index = ({ initialHighlightedJobs }: IndexProps) => {
                 event.preventDefault();
                 searchJobs();
               }}
-              className="mt-10 rounded-3xl border border-border/60 bg-background/70 p-2.5 shadow-lift backdrop-blur-2xl"
+              className="mt-6 max-w-3xl text-balance text-5xl font-semibold tracking-[-0.04em] text-foreground md:text-7xl lg:text-[5.25rem] lg:leading-[0.95]"
             >
               <div className="grid gap-2 lg:grid-cols-[1fr_1fr_auto]">
-                <div className="flex items-center gap-2 rounded-2xl bg-muted/50 px-4 transition-colors focus-within:bg-background focus-within:ring-2 focus-within:ring-primary/20">
+                <div className="relative rounded-2xl bg-muted/50 transition-colors focus-within:bg-background focus-within:ring-2 focus-within:ring-primary/20">
                   <Search
-                    className="size-5 text-muted-foreground"
+                    className="pointer-events-none absolute left-4 top-1/2 z-10 size-5 -translate-y-1/2 text-muted-foreground"
                     aria-hidden="true"
                   />
 
-                  <Input
-                    list="home-keyword-suggestions"
-                    aria-label="Search by title, company, or skill"
-                    placeholder="Title, company, skill, keyword"
+                  <KeywordAutocomplete
+                    id="homeKeywordSearch"
                     value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    className="h-12 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
-                  />
+                    placeholder="Title, company, skill, keyword"
+                    showClearButton={false}
+                    className="h-12 border-0 bg-transparent pl-11 pr-4 shadow-none focus-visible:ring-0"
+                    onValueChange={(value) => {
+                      setQuery(value);
 
-                  <datalist id="home-keyword-suggestions">
-                    {keywordSuggestions.map((suggestion) => (
-                      <option key={suggestion} value={suggestion} />
-                    ))}
-                  </datalist>
+                      if (!value.trim()) {
+                        setSelectedKeyword(null);
+                      }
+                    }}
+                    onKeywordSelect={(suggestion) => {
+                      setSelectedKeyword(toSelectedKeyword(suggestion));
+                    }}
+                    onClear={() => {
+                      setSelectedKeyword(null);
+                    }}
+                  />
                 </div>
 
-                <div className="flex items-center gap-2 rounded-2xl bg-muted/50 px-4 transition-colors focus-within:bg-background focus-within:ring-2 focus-within:ring-primary/20">
+                <div className="relative rounded-2xl bg-muted/50 transition-colors focus-within:bg-background focus-within:ring-2 focus-within:ring-primary/20">
                   <MapPin
-                    className="size-5 text-muted-foreground"
+                    className="pointer-events-none absolute left-4 top-1/2 z-10 size-5 -translate-y-1/2 text-muted-foreground"
                     aria-hidden="true"
                   />
 
-                  <Input
-                    list="home-location-suggestions"
-                    aria-label="Search by location"
+                  <LocationAutocomplete
+                    id="homeLocationSearch"
+                    value={locationQuery}
                     placeholder="Location"
-                    value={location}
-                    onChange={(event) => {
-                      setLocation(event.target.value);
+                    showClearButton={false}
+                    className="h-12 border-0 bg-transparent pl-11 pr-12 shadow-none focus-visible:ring-0"
+                    onValueChange={(value) => {
+                      setLocationQuery(value);
+                      setLocationError(null);
+
+                      if (!value.trim()) {
+                        setSelectedLocation(null);
+                      }
+                    }}
+                    onLocationSelect={(location) => {
+                      setSelectedLocation(toSelectedLocation(location));
                       setLocationError(null);
                     }}
-                    className="h-12 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+                    onClear={() => {
+                      setSelectedLocation(null);
+                      setLocationError(null);
+                    }}
                   />
 
                   <button
                     type="button"
                     aria-label="Use my location"
                     onClick={useMyLocation}
-                    className="rounded-full p-2 text-primary transition hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full p-2 text-primary transition hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
                     <Crosshair className="size-4" aria-hidden="true" />
                   </button>
-
-                  <datalist id="home-location-suggestions">
-                    {locationSuggestions.map((suggestion) => (
-                      <option key={suggestion} value={suggestion} />
-                    ))}
-                  </datalist>
                 </div>
 
                 <Button variant="hero" size="xl" type="submit">
@@ -188,9 +252,9 @@ const Index = ({ initialHighlightedJobs }: IndexProps) => {
 
           <aside
             aria-labelledby="featured-roles-heading"
-            className="relative animate-reveal lg:pl-6"
+            className="relative animate-reveal lg:pl-4"
           >
-            <div className="rounded-3xl border border-border/60 bg-background/70 p-5 shadow-lift backdrop-blur-2xl">
+            <div className="rounded-4xl border border-border/60 bg-background/75 p-6 shadow-lift backdrop-blur-2xl lg:min-h-152">
               <div className="flex items-center justify-between border-b border-border/60 pb-4">
                 <div>
                   <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
@@ -208,7 +272,7 @@ const Index = ({ initialHighlightedJobs }: IndexProps) => {
                 <Badge variant="warm">620 new</Badge>
               </div>
 
-              <div className="mt-4 space-y-3">
+              <div className="mt-5 space-y-4">
                 {highlightedJobs.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-border bg-background p-5 text-sm text-muted-foreground">
                     Featured roles will appear after ingestion runs or please

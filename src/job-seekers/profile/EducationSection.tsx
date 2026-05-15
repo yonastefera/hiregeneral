@@ -5,7 +5,12 @@ import { GraduationCap, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -37,6 +42,7 @@ const SCHOOL_SEARCH_DEBOUNCE_MS = 150;
 
 const DEGREE_OPTIONS = [
   "High School Diploma",
+  "GED",
   "Certificate",
   "Associate Degree",
   "Bachelor's Degree",
@@ -47,13 +53,24 @@ const DEGREE_OPTIONS = [
   "BS",
   "MBA",
   "MS",
+  "MA",
   "PhD",
+  "JD",
+  "MD",
+  "Other",
+  "Not specified",
 ];
+
+const SELECT_CONTENT_CLASS =
+  "z-[9999] max-h-72 w-[var(--radix-select-trigger-width)] overflow-y-auto rounded-xl border border-border bg-white p-1 text-foreground shadow-lg";
+
+const SELECT_ITEM_CLASS =
+  "relative cursor-pointer rounded-lg py-2.5 pl-9 pr-3 text-sm font-medium text-foreground focus:bg-neutral-200 focus:text-foreground data-[highlighted]:bg-neutral-200 data-[highlighted]:text-foreground data-[state=checked]:bg-neutral-200 data-[state=checked]:text-foreground";
 
 const emptyEducation = (): EducationItem => ({
   id: createLocalId("education"),
   school_name: "",
-  degree: null,
+  degree: "Not specified",
   field_of_study: null,
   start_year: null,
   end_year: null,
@@ -78,6 +95,7 @@ function normalizeSelectValue(value: string | number | null | undefined) {
   if (value === null || value === undefined || value === "") {
     return EMPTY_VALUE;
   }
+
   return String(value);
 }
 
@@ -87,6 +105,12 @@ function denormalizeYear(value: string) {
   const year = Number(value);
 
   return Number.isFinite(year) ? year : null;
+}
+
+function denormalizeDegree(value: string) {
+  if (value === EMPTY_VALUE) return null;
+
+  return value;
 }
 
 function normalizeText(value: string | null | undefined) {
@@ -107,11 +131,12 @@ export default function EducationSection({
   const [schoolSuggestions, setSchoolSuggestions] = useState<
     SchoolSuggestion[]
   >([]);
-  const [schoolSuggestionCache, setSchoolSuggestionCache] = useState<
-    Record<string, SchoolSuggestion[]>
-  >({});
   const [showSchoolSuggestions, setShowSchoolSuggestions] = useState(false);
   const [loadingSchools, setLoadingSchools] = useState(false);
+
+  const schoolSuggestionCacheRef = useRef<Record<string, SchoolSuggestion[]>>(
+    {},
+  );
 
   const [revealedDeleteId, setRevealedDeleteId] = useState<string | null>(null);
   const [dragStartX, setDragStartX] = useState<number | null>(null);
@@ -127,11 +152,13 @@ export default function EducationSection({
 
     setDraft({
       ...nextDraft,
+      degree: nextDraft.degree ?? "Not specified",
       description: nextDraft.description ?? "",
     });
 
     setInitialDraft({
       ...nextDraft,
+      degree: nextDraft.degree ?? "Not specified",
       description: nextDraft.description ?? "",
     });
 
@@ -152,7 +179,7 @@ export default function EducationSection({
       return;
     }
 
-    const cachedSuggestions = schoolSuggestionCache[cacheKey];
+    const cachedSuggestions = schoolSuggestionCacheRef.current[cacheKey];
 
     if (cachedSuggestions) {
       setSchoolSuggestions(cachedSuggestions);
@@ -174,7 +201,6 @@ export default function EducationSection({
         );
 
         if (!response.ok) {
-          setSchoolSuggestions([]);
           return;
         }
 
@@ -184,15 +210,10 @@ export default function EducationSection({
 
         const nextSuggestions = payload.schools ?? [];
 
+        schoolSuggestionCacheRef.current[cacheKey] = nextSuggestions;
         setSchoolSuggestions(nextSuggestions);
-        setSchoolSuggestionCache((current) => ({
-          ...current,
-          [cacheKey]: nextSuggestions,
-        }));
       } catch {
-        if (!controller.signal.aborted) {
-          setSchoolSuggestions([]);
-        }
+        // Keep existing suggestions visible to avoid flicker.
       } finally {
         if (!controller.signal.aborted) {
           setLoadingSchools(false);
@@ -204,7 +225,7 @@ export default function EducationSection({
       window.clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [open, schoolQuery, schoolSuggestionCache]);
+  }, [open, schoolQuery]);
 
   const hasChanges =
     normalizeText(draft.school_name) !==
@@ -354,7 +375,7 @@ export default function EducationSection({
             return (
               <li
                 key={item.id}
-                className="relative overflow-hidden border border-[#f2f2f2] bg-white shadow-soft [border-radius:unset]"
+                className="relative overflow-hidden border border-[#f2f2f2] bg-white shadow-soft rounded-[unset]"
                 onPointerDown={(event) => handlePointerDown(event.clientX)}
                 onPointerUp={(event) => handlePointerUp(item.id, event.clientX)}
               >
@@ -465,6 +486,10 @@ export default function EducationSection({
             <DialogTitle className="text-xl font-bold tracking-tight">
               Education
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              Add or edit your school, degree, field of study, attendance dates,
+              and education description.
+            </DialogDescription>
           </div>
 
           <div className="space-y-3.5 px-5 pb-5">
@@ -533,10 +558,31 @@ export default function EducationSection({
               {shouldShowSchoolDropdown && (
                 <ul
                   id="school-suggestion-list"
-                  className="absolute left-0 right-0 top-full z-50 mt-1 max-h-56 overflow-y-auto rounded-md border border-border bg-background py-2 shadow-lg"
+                  className="absolute left-0 right-0 top-full z-9999 mt-1 max-h-56 overflow-y-auto rounded-md border border-border bg-background py-2 shadow-lg"
                   role="listbox"
                 >
-                  {loadingSchools && (
+                  {schoolSuggestions.map((school) => (
+                    <li key={school.id} role="option" aria-selected={false}>
+                      <button
+                        type="button"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => selectSchoolSuggestion(school)}
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                      >
+                        <span className="font-medium">{school.name}</span>
+
+                        {(school.city || school.state) && (
+                          <span className="block text-xs text-muted-foreground">
+                            {[school.city, school.state]
+                              .filter(Boolean)
+                              .join(", ")}
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+
+                  {loadingSchools && schoolSuggestions.length === 0 && (
                     <li className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
                       <Loader2
                         aria-hidden="true"
@@ -545,28 +591,6 @@ export default function EducationSection({
                       Searching schools...
                     </li>
                   )}
-
-                  {!loadingSchools &&
-                    schoolSuggestions.map((school) => (
-                      <li key={school.id} role="option" aria-selected={false}>
-                        <button
-                          type="button"
-                          onMouseDown={(event) => event.preventDefault()}
-                          onClick={() => selectSchoolSuggestion(school)}
-                          className="w-full px-3 py-2 text-left text-sm hover:bg-muted"
-                        >
-                          <span className="font-medium">{school.name}</span>
-
-                          {(school.city || school.state) && (
-                            <span className="block text-xs text-muted-foreground">
-                              {[school.city, school.state]
-                                .filter(Boolean)
-                                .join(", ")}
-                            </span>
-                          )}
-                        </button>
-                      </li>
-                    ))}
                 </ul>
               )}
             </div>
@@ -576,21 +600,41 @@ export default function EducationSection({
                 Degree<span aria-hidden="true">*</span>
               </Label>
 
-              <Input
-                id="degree"
-                value={draft.degree ?? ""}
-                onChange={(event) =>
-                  setDraft({ ...draft, degree: event.target.value })
+              <Select
+                value={normalizeSelectValue(draft.degree)}
+                onValueChange={(value) =>
+                  setDraft({
+                    ...draft,
+                    degree: denormalizeDegree(value),
+                  })
                 }
-                placeholder="BSC"
-                list="degree-options"
-              />
+              >
+                <SelectTrigger
+                  id="degree"
+                  className="h-12 w-full rounded-xl border border-input bg-background px-4 text-base shadow-none focus:ring-2 focus:ring-[#0c8f8f]"
+                >
+                  <SelectValue placeholder="Select degree" />
+                </SelectTrigger>
 
-              <datalist id="degree-options">
-                {DEGREE_OPTIONS.map((degree) => (
-                  <option key={degree} value={degree} />
-                ))}
-              </datalist>
+                <SelectContent
+                  position="popper"
+                  side="bottom"
+                  align="start"
+                  sideOffset={6}
+                  avoidCollisions={false}
+                  className={SELECT_CONTENT_CLASS}
+                >
+                  {DEGREE_OPTIONS.map((degree) => (
+                    <SelectItem
+                      key={degree}
+                      value={degree}
+                      className={SELECT_ITEM_CLASS}
+                    >
+                      {degree}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-1.5">
@@ -621,14 +665,34 @@ export default function EducationSection({
                     })
                   }
                 >
-                  <SelectTrigger id="startYear" className="rounded-r-none">
+                  <SelectTrigger
+                    id="startYear"
+                    className="h-12 w-full rounded-r-none border border-input bg-background px-4 text-base shadow-none focus:ring-2 focus:ring-[#0c8f8f]"
+                  >
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
 
-                  <SelectContent>
-                    <SelectItem value={EMPTY_VALUE}>Not specified</SelectItem>
+                  <SelectContent
+                    position="popper"
+                    side="bottom"
+                    align="start"
+                    sideOffset={6}
+                    avoidCollisions={false}
+                    className={SELECT_CONTENT_CLASS}
+                  >
+                    <SelectItem
+                      value={EMPTY_VALUE}
+                      className={SELECT_ITEM_CLASS}
+                    >
+                      Not specified
+                    </SelectItem>
+
                     {yearOptions.map((year) => (
-                      <SelectItem key={year.value} value={year.value}>
+                      <SelectItem
+                        key={year.value}
+                        value={year.value}
+                        className={SELECT_ITEM_CLASS}
+                      >
                         {year.label}
                       </SelectItem>
                     ))}
@@ -653,15 +717,32 @@ export default function EducationSection({
                 >
                   <SelectTrigger
                     id="endYear"
-                    className="rounded-l-none border-l-0"
+                    className="h-12 w-full rounded-l-none border border-l-0 border-input bg-background px-4 text-base shadow-none focus:ring-2 focus:ring-[#0c8f8f]"
                   >
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
 
-                  <SelectContent>
-                    <SelectItem value={EMPTY_VALUE}>Not specified</SelectItem>
+                  <SelectContent
+                    position="popper"
+                    side="bottom"
+                    align="start"
+                    sideOffset={6}
+                    avoidCollisions={false}
+                    className={SELECT_CONTENT_CLASS}
+                  >
+                    <SelectItem
+                      value={EMPTY_VALUE}
+                      className={SELECT_ITEM_CLASS}
+                    >
+                      Not specified
+                    </SelectItem>
+
                     {yearOptions.map((year) => (
-                      <SelectItem key={year.value} value={year.value}>
+                      <SelectItem
+                        key={year.value}
+                        value={year.value}
+                        className={SELECT_ITEM_CLASS}
+                      >
                         {year.label}
                       </SelectItem>
                     ))}

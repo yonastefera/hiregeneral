@@ -26,6 +26,25 @@ import { cn } from "@/lib/utils";
 const PAGE_SIZE = 8;
 const INACTIVE_DAYS = 60;
 
+const prettyDateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+
+const applicationStatuses = [
+  "submitted",
+  "reviewed",
+  "reviewing",
+  "interview",
+  "offer",
+  "closed",
+  "rejected",
+  "withdrawn",
+] as const;
+
+type ApplicationStatus = (typeof applicationStatuses)[number];
+
 type SavedJobRecord = {
   id: string;
   jobId: string;
@@ -47,18 +66,10 @@ type ApplicationRecord = {
   logo: string;
   location: string;
   resumeName: string;
-  resumeUrl: string;
+  resumeUrl: string | null;
   appliedAt: string;
   receivedAt: string;
-  status:
-    | "submitted"
-    | "reviewed"
-    | "reviewing"
-    | "interview"
-    | "offer"
-    | "closed"
-    | "rejected"
-    | "withdrawn";
+  status: ApplicationStatus;
   slug: string;
 };
 
@@ -90,16 +101,21 @@ type ApplicationApiRow = {
 };
 
 const isWithin = (iso: string, days: number) => {
-  const diff = (Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24);
-  return diff <= days;
+  const timestamp = new Date(iso).getTime();
+
+  if (Number.isNaN(timestamp)) return false;
+
+  const diff = (Date.now() - timestamp) / (1000 * 60 * 60 * 24);
+
+  return diff >= 0 && diff <= days;
 };
 
 function formatPrettyDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(value));
+  const timestamp = new Date(value).getTime();
+
+  if (Number.isNaN(timestamp)) return "Unknown date";
+
+  return prettyDateFormatter.format(new Date(timestamp));
 }
 
 function formatSalary(
@@ -107,7 +123,10 @@ function formatSalary(
   max: number | null | undefined,
   currency = "USD",
 ) {
-  if (!min && !max) return undefined;
+  const hasMin = min != null;
+  const hasMax = max != null;
+
+  if (!hasMin && !hasMax) return undefined;
 
   const fmt = (n: number) =>
     Intl.NumberFormat("en-US", {
@@ -116,10 +135,16 @@ function formatSalary(
       maximumFractionDigits: 0,
     }).format(n);
 
-  if (min && max) return `${fmt(min)} - ${fmt(max)}`;
-  if (min) return `From ${fmt(min)}`;
+  if (hasMin && hasMax) return `${fmt(min)} - ${fmt(max)}`;
+  if (hasMin) return `From ${fmt(min)}`;
 
   return `Up to ${fmt(max!)}`;
+}
+
+function normalizeApplicationStatus(status: string): ApplicationStatus {
+  return applicationStatuses.includes(status as ApplicationStatus)
+    ? (status as ApplicationStatus)
+    : "submitted";
 }
 
 function logoFor(job: ApiJob) {
@@ -165,10 +190,10 @@ function toApplicationRecord(row: ApplicationApiRow): ApplicationRecord | null {
     logo: logoFor(row.jobs),
     location: row.jobs.location,
     resumeName: resumeName(row.resume_url),
-    resumeUrl: row.resume_url ?? "#",
+    resumeUrl: row.resume_url,
     appliedAt: row.created_at,
     receivedAt: row.created_at,
-    status: row.status as ApplicationRecord["status"],
+    status: normalizeApplicationStatus(row.status),
   };
 }
 
@@ -185,13 +210,13 @@ function CompanyAvatar({ company, logo }: { company: string; logo: string }) {
       {logoUrl ? (
         <Image
           src={logoUrl}
-          alt={`${company} logo`}
+          alt=""
           width={48}
           height={48}
           className="size-full object-contain p-1.5"
         />
       ) : (
-        logoText
+        <span aria-hidden="true">{logoText}</span>
       )}
     </div>
   );
@@ -199,26 +224,15 @@ function CompanyAvatar({ company, logo }: { company: string; logo: string }) {
 
 function SavedCard({
   item,
-  onOpen,
   onUnsave,
   unsaving,
 }: {
   item: SavedJobRecord;
-  onOpen: (slug: string) => void;
   onUnsave: (jobId: string) => void;
   unsaving: boolean;
 }) {
   return (
-    <article
-      role="link"
-      tabIndex={0}
-      onClick={() => onOpen(item.slug)}
-      onKeyDown={(event) =>
-        (event.key === "Enter" || event.key === " ") &&
-        (event.preventDefault(), onOpen(item.slug))
-      }
-      className="group cursor-pointer rounded-xl border border-border/80 bg-card p-5 transition-all hover:border-primary/40 hover:shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-    >
+    <article className="group rounded-xl border border-border/80 bg-card p-5 transition-all hover:border-primary/40 hover:shadow-soft focus-within:border-primary/40 focus-within:shadow-soft">
       <div className="min-w-0">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-4">
@@ -233,51 +247,56 @@ function SavedCard({
 
           <button
             type="button"
-            aria-label="Remove from saved"
+            aria-label={`Remove ${item.title} from saved jobs`}
             disabled={unsaving}
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              onUnsave(item.jobId);
-            }}
+            onClick={() => onUnsave(item.jobId)}
             className={cn(
-              "grid h-10 w-7.75 shrink-0 place-items-center rounded-lg border-none bg-transparent text-primary transition-colors hover:bg-transparent hover:text-primary disabled:cursor-wait disabled:opacity-80",
+              "grid h-10 w-[31px] shrink-0 place-items-center rounded-lg border-none bg-transparent text-primary transition-colors hover:bg-transparent hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-wait disabled:opacity-80",
             )}
           >
             {unsaving ? (
-              <Loader2 className="size-6 animate-spin" />
+              <Loader2 className="size-6 animate-spin" aria-hidden="true" />
             ) : (
-              <Bookmark className="size-6 fill-current" />
+              <Bookmark className="size-6 fill-current" aria-hidden="true" />
             )}
           </button>
         </div>
 
-        <h3 className="mt-4 truncate text-base font-semibold tracking-tight text-foreground transition-colors group-hover:text-primary md:text-lg">
-          {item.title}
-        </h3>
+        <h2 className="mt-4 truncate text-base font-semibold tracking-tight md:text-lg">
+          <Link
+            href={`/jobs/${item.slug}`}
+            className="text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          >
+            {item.title}
+          </Link>
+        </h2>
 
         <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
-            <MapPin className="size-3.5" />
+            <MapPin className="size-3.5" aria-hidden="true" />
             {item.location}
           </span>
 
           {item.salary && (
             <span className="inline-flex items-center gap-1.5">
-              <Wallet className="size-3.5" />
+              <Wallet className="size-3.5" aria-hidden="true" />
               {item.salary}
             </span>
           )}
 
           <span className="inline-flex items-center gap-1.5">
-            <Calendar className="size-3.5" />
+            <Calendar className="size-3.5" aria-hidden="true" />
             Saved {formatPrettyDate(item.savedAt)}
           </span>
         </div>
 
-        <div className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary opacity-0 transition-all group-hover:opacity-100">
-          View details <ArrowRight className="size-3.5" />
-        </div>
+        <Link
+          href={`/jobs/${item.slug}`}
+          className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary opacity-0 transition-all hover:text-primary group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          aria-label={`View details for ${item.title}`}
+        >
+          View details <ArrowRight className="size-3.5" aria-hidden="true" />
+        </Link>
       </div>
     </article>
   );
@@ -297,15 +316,9 @@ const statusColor: Record<
   withdrawn: "soft",
 };
 
-function ApplicationCard({
-  item,
-  onOpen,
-}: {
-  item: ApplicationRecord;
-  onOpen: (slug: string) => void;
-}) {
+function ApplicationCard({ item }: { item: ApplicationRecord }) {
   return (
-    <article className="rounded-lg border border-border bg-card p-5 transition-all hover:border-primary/40 hover:shadow-soft">
+    <article className="rounded-lg border border-border bg-card p-5 transition-all hover:border-primary/40 hover:shadow-soft focus-within:border-primary/40 focus-within:shadow-soft">
       <div className="flex items-start gap-4">
         <CompanyAvatar company={item.company} logo={item.logo} />
 
@@ -316,53 +329,55 @@ function ApplicationCard({
                 {item.company}
               </p>
 
-              <button
-                type="button"
-                onClick={() => onOpen(item.slug)}
-                className="mt-1 truncate text-left text-base font-semibold tracking-tight text-foreground hover:text-primary md:text-lg"
-              >
-                {item.title}
-              </button>
+              <h2 className="mt-1 truncate text-base font-semibold tracking-tight md:text-lg">
+                <Link
+                  href={`/jobs/${item.slug}`}
+                  className="text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                >
+                  {item.title}
+                </Link>
+              </h2>
             </div>
 
-            <Badge
-              variant={statusColor[item.status] ?? "soft"}
-              className="capitalize"
-            >
+            <Badge variant={statusColor[item.status]} className="capitalize">
               {item.status}
             </Badge>
           </div>
 
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1.5">
-              <MapPin className="size-3.5" />
+              <MapPin className="size-3.5" aria-hidden="true" />
               {item.location}
             </span>
 
             <span className="inline-flex items-center gap-1.5">
-              <Calendar className="size-3.5" />
+              <Calendar className="size-3.5" aria-hidden="true" />
               Applied {formatPrettyDate(item.appliedAt)}
             </span>
 
             <span className="inline-flex items-center gap-1.5">
-              <Calendar className="size-3.5" />
+              <Calendar className="size-3.5" aria-hidden="true" />
               Received {formatPrettyDate(item.receivedAt)}
             </span>
           </div>
 
-          <a
-            href={item.resumeUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-3 inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:text-primary"
-            onClick={(event) =>
-              item.resumeUrl === "#" && event.preventDefault()
-            }
-          >
-            <FileText className="size-3.5" />
-            <span className="max-w-[18rem] truncate">{item.resumeName}</span>
-            <ExternalLink className="size-3" />
-          </a>
+          {item.resumeUrl ? (
+            <a
+              href={item.resumeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            >
+              <FileText className="size-3.5" aria-hidden="true" />
+              <span className="max-w-[18rem] truncate">{item.resumeName}</span>
+              <ExternalLink className="size-3" aria-hidden="true" />
+            </a>
+          ) : (
+            <span className="mt-3 inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground">
+              <FileText className="size-3.5" aria-hidden="true" />
+              <span className="max-w-[18rem] truncate">{item.resumeName}</span>
+            </span>
+          )}
         </div>
       </div>
     </article>
@@ -384,7 +399,7 @@ export default function SavedJobsPage() {
   const { toggleSaved, pendingId } = useSavedJobs();
 
   useEffect(() => {
-    let active = true;
+    const controller = new AbortController();
 
     async function loadActivity() {
       setLoading(true);
@@ -392,8 +407,14 @@ export default function SavedJobsPage() {
 
       try {
         const [savedResponse, applicationsResponse] = await Promise.all([
-          fetch("/api/saved-jobs", { cache: "no-store" }),
-          fetch("/api/applications", { cache: "no-store" }),
+          fetch("/api/saved-jobs", {
+            cache: "no-store",
+            signal: controller.signal,
+          }),
+          fetch("/api/applications", {
+            cache: "no-store",
+            signal: controller.signal,
+          }),
         ]);
 
         if (
@@ -404,7 +425,10 @@ export default function SavedJobsPage() {
           return;
         }
 
-        if (!savedResponse.ok) throw new Error("Could not load saved jobs.");
+        if (!savedResponse.ok) {
+          throw new Error("Could not load saved jobs.");
+        }
+
         if (!applicationsResponse.ok) {
           throw new Error("Could not load applications.");
         }
@@ -414,27 +438,29 @@ export default function SavedJobsPage() {
           applicationsResponse.json(),
         ]);
 
-        if (!active) return;
+        if (controller.signal.aborted) return;
 
         setSavedRows(Array.isArray(savedBody.data) ? savedBody.data : []);
         setApplicationRows(
           Array.isArray(applicationsBody.data) ? applicationsBody.data : [],
         );
       } catch (error) {
-        if (!active) return;
+        if (controller.signal.aborted) return;
 
         setLoadError(
           error instanceof Error ? error.message : "Could not load activity.",
         );
       } finally {
-        if (active) setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     }
 
     loadActivity();
 
     return () => {
-      active = false;
+      controller.abort();
     };
   }, [router]);
 
@@ -461,10 +487,6 @@ export default function SavedJobsPage() {
     [applicationRows],
   );
 
-  const openJob = (slug: string) => {
-    router.push(`/jobs/${slug}`);
-  };
-
   const onUnsave = async (jobId: string) => {
     const saved = await toggleSaved(jobId);
 
@@ -490,8 +512,12 @@ export default function SavedJobsPage() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center rounded-lg border border-border bg-card p-12 text-muted-foreground">
-            <Loader2 className="mr-2 size-5 animate-spin" />
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex items-center justify-center rounded-lg border border-border bg-card p-12 text-muted-foreground"
+          >
+            <Loader2 className="mr-2 size-5 animate-spin" aria-hidden="true" />
             Loading your activity...
           </div>
         ) : loadError ? (
@@ -534,7 +560,6 @@ export default function SavedJobsPage() {
                       <SavedCard
                         key={item.id}
                         item={item}
-                        onOpen={openJob}
                         onUnsave={onUnsave}
                         unsaving={pendingId === item.jobId}
                       />
@@ -573,11 +598,7 @@ export default function SavedJobsPage() {
                 <>
                   <div className="grid gap-3">
                     {appsFiltered.slice(0, appsVisible).map((item) => (
-                      <ApplicationCard
-                        key={item.id}
-                        item={item}
-                        onOpen={openJob}
-                      />
+                      <ApplicationCard key={item.id} item={item} />
                     ))}
                   </div>
 
@@ -615,7 +636,7 @@ function EmptyState({
 }) {
   return (
     <div className="rounded-lg border border-dashed border-border bg-card p-10 text-center">
-      <h3 className="text-lg font-semibold">{title}</h3>
+      <h2 className="text-lg font-semibold">{title}</h2>
 
       <p className="mt-2 text-sm text-muted-foreground">{description}</p>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import type { ChangeEvent, ReactNode, RefObject } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import {
   Award,
@@ -18,9 +18,9 @@ import {
   Medal,
   Pencil,
   Phone,
-  X,
 } from "lucide-react";
 
+import LocationAutocomplete from "@/components/location/LocationAutocomplete";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -55,19 +55,6 @@ type ProfileInfoSectionProps = {
   uploadingAvatar: boolean;
   onAvatarUpload: (event: ChangeEvent<HTMLInputElement>) => void;
   onProfileChange: (profile: JobSeekerProfile) => void;
-};
-
-type LocationSuggestion = {
-  id: string;
-  label: string;
-  city: string;
-  state: string;
-  zip_code: string | null;
-  country: string;
-};
-
-type LocationSearchResponse = {
-  locations?: LocationSuggestion[];
 };
 
 function normalizeText(value: string | null | undefined) {
@@ -262,19 +249,8 @@ export default function ProfileInfoSection({
   const [open, setOpen] = useState(false);
   const [employerPreviewOpen, setEmployerPreviewOpen] = useState(false);
   const [draft, setDraft] = useState(profile);
-
   const [locationQuery, setLocationQuery] = useState("");
   const [initialLocationQuery, setInitialLocationQuery] = useState("");
-  const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
-  const [locationSuggestions, setLocationSuggestions] = useState<
-    LocationSuggestion[]
-  >([]);
-  const [loadingLocationSuggestions, setLoadingLocationSuggestions] =
-    useState(false);
-
-  const locationSuggestionCacheRef = useRef<
-    Record<string, LocationSuggestion[]>
-  >({});
 
   useEffect(() => {
     if (!open) return;
@@ -284,71 +260,7 @@ export default function ProfileInfoSection({
     setDraft(profile);
     setLocationQuery(nextLocation);
     setInitialLocationQuery(nextLocation);
-    setShowLocationSuggestions(false);
-    setLocationSuggestions([]);
-    setLoadingLocationSuggestions(false);
   }, [open, profile]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const query = locationQuery.trim();
-    const cacheKey = query.toLowerCase();
-
-    if (query.length < 2) {
-      setLocationSuggestions([]);
-      setLoadingLocationSuggestions(false);
-      return;
-    }
-
-    const cachedSuggestions = locationSuggestionCacheRef.current[cacheKey];
-
-    if (cachedSuggestions) {
-      setLocationSuggestions(cachedSuggestions);
-      setLoadingLocationSuggestions(false);
-      return;
-    }
-
-    const controller = new AbortController();
-
-    const timeoutId = window.setTimeout(async () => {
-      setLoadingLocationSuggestions(true);
-
-      try {
-        const response = await fetch(
-          `/api/locations?query=${encodeURIComponent(query)}`,
-          {
-            signal: controller.signal,
-          },
-        );
-
-        if (!response.ok) {
-          throw new Error("Could not fetch location suggestions.");
-        }
-
-        const payload = (await response.json()) as LocationSearchResponse;
-        const nextLocations = payload.locations ?? [];
-
-        locationSuggestionCacheRef.current[cacheKey] = nextLocations;
-        setLocationSuggestions(nextLocations);
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return;
-        }
-
-        // Keep previous suggestions visible to avoid dropdown flicker.
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoadingLocationSuggestions(false);
-        }
-      }
-    }, 160);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-      controller.abort();
-    };
-  }, [locationQuery, open]);
 
   const initials = getInitials(profile);
   const draftInitials = getInitials(draft);
@@ -382,17 +294,6 @@ export default function ProfileInfoSection({
       ...profile,
       visibility: isPublic ? "private" : "public",
     });
-  };
-
-  const selectLocationSuggestion = (suggestion: LocationSuggestion) => {
-    setLocationQuery(suggestion.label);
-    setDraft({
-      ...draft,
-      city: suggestion.city,
-      state: suggestion.state,
-      zip_code: suggestion.zip_code,
-    });
-    setShowLocationSuggestions(false);
   };
 
   return (
@@ -671,93 +572,37 @@ export default function ProfileInfoSection({
                   Postal Code or City, State
                 </Label>
 
-                <div className="relative">
-                  <Input
-                    id="locationInput"
-                    value={locationQuery}
-                    onFocus={() => setShowLocationSuggestions(true)}
-                    onBlur={() => {
-                      window.setTimeout(() => {
-                        setShowLocationSuggestions(false);
-                      }, 200);
-                    }}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      const parsedLocation = parseLocationInput(value, draft);
+                <LocationAutocomplete
+                  id="locationInput"
+                  value={locationQuery}
+                  placeholder="Postal Code or City, State"
+                  onValueChange={(value) => {
+                    const parsedLocation = parseLocationInput(value, draft);
 
-                      setLocationQuery(value);
-                      setDraft({
-                        ...draft,
-                        ...parsedLocation,
-                      });
-                      setShowLocationSuggestions(true);
-                    }}
-                    autoComplete="off"
-                    className="h-12 pr-10"
-                  />
-
-                  {locationQuery && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLocationQuery("");
-                        setDraft({
-                          ...draft,
-                          city: null,
-                          state: null,
-                          zip_code: null,
-                        });
-                        setLocationSuggestions([]);
-                        setShowLocationSuggestions(false);
-                      }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      aria-label="Clear location"
-                    >
-                      <X aria-hidden="true" className="size-4" />
-                    </button>
-                  )}
-
-                  {showLocationSuggestions &&
-                    (loadingLocationSuggestions ||
-                      locationSuggestions.length > 0) && (
-                      <ul
-                        className="absolute left-0 right-0 top-full z-9999 mt-1 max-h-64 overflow-y-auto rounded-xl border border-border bg-background py-2 shadow-xl"
-                        role="listbox"
-                      >
-                        {locationSuggestions.map((suggestion) => (
-                          <li
-                            key={suggestion.id}
-                            role="option"
-                            aria-selected={false}
-                          >
-                            <button
-                              type="button"
-                              onMouseDown={(event) => event.preventDefault()}
-                              onClick={() =>
-                                selectLocationSuggestion(suggestion)
-                              }
-                              className="w-full px-4 py-3 text-left text-sm hover:bg-muted"
-                            >
-                              {suggestion.city},{" "}
-                              <span className="font-semibold">
-                                {suggestion.state} {suggestion.country}
-                                {suggestion.zip_code
-                                  ? ` ${suggestion.zip_code}`
-                                  : ""}
-                              </span>
-                            </button>
-                          </li>
-                        ))}
-
-                        {loadingLocationSuggestions &&
-                          locationSuggestions.length === 0 && (
-                            <li className="px-4 py-3 text-sm text-muted-foreground">
-                              Searching locations...
-                            </li>
-                          )}
-                      </ul>
-                    )}
-                </div>
+                    setLocationQuery(value);
+                    setDraft({
+                      ...draft,
+                      ...parsedLocation,
+                    });
+                  }}
+                  onLocationSelect={(selectedLocation) => {
+                    setLocationQuery(selectedLocation.label);
+                    setDraft({
+                      ...draft,
+                      city: selectedLocation.city,
+                      state: selectedLocation.state,
+                      zip_code: selectedLocation.zip_code,
+                    });
+                  }}
+                  onClear={() => {
+                    setDraft({
+                      ...draft,
+                      city: null,
+                      state: null,
+                      zip_code: null,
+                    });
+                  }}
+                />
               </div>
 
               <fieldset className="mt-5">

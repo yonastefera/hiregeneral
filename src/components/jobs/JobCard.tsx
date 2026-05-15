@@ -112,20 +112,18 @@ export function JobCard({ job, saved, saving = false, onSave }: JobCardProps) {
               disabled={saving}
               onClick={onSaveClick}
               className={cn(
-                "relative z-10 grid size-9 place-items-center rounded-lg border border-transparent text-muted-foreground transition-all",
-                "hover:border-border hover:bg-secondary/60 hover:text-foreground",
-                saved && "text-accent",
+                "relative z-10 grid size-10 shrink-0 place-items-center rounded-lg bg-transparent text-muted-foreground transition-colors",
+                "hover:bg-transparent hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2",
+                saved && "text-primary",
                 saving && "cursor-wait opacity-80",
               )}
             >
               {saving ? (
-                <Loader2 className="size-4 animate-spin" />
+                <Loader2 className="size-5 animate-spin" />
               ) : (
                 <Bookmark
-                  className={cn(
-                    "size-4",
-                    saved && "fill-accent/20 text-accent",
-                  )}
+                  className={cn("size-5", saved && "fill-current")}
+                  strokeWidth={2}
                 />
               )}
             </button>

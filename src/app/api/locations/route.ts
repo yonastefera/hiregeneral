@@ -128,13 +128,10 @@ export async function GET(request: Request) {
       code: error.code,
     });
 
-    return NextResponse.json(
-      {
-        error: "Could not fetch location suggestions.",
-        details: error.message,
-      },
-      { status: 500 },
-    );
+    return NextResponse.json({
+      error: "Could not fetch location suggestions.",
+      details: error.message,
+    });
   }
 
   const payload: LocationSearchPayload = {

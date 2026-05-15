@@ -9,13 +9,14 @@ import {
   MapPin,
   Search,
   SlidersHorizontal,
-  Sparkles,
   X,
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
+import LocationAutocomplete from "@/components/location/LocationAutocomplete";
+import type { LocationSuggestion } from "@/components/location/location-types";
+import KeywordAutocomplete from "@/components/search/KeywordAutocomplete";
+import type { KeywordSuggestion } from "@/components/search/keyword-types";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Pagination,
   PaginationContent,
@@ -27,7 +28,6 @@ import {
 } from "@/components/ui/pagination";
 import { JobCard } from "@/components/jobs/JobCard";
 import { JobCardSkeleton } from "@/components/jobs/JobLoadingSkeletons";
-import { keywordSuggestions, locationSuggestions } from "@/data/suggestions";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
 import { toJobCardShape } from "@/lib/jobs/card-shape";
 import { cn } from "@/lib/utils";
@@ -36,7 +36,6 @@ import type { Job } from "@/lib/db/types";
 const DEFAULT_POSTED = "3650";
 const DEFAULT_DISTANCE = "100";
 const PAGE_SIZE = 20;
-const SEARCH_DEBOUNCE_MS = 300;
 
 type JobsApiResponse = {
   data?: Job[];
@@ -44,6 +43,19 @@ type JobsApiResponse = {
   newJobs?: number;
   totalPages?: number;
   error?: string;
+};
+
+type SelectedKeyword = {
+  term: string;
+  label: string;
+  category: string | null;
+};
+
+type SelectedLocation = {
+  city: string;
+  state: string;
+  zip_code: string | null;
+  label: string;
 };
 
 const postedOptions = [
@@ -86,16 +98,21 @@ function getJobsFromApiBody(body: unknown): Job[] {
   return [];
 }
 
-function useDebouncedValue(value: string, delay: number) {
-  const [debounced, setDebounced] = useState(value);
+function toSelectedKeyword(suggestion: KeywordSuggestion): SelectedKeyword {
+  return {
+    term: suggestion.term,
+    label: suggestion.label,
+    category: suggestion.category,
+  };
+}
 
-  useEffect(() => {
-    const timeout = window.setTimeout(() => setDebounced(value), delay);
-
-    return () => window.clearTimeout(timeout);
-  }, [value, delay]);
-
-  return debounced;
+function toSelectedLocation(location: LocationSuggestion): SelectedLocation {
+  return {
+    city: location.city,
+    state: location.state,
+    zip_code: location.zip_code,
+    label: location.label,
+  };
 }
 
 export default function JobsPage() {
@@ -103,8 +120,19 @@ export default function JobsPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const [query, setQuery] = useState(searchParams.get("q") ?? "");
-  const [location, setLocation] = useState(searchParams.get("location") ?? "");
+  const initialQuery = searchParams.get("q") ?? "";
+  const initialLocation = searchParams.get("location") ?? "";
+
+  const [query, setQuery] = useState(initialQuery);
+  const [submittedQuery, setSubmittedQuery] = useState(initialQuery);
+
+  const [location, setLocation] = useState(initialLocation);
+  const [submittedLocation, setSubmittedLocation] = useState(initialLocation);
+
+  const [, setSelectedKeyword] = useState<SelectedKeyword | null>(null);
+
+  const [, setSelectedLocation] = useState<SelectedLocation | null>(null);
+
   const [dateFilter, setDateFilter] = useState(
     searchParams.get("posted") ?? DEFAULT_POSTED,
   );
@@ -122,22 +150,30 @@ export default function JobsPage() {
   const hasLoadedOnceRef = useRef(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const debouncedQuery = useDebouncedValue(query.trim(), SEARCH_DEBOUNCE_MS);
-  const debouncedLocation = useDebouncedValue(
-    location.trim(),
-    SEARCH_DEBOUNCE_MS,
-  );
-
   const { isSaved, toggleSaved, pendingId } = useSavedJobs();
 
   useEffect(() => {
     const next = new URLSearchParams();
 
-    if (debouncedQuery) next.set("q", debouncedQuery);
-    if (debouncedLocation) next.set("location", debouncedLocation);
-    if (dateFilter !== DEFAULT_POSTED) next.set("posted", dateFilter);
-    if (distance !== DEFAULT_DISTANCE) next.set("distance", distance);
-    if (page > 1) next.set("page", String(page));
+    if (submittedQuery.trim()) {
+      next.set("q", submittedQuery.trim());
+    }
+
+    if (submittedLocation.trim()) {
+      next.set("location", submittedLocation.trim());
+    }
+
+    if (dateFilter !== DEFAULT_POSTED) {
+      next.set("posted", dateFilter);
+    }
+
+    if (distance !== DEFAULT_DISTANCE) {
+      next.set("distance", distance);
+    }
+
+    if (page > 1) {
+      next.set("page", String(page));
+    }
 
     const nextQueryString = next.toString();
     const currentQueryString = searchParams.toString();
@@ -151,8 +187,8 @@ export default function JobsPage() {
       );
     }
   }, [
-    debouncedQuery,
-    debouncedLocation,
+    submittedQuery,
+    submittedLocation,
     dateFilter,
     distance,
     page,
@@ -163,7 +199,7 @@ export default function JobsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedQuery, debouncedLocation, dateFilter, distance]);
+  }, [submittedQuery, submittedLocation, dateFilter, distance]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -180,12 +216,12 @@ export default function JobsPage() {
           distance,
         });
 
-        if (debouncedQuery) {
-          params.set("query", debouncedQuery);
+        if (submittedQuery.trim()) {
+          params.set("query", submittedQuery.trim());
         }
 
-        if (debouncedLocation) {
-          params.set("location", debouncedLocation);
+        if (submittedLocation.trim()) {
+          params.set("location", submittedLocation.trim());
         }
 
         const response = await fetch(`/api/jobs?${params.toString()}`, {
@@ -227,6 +263,7 @@ export default function JobsPage() {
             ? Math.max(1, body.totalPages)
             : 1,
         );
+
         hasLoadedOnceRef.current = true;
         setHasLoadedOnce(true);
       } catch (error) {
@@ -252,20 +289,32 @@ export default function JobsPage() {
     loadJobs();
 
     return () => controller.abort();
-  }, [page, debouncedQuery, debouncedLocation, dateFilter, distance]);
+  }, [page, submittedQuery, submittedLocation, dateFilter, distance]);
 
   const cardJobs = useMemo(() => jobs.map(toJobCardShape), [jobs]);
 
   const clearAll = () => {
     setQuery("");
+    setSelectedKeyword(null);
+    setSubmittedQuery("");
+
     setLocation("");
+    setSelectedLocation(null);
+    setSubmittedLocation("");
+
     setDateFilter(DEFAULT_POSTED);
     setDistance(DEFAULT_DISTANCE);
     setPage(1);
   };
 
+  const submitSearch = () => {
+    setSubmittedQuery(query.trim());
+    setSubmittedLocation(location.trim());
+    setPage(1);
+  };
+
   const hasActiveFilters =
-    Boolean(query || location) ||
+    Boolean(query || location || submittedQuery || submittedLocation) ||
     dateFilter !== DEFAULT_POSTED ||
     distance !== DEFAULT_DISTANCE;
 
@@ -318,18 +367,13 @@ export default function JobsPage() {
   return (
     <main className="min-h-screen bg-background">
       <section
-        className="relative overflow-hidden bg-hero-gradient px-4 py-12"
+        className="relative overflow-visible bg-hero-gradient px-4 py-12"
         aria-labelledby="jobs-page-title"
       >
         <div className="pointer-events-none absolute -top-24 right-[-10%] size-72 rounded-full bg-accent/15 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 left-[-10%] size-72 rounded-full bg-primary/15 blur-3xl" />
 
         <div className="relative mx-auto max-w-368 px-4 md:px-6 xl:px-8">
-          <Badge variant="soft" className="gap-1.5">
-            <Sparkles aria-hidden="true" className="size-3" />
-            Search results
-          </Badge>
-
           <h1
             id="jobs-page-title"
             className="mt-4 text-balance text-4xl font-bold tracking-tight md:text-5xl"
@@ -344,64 +388,80 @@ export default function JobsPage() {
           <form
             role="search"
             aria-label="Search jobs"
-            className="mt-7 grid gap-2 rounded-2xl border border-border/70 bg-surface/95 p-2 shadow-lift backdrop-blur md:grid-cols-[1fr_1fr_auto]"
+            className="relative z-30 mt-7 grid gap-2 rounded-2xl border border-border/70 bg-surface/95 p-2 shadow-lift backdrop-blur md:grid-cols-[1fr_1fr_auto]"
             onSubmit={(event) => {
               event.preventDefault();
-              setPage(1);
+              submitSearch();
             }}
           >
-            <div className="flex items-center gap-2 rounded-xl border border-input bg-background px-3 transition-colors focus-within:border-primary/50">
+            <div className="relative rounded-xl border border-input bg-background transition-colors focus-within:border-primary/50">
               <Search
                 aria-hidden="true"
-                className="size-4 text-muted-foreground"
+                className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-muted-foreground"
               />
 
               <label htmlFor="job-query" className="sr-only">
                 Job title, skill, company, or keyword
               </label>
 
-              <Input
+              <KeywordAutocomplete
                 id="job-query"
-                list="job-keyword-suggestions"
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
                 placeholder="Job title, skill, company, or keyword"
-                className="h-12 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
-                autoComplete="off"
-              />
+                showClearButton={false}
+                className="h-12 border-0 bg-transparent pl-9 pr-3 shadow-none focus-visible:ring-0"
+                onValueChange={(value) => {
+                  setQuery(value);
 
-              <datalist id="job-keyword-suggestions">
-                {keywordSuggestions.map((suggestion) => (
-                  <option key={suggestion} value={suggestion} />
-                ))}
-              </datalist>
+                  if (!value.trim()) {
+                    setSelectedKeyword(null);
+                  }
+                }}
+                onKeywordSelect={(suggestion) => {
+                  const nextKeyword = toSelectedKeyword(suggestion);
+
+                  setSelectedKeyword(nextKeyword);
+                  setQuery(nextKeyword.term);
+                }}
+                onClear={() => {
+                  setSelectedKeyword(null);
+                }}
+              />
             </div>
 
-            <div className="flex items-center gap-2 rounded-xl border border-input bg-background px-3 transition-colors focus-within:border-primary/50">
+            <div className="relative rounded-xl border border-input bg-background transition-colors focus-within:border-primary/50">
               <MapPin
                 aria-hidden="true"
-                className="size-4 text-muted-foreground"
+                className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-muted-foreground"
               />
 
               <label htmlFor="job-location" className="sr-only">
-                City, state, or remote
+                City, state, or ZIP
               </label>
 
-              <Input
+              <LocationAutocomplete
                 id="job-location"
-                list="job-location-suggestions"
                 value={location}
-                onChange={(event) => setLocation(event.target.value)}
-                placeholder="City, state, or remote"
-                className="h-12 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
-                autoComplete="address-level2"
-              />
+                placeholder="City, state, or ZIP"
+                showClearButton={false}
+                className="h-12 border-0 bg-transparent pl-9 pr-3 shadow-none focus-visible:ring-0"
+                onValueChange={(value) => {
+                  setLocation(value);
 
-              <datalist id="job-location-suggestions">
-                {locationSuggestions.map((suggestion) => (
-                  <option key={suggestion} value={suggestion} />
-                ))}
-              </datalist>
+                  if (!value.trim()) {
+                    setSelectedLocation(null);
+                  }
+                }}
+                onLocationSelect={(suggestion) => {
+                  const nextLocation = toSelectedLocation(suggestion);
+
+                  setSelectedLocation(nextLocation);
+                  setLocation(nextLocation.label);
+                }}
+                onClear={() => {
+                  setSelectedLocation(null);
+                }}
+              />
             </div>
 
             <Button type="submit" variant="hero" size="xl">

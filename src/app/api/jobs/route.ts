@@ -1,5 +1,3 @@
-// app/api/jobs/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
@@ -178,46 +176,7 @@ function balanceJobsByCompany<T extends { company_name: string }>(jobs: T[]) {
   return balanced;
 }
 
-function searchRank<
-  T extends { company_name: string; title: string; category: string | null },
->(job: T, query: string) {
-  const normalizedQuery = query.trim().toLowerCase();
-
-  if (!normalizedQuery) return 0;
-
-  const company = job.company_name.toLowerCase();
-  const title = job.title.toLowerCase();
-  const category = job.category?.toLowerCase() ?? "";
-
-  if (company === normalizedQuery) return 0;
-  if (company.includes(normalizedQuery)) return 1;
-  if (title === normalizedQuery) return 2;
-  if (title.includes(normalizedQuery)) return 3;
-  if (category.includes(normalizedQuery)) return 4;
-
-  return 5;
-}
-
-function rankSearchResults<
-  T extends {
-    company_name: string;
-    title: string;
-    category: string | null;
-    posted_at: string;
-  },
->(jobs: T[], query: string) {
-  if (!query.trim()) return jobs;
-
-  return [...jobs].sort((a, b) => {
-    const rankDiff = searchRank(a, query) - searchRank(b, query);
-
-    if (rankDiff !== 0) return rankDiff;
-
-    return new Date(b.posted_at).getTime() - new Date(a.posted_at).getTime();
-  });
-}
-
-function hasSearchIntent(params: {
+function shouldBalanceCompanyResults(params: {
   query: string;
   location: string;
   workMode: string;
@@ -225,16 +184,21 @@ function hasSearchIntent(params: {
   category: string;
   company: string;
   excludeId: string;
+  balance: string;
 }) {
-  return Boolean(
-    params.query.trim() ||
-    params.location.trim() ||
+  if (params.balance !== "company") return false;
+
+  const hasKeywordIntent = Boolean(params.query.trim());
+  const hasSpecificCompanyIntent = Boolean(params.company.trim());
+  const hasDetailIntent = Boolean(
     params.workMode ||
     params.employmentType ||
     params.category ||
-    params.company.trim() ||
     params.excludeId,
   );
+
+  // Balance broad browsing searches, including location-only searches.
+  return !hasKeywordIntent && !hasSpecificCompanyIntent && !hasDetailIntent;
 }
 
 function locationSearchTerm(value: string) {
@@ -242,6 +206,162 @@ function locationSearchTerm(value: string) {
     .split(",")
     .map((part) => part.trim())
     .find(Boolean);
+}
+
+function normalizeSearchTerm(value: string) {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function escapeIlikeValue(value: string) {
+  return value.replace(/[%_]/g, "\\$&").replace(/,/g, " ");
+}
+
+function getSearchTokens(query: string) {
+  const normalized = normalizeSearchTerm(query);
+
+  if (!normalized) return [];
+
+  return normalized
+    .split(" ")
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3)
+    .slice(0, 6);
+}
+
+async function getKeywordCategories(query: string) {
+  const normalized = normalizeSearchTerm(query);
+
+  if (!normalized) return [];
+
+  const tokens = getSearchTokens(normalized);
+  const lookupTerms = Array.from(new Set([normalized, ...tokens])).slice(0, 5);
+
+  if (lookupTerms.length === 0) return [];
+
+  const filter = lookupTerms
+    .map((term) => `term.ilike.%${escapeIlikeValue(term)}%`)
+    .join(",");
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("keyword_suggestions")
+      .select("category")
+      .or(filter)
+      .not("category", "is", null)
+      .limit(10);
+
+    if (error) {
+      console.error("[GET /api/jobs] Keyword category lookup failed:", error);
+      return [];
+    }
+
+    return Array.from(
+      new Set(
+        (data ?? [])
+          .map((row) =>
+            typeof row.category === "string" ? row.category.trim() : "",
+          )
+          .filter(Boolean),
+      ),
+    );
+  } catch (error) {
+    console.error("[GET /api/jobs] Keyword category lookup crashed:", error);
+    return [];
+  }
+}
+
+function buildJobSearchFilter(query: string, categories: string[]) {
+  const normalized = normalizeSearchTerm(query);
+
+  if (!normalized) return null;
+
+  const tokens = getSearchTokens(normalized);
+  const filters: string[] = [];
+
+  filters.push(`search_text.ilike.%${escapeIlikeValue(normalized)}%`);
+
+  for (const token of tokens) {
+    filters.push(`search_text.ilike.%${escapeIlikeValue(token)}%`);
+  }
+
+  for (const category of categories.slice(0, 3)) {
+    filters.push(`category.ilike.%${escapeIlikeValue(category)}%`);
+  }
+
+  return Array.from(new Set(filters)).join(",");
+}
+
+function expandedSearchRank<
+  T extends {
+    company_name: string;
+    title: string;
+    category: string | null;
+    posted_at: string;
+    skills?: string[] | null;
+  },
+>(job: T, query: string, categories: string[]) {
+  const normalizedQuery = normalizeSearchTerm(query);
+  const tokens = getSearchTokens(query);
+
+  if (!normalizedQuery) return 0;
+
+  const title = job.title.toLowerCase();
+  const company = job.company_name.toLowerCase();
+  const category = job.category?.toLowerCase() ?? "";
+  const skillsText = Array.isArray(job.skills)
+    ? job.skills.join(" ").toLowerCase()
+    : "";
+
+  if (title === normalizedQuery) return 0;
+  if (title.startsWith(normalizedQuery)) return 1;
+  if (title.includes(normalizedQuery)) return 2;
+
+  const titleTokenMatches = tokens.filter((token) =>
+    title.includes(token),
+  ).length;
+
+  if (tokens.length > 0 && titleTokenMatches === tokens.length) return 3;
+  if (titleTokenMatches > 0) return 10 - titleTokenMatches;
+
+  if (company.includes(normalizedQuery)) return 20;
+
+  const skillTokenMatches = tokens.filter((token) =>
+    skillsText.includes(token),
+  ).length;
+
+  if (skillTokenMatches > 0) return 30 - skillTokenMatches;
+
+  const categoryMatchIndex = categories.findIndex((item) =>
+    category.includes(item.toLowerCase()),
+  );
+
+  if (categoryMatchIndex >= 0) return 50 + categoryMatchIndex;
+
+  if (tokens.some((token) => category.includes(token))) return 60;
+
+  return 100;
+}
+
+function rankExpandedSearchResults<
+  T extends {
+    company_name: string;
+    title: string;
+    category: string | null;
+    posted_at: string;
+    skills?: string[] | null;
+  },
+>(jobs: T[], query: string, categories: string[]) {
+  if (!query.trim()) return jobs;
+
+  return [...jobs].sort((a, b) => {
+    const rankDiff =
+      expandedSearchRank(a, query, categories) -
+      expandedSearchRank(b, query, categories);
+
+    if (rankDiff !== 0) return rankDiff;
+
+    return new Date(b.posted_at).getTime() - new Date(a.posted_at).getTime();
+  });
 }
 
 async function hydrateJobDetails(candidates: JobCandidateRow[]) {
@@ -305,10 +425,8 @@ export async function GET(req: NextRequest) {
     const balance = searchParams.get("balance") ?? DEFAULT_COMPANY_BALANCE;
     const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
     const pageSize = Math.min(25, Number(searchParams.get("pageSize") ?? "10"));
+    const keywordCategories = await getKeywordCategories(query);
 
-    // Fetch a lightweight candidate set, then hydrate only the jobs returned on
-    // this page. This keeps tiny dashboard requests from downloading every full
-    // job description in the table.
     let dbQuery = supabaseAdmin
       .from("jobs")
       .select(JOB_CANDIDATE_SELECT, { count: "exact" })
@@ -322,11 +440,11 @@ export async function GET(req: NextRequest) {
       .limit(MAX_CANDIDATE_JOBS);
 
     if (query.trim()) {
-      const q = `%${query.trim()}%`;
+      const keywordFilter = buildJobSearchFilter(query, keywordCategories);
 
-      dbQuery = dbQuery.or(
-        `title.ilike.${q},company_name.ilike.${q},description.ilike.${q},location.ilike.${q},category.ilike.${q}`,
-      );
+      if (keywordFilter) {
+        dbQuery = dbQuery.or(keywordFilter);
+      }
     }
 
     if (location.trim()) {
@@ -373,20 +491,20 @@ export async function GET(req: NextRequest) {
 
     const candidateJobs = (data ?? []) as JobCandidateRow[];
 
-    const shouldBalanceByCompany =
-      balance === "company" &&
-      !hasSearchIntent({
-        query,
-        location,
-        workMode,
-        employmentType,
-        category,
-        company,
-        excludeId,
-      });
+    const shouldBalanceByCompany = shouldBalanceCompanyResults({
+      query,
+      location,
+      workMode,
+      employmentType,
+      category,
+      company,
+      excludeId,
+      balance,
+    });
+
     const displayCandidates = shouldBalanceByCompany
       ? balanceJobsByCompany(candidateJobs)
-      : rankSearchResults(candidateJobs, query);
+      : rankExpandedSearchResults(candidateJobs, query, keywordCategories);
 
     const total = count ?? displayCandidates.length;
     const newJobs = displayCandidates.filter((job) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -16,266 +16,250 @@ type SkillsSectionProps = {
 
 const MAX_SKILLS = 15;
 
-const RECOMMENDED_SKILLS = [
-  "NoSQL",
-  "EC2",
-  "Bootstrap.js",
-  "MFC",
-  "VxWorks",
-  "WCF",
-  "STL",
-  "Device Driver",
-];
-
-function normalizeSkill(value: string) {
-  return value.trim().replace(/\s+/g, " ");
+function normalizeSkills(skills: string[] | null | undefined) {
+  return Array.from(
+    new Set((skills ?? []).map((skill) => skill.trim()).filter(Boolean)),
+  );
 }
 
-function isSameSkill(first: string, second: string) {
-  return first.trim().toLowerCase() === second.trim().toLowerCase();
-}
+function areSkillListsEqual(
+  first: string[] | null | undefined,
+  second: string[] | null | undefined,
+) {
+  const firstSkills = normalizeSkills(first).sort((a, b) => a.localeCompare(b));
+  const secondSkills = normalizeSkills(second).sort((a, b) =>
+    a.localeCompare(b),
+  );
 
-function getInitialSkills(profile: JobSeekerProfile) {
-  return Array.isArray(profile.skills)
-    ? profile.skills
-        .map(normalizeSkill)
-        .filter(Boolean)
-        .filter((skill, index, allSkills) => {
-          return (
-            allSkills.findIndex((item) => isSameSkill(item, skill)) === index
-          );
-        })
-    : [];
+  if (firstSkills.length !== secondSkills.length) return false;
+
+  return firstSkills.every((skill, index) => skill === secondSkills[index]);
 }
 
 export default function SkillsSection({
   profile,
   onProfileChange,
 }: SkillsSectionProps) {
-  const profileSkills = useMemo(() => getInitialSkills(profile), [profile]);
   const [open, setOpen] = useState(false);
-  const [draftSkills, setDraftSkills] = useState<string[]>(profileSkills);
-  const [newSkill, setNewSkill] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  const hasSkills = profileSkills.length > 0;
+  const [skills, setSkills] = useState<string[]>([]);
+  const [skillInput, setSkillInput] = useState("");
 
   useEffect(() => {
     if (!open) return;
 
-    setDraftSkills(profileSkills);
-    setNewSkill("");
-    setError(null);
-  }, [open, profileSkills]);
+    setSkills(normalizeSkills(profile.skills).slice(0, MAX_SKILLS));
+    setSkillInput("");
+  }, [open, profile.skills]);
 
-  const hasChanges =
-    draftSkills.length !== profileSkills.length ||
-    draftSkills.some((skill, index) => skill !== profileSkills[index]);
-
-  const canAddMore = draftSkills.length < MAX_SKILLS;
-
-  const recommendedSkills = RECOMMENDED_SKILLS.filter(
-    (recommendedSkill) =>
-      !draftSkills.some((skill) => isSameSkill(skill, recommendedSkill)),
+  const currentSkills = useMemo(
+    () => normalizeSkills(profile.skills).slice(0, MAX_SKILLS),
+    [profile.skills],
   );
 
-  const addSkill = (value: string) => {
-    const normalizedSkill = normalizeSkill(value);
+  const draftSkills = useMemo(
+    () => normalizeSkills(skills).slice(0, MAX_SKILLS),
+    [skills],
+  );
 
-    if (!normalizedSkill) {
-      setError("Enter a skill before adding it.");
-      return;
-    }
+  const trimmedSkillInput = skillInput.trim();
 
-    if (!canAddMore) {
-      setError(`You can add up to ${MAX_SKILLS} skills.`);
-      return;
-    }
+  const hasDuplicateSkill = draftSkills.some(
+    (skill) => skill.toLowerCase() === trimmedSkillInput.toLowerCase(),
+  );
 
-    if (draftSkills.some((skill) => isSameSkill(skill, normalizedSkill))) {
-      setError("That skill is already added.");
-      return;
-    }
+  const canAddSkill =
+    trimmedSkillInput.length > 0 &&
+    draftSkills.length < MAX_SKILLS &&
+    !hasDuplicateSkill;
 
-    setDraftSkills((current) => [...current, normalizedSkill]);
-    setNewSkill("");
-    setError(null);
+  const nextDraftSkills = canAddSkill
+    ? normalizeSkills([...draftSkills, trimmedSkillInput]).slice(0, MAX_SKILLS)
+    : draftSkills;
+
+  const canSave =
+    nextDraftSkills.length <= MAX_SKILLS &&
+    !areSkillListsEqual(currentSkills, nextDraftSkills);
+
+  const addSkill = () => {
+    if (!canAddSkill) return;
+
+    setSkills([...draftSkills, trimmedSkillInput]);
+    setSkillInput("");
   };
 
   const removeSkill = (skillToRemove: string) => {
-    setDraftSkills((current) =>
-      current.filter((skill) => !isSameSkill(skill, skillToRemove)),
+    setSkills(
+      draftSkills.filter(
+        (skill) => skill.toLowerCase() !== skillToRemove.toLowerCase(),
+      ),
     );
-    setError(null);
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    addSkill(newSkill);
-  };
-
-  const save = () => {
-    if (!hasChanges) return;
+  const handleSave = () => {
+    if (!canSave) return;
 
     onProfileChange({
       ...profile,
-      skills: draftSkills,
+      skills: nextDraftSkills,
     });
 
     setOpen(false);
   };
 
   return (
-    <section
-      className="mx-auto max-w-3xl px-4 py-8"
-      aria-labelledby="skills-heading"
-    >
-      <div className="flex items-center justify-between gap-4">
-        <h2 id="skills-heading" className="text-2xl font-bold tracking-tight">
-          Skills
-        </h2>
+    <>
+      <section
+        className="mx-auto max-w-3xl px-4 py-8"
+        aria-labelledby="skills-heading"
+      >
+        <div className="flex items-center justify-between gap-4">
+          <h2 id="skills-heading" className="text-2xl font-bold tracking-tight">
+            Skills
+          </h2>
 
-        {hasSkills && (
           <Button
             type="button"
             variant="outline"
             onClick={() => setOpen(true)}
-            className="rounded-md px-5"
+            className="border border-[#f2f2f2] bg-white px-5 shadow-none [border-radius:3px]"
           >
             <Pencil aria-hidden="true" className="size-4" />
             Edit
           </Button>
-        )}
-      </div>
+        </div>
 
-      {hasSkills ? (
-        <ul className="mt-6 flex flex-wrap gap-2" aria-label="Skills">
-          {profileSkills.map((skill) => (
-            <li
-              key={skill}
-              className="rounded-md bg-muted px-3 py-2 text-xs font-semibold text-foreground"
-            >
-              {skill}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setOpen(true)}
-          className="mt-6 rounded-md px-5 font-semibold"
-        >
-          <Plus aria-hidden="true" className="size-4" />
-          Add Skills
-        </Button>
-      )}
+        {currentSkills.length > 0 ? (
+          <div className="mt-5 flex flex-wrap gap-2">
+            {currentSkills.map((skill) => (
+              <span
+                key={skill}
+                className="rounded-full border border-[#f2f2f2] bg-white px-3 py-1.5 text-sm font-semibold text-foreground"
+              >
+                {skill}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="mt-5 inline-flex items-center gap-2 font-semibold text-foreground hover:text-primary"
+          >
+            <Plus aria-hidden="true" className="size-4" />
+            Add Skills
+          </button>
+        )}
+
+        {currentSkills.length > 0 && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            {currentSkills.length}/{MAX_SKILLS} skills added
+          </p>
+        )}
+      </section>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[88vh] max-w-lg overflow-y-auto rounded-xl border border-border bg-background p-0 shadow-2xl">
-          <div className="px-6 pb-3 pt-6">
-            <DialogTitle className="text-2xl font-bold tracking-tight">
+        <DialogContent className="max-h-[86vh] max-w-lg overflow-y-auto rounded-2xl border border-border bg-background p-0 shadow-2xl">
+          <div className="border-b border-border px-7 py-6">
+            <DialogTitle className="text-3xl font-bold tracking-tight">
               Skills
             </DialogTitle>
+
+            <p className="mt-2 text-sm text-muted-foreground">
+              Add up to {MAX_SKILLS} skills that best represent your experience.
+            </p>
           </div>
 
-          <div className="space-y-5 px-6 pb-6">
-            {draftSkills.length > 0 && (
-              <ul className="flex flex-wrap gap-2" aria-label="Selected skills">
-                {draftSkills.map((skill) => (
-                  <li key={skill}>
-                    <button
-                      type="button"
-                      onClick={() => removeSkill(skill)}
-                      className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
-                      aria-label={`Remove ${skill}`}
-                    >
-                      {skill}
-                      <X aria-hidden="true" className="size-3.5" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+          <div className="space-y-6 px-7 py-6">
+            <div className="space-y-2">
+              <Label htmlFor="skillInput">Skill</Label>
 
-            <form className="space-y-2" onSubmit={handleSubmit}>
-              <Label htmlFor="skillInput">Add skill</Label>
-
-              <div className="flex">
+              <div className="flex gap-2">
                 <Input
                   id="skillInput"
-                  value={newSkill}
-                  onChange={(event) => {
-                    setNewSkill(event.target.value);
-                    setError(null);
+                  value={skillInput}
+                  onChange={(event) => setSkillInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      addSkill();
+                    }
                   }}
-                  className="rounded-r-none"
-                  disabled={!canAddMore}
+                  placeholder="Example: React, Forklift, Customer Service"
+                  className="h-12"
                 />
 
                 <Button
-                  type="submit"
+                  type="button"
                   variant="outline"
-                  className="rounded-l-none border-l-0 px-6 font-semibold"
-                  disabled={!newSkill.trim() || !canAddMore}
+                  onClick={addSkill}
+                  disabled={!canAddSkill}
+                  className="h-12 shrink-0 border border-[#f2f2f2] bg-white px-4 shadow-none [border-radius:3px]"
                 >
                   Add
                 </Button>
               </div>
 
-              <div className="flex items-center justify-between gap-4">
+              {hasDuplicateSkill && trimmedSkillInput.length > 0 && (
                 <p className="text-xs text-muted-foreground">
-                  {draftSkills.length}/{MAX_SKILLS} Skills added
+                  This skill is already added.
                 </p>
+              )}
 
-                {error && (
-                  <p className="text-xs font-medium text-destructive">
-                    {error}
+              {draftSkills.length >= MAX_SKILLS && (
+                <p className="text-xs text-muted-foreground">
+                  You reached the {MAX_SKILLS}-skill limit.
+                </p>
+              )}
+            </div>
+
+            {draftSkills.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <p className="text-sm font-semibold text-foreground">
+                    Selected skills
                   </p>
-                )}
-              </div>
-            </form>
 
-            {recommendedSkills.length > 0 && (
-              <div className="rounded-xl bg-muted/70 p-5">
-                <h3 className="font-semibold">Recommended Skills</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {draftSkills.length}/{MAX_SKILLS}
+                  </p>
+                </div>
 
-                <p className="mt-2 text-sm text-foreground">
-                  Based on your work history and activity
-                </p>
+                <div className="flex flex-wrap gap-2">
+                  {draftSkills.map((skill) => (
+                    <span
+                      key={skill}
+                      className="inline-flex items-center gap-2 rounded-full border border-[#f2f2f2] bg-white px-3 py-1.5 text-sm font-semibold text-foreground"
+                    >
+                      {skill}
 
-                <ul className="mt-4 flex flex-wrap gap-2">
-                  {recommendedSkills.map((skill) => (
-                    <li key={skill}>
-                      <Button
+                      <button
                         type="button"
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full bg-background"
-                        onClick={() => addSkill(skill)}
-                        disabled={!canAddMore}
+                        onClick={() => removeSkill(skill)}
+                        className="text-muted-foreground hover:text-foreground"
+                        aria-label={`Remove ${skill}`}
                       >
-                        <Plus aria-hidden="true" className="size-3.5" />
-                        {skill}
-                      </Button>
-                    </li>
+                        <X aria-hidden="true" className="size-3.5" />
+                      </button>
+                    </span>
                   ))}
-                </ul>
+                </div>
               </div>
             )}
+          </div>
 
+          <div className="sticky bottom-0 border-t border-border bg-background px-7 py-5">
             <Button
               type="button"
-              className="mt-3 w-full bg-primary text-primary-foreground hover:bg-primary/90"
+              className="w-full bg-[#087f73] text-white hover:bg-[#066d63] disabled:bg-[#087f73]/40"
               size="lg"
-              onClick={save}
-              disabled={!hasChanges}
+              onClick={handleSave}
+              disabled={!canSave}
             >
               Save
             </Button>
           </div>
         </DialogContent>
       </Dialog>
-    </section>
+    </>
   );
 }
