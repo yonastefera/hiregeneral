@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Footer } from "@/components/Footer";
 import { SiteHeaderController } from "@/components/SiteHeaderController";
 import { AppProviders } from "@/components/providers/AppProviders";
+import ConsoleBrand from "@/components/ConsoleBrand";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -24,6 +25,8 @@ export default function RootLayout({
             <Footer />
           </div>
         </AppProviders>
+
+        <ConsoleBrand />
       </body>
     </html>
   );
