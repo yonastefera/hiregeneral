@@ -27,6 +27,12 @@ type LocationAutocompleteProps = {
 const DEFAULT_MIN_QUERY_LENGTH = 2;
 const DEFAULT_DEBOUNCE_MS = 80;
 
+function getLocationLabel(location: LocationSuggestion) {
+  return (
+    location.label || [location.city, location.state].filter(Boolean).join(", ")
+  ).trim();
+}
+
 export default function LocationAutocomplete({
   id = "location",
   value,
@@ -82,7 +88,10 @@ export default function LocationAutocomplete({
         }
 
         const payload = (await response.json()) as LocationSearchResponse;
-        const nextSuggestions = payload.locations ?? [];
+
+        const nextSuggestions = (payload.locations ?? []).filter(
+          (location) => getLocationLabel(location).length > 0,
+        );
 
         cacheRef.current[cacheKey] = nextSuggestions;
 
@@ -95,8 +104,6 @@ export default function LocationAutocomplete({
         }
 
         console.error("[location-autocomplete] request failed:", error);
-
-        // Keep the previous suggestions visible instead of flashing empty/loading UI.
       }
     }, debounceMs);
 
@@ -121,8 +128,13 @@ export default function LocationAutocomplete({
   };
 
   const selectLocation = (location: LocationSuggestion) => {
-    onValueChange(location.label);
-    onLocationSelect(location);
+    const label = getLocationLabel(location);
+
+    onValueChange(label);
+    onLocationSelect({
+      ...location,
+      label,
+    });
     setShowSuggestions(false);
     inputRef.current?.focus();
   };
@@ -168,26 +180,30 @@ export default function LocationAutocomplete({
       )}
 
       {shouldShowDropdown && (
-        <div className="absolute left-0 right-0 top-full z-9999 mt-2 w-full overflow-hidden rounded-xl border border-[#f2f2f2] bg-white shadow-lg">
+        <div className="absolute left-0 top-full z-9999 mt-2 w-full min-w-full overflow-hidden rounded-xl border border-[#f2f2f2] bg-white text-sm font-normal leading-5 tracking-normal text-foreground shadow-lg">
           <ul
             id={`${id}-suggestions`}
             className="max-h-64 w-full overflow-y-auto p-1"
             role="listbox"
           >
-            {suggestions.map((location) => (
-              <li key={location.id} role="option" aria-selected={false}>
-                <button
-                  type="button"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => selectLocation(location)}
-                  className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-neutral-200 focus:bg-neutral-200 focus:outline-none"
-                >
-                  <span className="min-w-0 truncate">
-                    {location.city}, {location.state}
-                  </span>
-                </button>
-              </li>
-            ))}
+            {suggestions.map((location) => {
+              const displayLabel = getLocationLabel(location);
+
+              return (
+                <li key={location.id} role="option" aria-selected={false}>
+                  <button
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => selectLocation(location)}
+                    className="flex w-full items-center rounded-lg px-3 py-2.5 text-left text-sm font-medium leading-5 tracking-normal text-foreground hover:bg-neutral-200 focus:bg-neutral-200 focus:outline-none"
+                  >
+                    <span className="block min-w-0 flex-1 truncate whitespace-nowrap">
+                      {displayLabel}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

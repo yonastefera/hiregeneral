@@ -407,7 +407,7 @@ export default function SavedJobsPage() {
 
       try {
         const [savedResponse, applicationsResponse] = await Promise.all([
-          fetch("/api/saved-jobs", {
+          fetch("/api/saved", {
             cache: "no-store",
             signal: controller.signal,
           }),
@@ -421,7 +421,7 @@ export default function SavedJobsPage() {
           savedResponse.status === 401 ||
           applicationsResponse.status === 401
         ) {
-          router.replace("/signin?next=/saved-jobs");
+          router.replace("/signin?next=/saved");
           return;
         }
 

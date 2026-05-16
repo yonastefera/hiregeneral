@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 
 // Routes that require any authenticated user
-const PROTECTED_ROUTES = ["/profile", "/saved", "/applications"];
+const PROTECTED_ROUTES = ["/profile", "/saved", "/applications", "/messages"];
 
 // Routes that require the recruiter or admin role
 const RECRUITER_ROUTES = ["/employers", "/dashboard"];
@@ -13,8 +13,10 @@ const ADMIN_ROUTES = ["/admin-control-center"];
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Build a response we can attach cookies to
-  let response = NextResponse.next({ request: req });
+  // Build a response we can attach refreshed Supabase cookies to.
+  let response = NextResponse.next({
+    request: req,
+  });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,7 +31,9 @@ export async function proxy(req: NextRequest) {
             req.cookies.set(name, value);
           });
 
-          response = NextResponse.next({ request: req });
+          response = NextResponse.next({
+            request: req,
+          });
 
           cookiesToSet.forEach(({ name, value, options }) => {
             response.cookies.set(name, value, options);
@@ -39,7 +43,7 @@ export async function proxy(req: NextRequest) {
     },
   );
 
-  // Refresh session — required for Server Components to stay in sync
+  // Refresh session — required for Server Components to stay in sync.
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -54,15 +58,18 @@ export async function proxy(req: NextRequest) {
 
   const isAdminRoute = ADMIN_ROUTES.some((route) => pathname.startsWith(route));
 
-  // Not logged in — redirect to sign in
-  if ((isProtected || isRecruiter || isAdminRoute) && !user) {
+  const requiresAuth = isProtected || isRecruiter || isAdminRoute;
+
+  // Not logged in — redirect to sign in.
+  if (requiresAuth && !user && pathname !== "/signin") {
     const url = req.nextUrl.clone();
     url.pathname = "/signin";
+    url.search = "";
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
 
-  // Logged in but check role for recruiter/admin routes
+  // Logged in but checking role for recruiter/admin routes.
   if (user && (isRecruiter || isAdminRoute)) {
     const { data: roles } = await supabase
       .from("user_roles")
@@ -74,6 +81,7 @@ export async function proxy(req: NextRequest) {
     if (isAdminRoute && !userRoles.includes("admin")) {
       const url = req.nextUrl.clone();
       url.pathname = "/jobs";
+      url.search = "";
       return NextResponse.redirect(url);
     }
 
@@ -84,6 +92,7 @@ export async function proxy(req: NextRequest) {
     ) {
       const url = req.nextUrl.clone();
       url.pathname = "/jobs";
+      url.search = "";
       return NextResponse.redirect(url);
     }
   }
@@ -94,11 +103,12 @@ export async function proxy(req: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all routes except:
-     * - _next/static, _next/image (Next.js internals)
-     * - favicon, public assets
+     * Match app routes, excluding:
      * - API routes
+     * - Next.js internals
+     * - common metadata files
+     * - anything with a file extension, such as .css, .js, .map, .txt, .ico, .woff2
      */
-    "/((?!_next/static|_next/image|api|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!api|_next|favicon.ico|robots.txt|sitemap.xml|.*\\..*).*)",
   ],
 };

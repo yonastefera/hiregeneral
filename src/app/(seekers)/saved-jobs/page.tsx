@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import SavedJobsPage from "@/components/pages/SavedJobsPage";
+import SavedJobsPage from "@/job-seekers/saved/SavedJobs";
 
 export const metadata: Metadata = {
   title: "Saved & Applied Jobs | HireGeneral",

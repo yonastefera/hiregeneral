@@ -48,8 +48,12 @@ export async function POST(req: NextRequest) {
     error: authError,
   } = await supabase.auth.getUser();
 
-  if (authError || !user) {
+  if (authError) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!user) {
+    return NextResponse.json({ data: [] });
   }
 
   const { job_id } = await req.json();

@@ -4,12 +4,12 @@ import { createClient } from "@/lib/supabase/server";
 import { locationSearchRateLimit, redis } from "@/lib/rate-limit";
 
 type LocationRow = {
-  id: number;
-  city: string;
-  state: string;
+  id: number | string;
+  city: string | null;
+  state: string | null;
   zip_code: string | null;
-  country: string;
-  popularity_rank: number;
+  country: string | null;
+  popularity_rank: number | null;
 };
 
 type LocationSuggestion = {
@@ -31,6 +31,10 @@ function normalizeQuery(value: string | null) {
   return value?.trim().replace(/\s+/g, " ") ?? "";
 }
 
+function cleanText(value: string | null | undefined) {
+  return value?.trim().replace(/\s+/g, " ") ?? "";
+}
+
 function getClientIdentifier(request: Request) {
   const forwardedFor = request.headers.get("x-forwarded-for");
   const realIp = request.headers.get("x-real-ip");
@@ -42,17 +46,42 @@ function getClientIdentifier(request: Request) {
   return realIp || "unknown";
 }
 
-function toSuggestion(location: LocationRow): LocationSuggestion {
+function toSuggestion(location: LocationRow): LocationSuggestion | null {
+  const city = cleanText(location.city);
+  const state = cleanText(location.state);
+  const zipCode = cleanText(location.zip_code);
+  const country = cleanText(location.country) || "USA";
+
+  if (!city || !state) {
+    return null;
+  }
+
+  const id = String(location.id || `${city}-${state}-${zipCode || country}`);
+
   return {
-    id: String(location.id),
-    city: location.city,
-    state: location.state,
-    zip_code: location.zip_code,
-    country: location.country,
-    label: location.zip_code
-      ? `${location.city}, ${location.state} ${location.country} ${location.zip_code}`
-      : `${location.city}, ${location.state} ${location.country}`,
+    id,
+    label: `${city}, ${state}`,
+    city,
+    state,
+    zip_code: zipCode || null,
+    country,
   };
+}
+
+function dedupeLocations(locations: LocationSuggestion[]) {
+  const seen = new Set<string>();
+
+  return locations.filter((location) => {
+    const key = [
+      location.city.toLowerCase(),
+      location.state.toLowerCase(),
+    ].join(":");
+
+    if (seen.has(key)) return false;
+
+    seen.add(key);
+    return true;
+  });
 }
 
 function jsonResponse(payload: LocationSearchPayload, status = 200) {
@@ -72,7 +101,11 @@ export async function GET(request: Request) {
     return jsonResponse({ locations: [] });
   }
 
-  const LOCATION_CACHE_VERSION = process.env.LOCATION_CACHE_VERSION ?? "1";
+  /*
+   * Bump this whenever location label formatting changes.
+   * Old malformed Redis entries may otherwise keep showing.
+   */
+  const LOCATION_CACHE_VERSION = process.env.LOCATION_CACHE_VERSION ?? "6";
 
   const cacheKey = `locations:${LOCATION_CACHE_VERSION}:${query.toLowerCase()}`;
 
@@ -128,14 +161,23 @@ export async function GET(request: Request) {
       code: error.code,
     });
 
-    return NextResponse.json({
-      error: "Could not fetch location suggestions.",
-      details: error.message,
-    });
+    return NextResponse.json(
+      {
+        error: "Could not fetch location suggestions.",
+        details: error.message,
+      },
+      { status: 500 },
+    );
   }
 
+  const locations = dedupeLocations(
+    ((data ?? []) as LocationRow[])
+      .map(toSuggestion)
+      .filter((location): location is LocationSuggestion => Boolean(location)),
+  );
+
   const payload: LocationSearchPayload = {
-    locations: ((data ?? []) as LocationRow[]).map(toSuggestion),
+    locations,
   };
 
   try {

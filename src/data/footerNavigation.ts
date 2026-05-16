@@ -1,44 +1,91 @@
 import { BriefcaseBusiness, Building2, Globe2 } from "lucide-react";
 
-export const footerSections = [
+export type FooterLinkAudience =
+  | "public"
+  | "authenticated"
+  | "job_seeker"
+  | "recruiter"
+  | "admin";
+
+export type FooterLink = {
+  label: string;
+  to: string;
+  audience?: FooterLinkAudience;
+};
+
+export type FooterSection = {
+  title: string;
+  icon: typeof BriefcaseBusiness;
+  links: FooterLink[];
+};
+
+export const footerSections: FooterSection[] = [
   {
     title: "Technology Professionals",
     icon: BriefcaseBusiness,
     links: [
-      { label: "Browse tech jobs", to: "/jobs" },
-      { label: "Saved jobs", to: "/saved-jobs" },
-      { label: "Salary guide", to: "/salary-guide" },
-      { label: "Profile", to: "/profile" },
-      { label: "Profile visibility", to: "/profile-visibility" },
+      { label: "Browse tech jobs", to: "/jobs", audience: "public" },
+      { label: "Saved jobs", to: "/saved", audience: "job_seeker" },
+      { label: "Salary guide", to: "/salary-guide", audience: "public" },
+      { label: "Profile", to: "/profile", audience: "job_seeker" },
+      {
+        label: "Profile visibility",
+        to: "/profile-visibility",
+        audience: "job_seeker",
+      },
     ],
   },
   {
     title: "Employers & Recruiters",
     icon: Building2,
     links: [
-      { label: "Post a job", to: "/employers/post-job" },
-      { label: "Search candidates", to: "/employers/candidates" },
-      { label: "Recruiter dashboard", to: "/employers/dashboard" },
-      { label: "Hiring resources", to: "/employers/resources" },
-      { label: "Employer branding", to: "/employers/branding" },
+      {
+        label: "Post a job",
+        to: "/employers/post-job",
+        audience: "recruiter",
+      },
+      {
+        label: "Search candidates",
+        to: "/employers/candidates",
+        audience: "recruiter",
+      },
+      {
+        label: "Recruiter dashboard",
+        to: "/employers/dashboard",
+        audience: "recruiter",
+      },
+      {
+        label: "Hiring resources",
+        to: "/employers/resources",
+        audience: "public",
+      },
+      {
+        label: "Employer branding",
+        to: "/employers/branding",
+        audience: "public",
+      },
     ],
   },
   {
     title: "Company Information",
     icon: Globe2,
     links: [
-      { label: "About HireGeneral", to: "/about" },
-      { label: "Contact", to: "/contact" },
-      { label: "Privacy", to: "/privacy" },
-      { label: "Terms", to: "/terms" },
-      { label: "Accessibility", to: "/accessibility" },
+      { label: "About HireGeneral", to: "/about", audience: "public" },
+      { label: "Contact", to: "/contact", audience: "public" },
+      { label: "Privacy", to: "/privacy", audience: "public" },
+      { label: "Terms", to: "/terms", audience: "public" },
+      { label: "Accessibility", to: "/accessibility", audience: "public" },
     ],
   },
 ];
 
-export const legalLinks = [
-  { label: "Privacy Policy", to: "/privacy" },
-  { label: "Terms of Use", to: "/terms" },
-  { label: "Cookie Policy", to: "/cookies" },
-  { label: "Do Not Sell My Info", to: "/privacy-choices" },
+export const legalLinks: FooterLink[] = [
+  { label: "Privacy Policy", to: "/privacy", audience: "public" },
+  { label: "Terms of Use", to: "/terms", audience: "public" },
+  { label: "Cookie Policy", to: "/cookies", audience: "public" },
+  {
+    label: "Do Not Sell My Info",
+    to: "/privacy-choices",
+    audience: "public",
+  },
 ];

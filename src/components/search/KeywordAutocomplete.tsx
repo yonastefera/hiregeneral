@@ -224,7 +224,7 @@ export default function KeywordAutocomplete({
       )}
 
       {shouldShowDropdown && (
-        <div className="absolute left-0 right-0 top-full z-[9999] mt-2 w-full overflow-hidden rounded-xl border border-[#f2f2f2] bg-white shadow-lg">
+        <div className="absolute left-0 right-0 top-full z-[9999] mt-2 w-full overflow-hidden rounded-xl border border-[#f2f2f2] bg-white text-sm font-normal leading-5 tracking-normal text-foreground shadow-lg">
           <ul
             id={`${id}-suggestions`}
             className="max-h-64 w-full overflow-y-auto p-1"
@@ -236,9 +236,11 @@ export default function KeywordAutocomplete({
                   type="button"
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => selectKeyword(suggestion)}
-                  className="block w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-neutral-200 focus:bg-neutral-200 focus:outline-none"
+                  className="block w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium leading-5 tracking-normal text-foreground hover:bg-neutral-200 focus:bg-neutral-200 focus:outline-none"
                 >
-                  <span className="block truncate">{suggestion.label}</span>
+                  <span className="block truncate whitespace-nowrap">
+                    {suggestion.label}
+                  </span>
                 </button>
               </li>
             ))}

@@ -32,14 +32,17 @@ interface UserProfile {
   user_type: string;
 }
 
-const baseNavLinks = [
-  { label: "Find jobs", href: "/jobs" },
+const publicNavLinks = [{ label: "Find jobs", href: "/jobs" }];
+
+const jobSeekerNavLinks = [
+  { label: "Saved", href: "/saved" },
   { label: "Messages", href: "/messages" },
   { label: "Profile", href: "/profile" },
-  { label: "For employers", href: "/employers/dashboard" },
 ];
 
-const savedNavLink = { label: "Saved", href: "/saved-jobs" };
+const recruiterNavLinks = [
+  { label: "For employers", href: "/employers/dashboard" },
+];
 
 export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
   const pathname = usePathname();
@@ -155,7 +158,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [user?.id, pathname]);
+  }, [user?.id]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -168,8 +171,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
 
     toast.success("Signed out.");
 
-    router.push("/jobs");
-    router.refresh();
+    router.replace("/jobs");
   };
 
   const displayName =
@@ -182,19 +184,24 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
     .join("")
     .toUpperCase();
 
+  const isJobSeeker = profile?.user_type === "job_seeker";
+
   const isRecruiter =
     profile?.user_type === "recruiter" || profile?.user_type === "admin";
 
   const navLinks = useMemo(() => {
-    const links = user
-      ? [baseNavLinks[0], savedNavLink, ...baseNavLinks.slice(1)]
-      : baseNavLinks;
+    if (!user || !profile) return publicNavLinks;
 
-    return links.filter((link) => {
-      if (link.href === "/employers/dashboard") return isRecruiter;
-      return true;
-    });
-  }, [user, isRecruiter]);
+    if (isJobSeeker) {
+      return [...publicNavLinks, ...jobSeekerNavLinks];
+    }
+
+    if (isRecruiter) {
+      return [...publicNavLinks, ...recruiterNavLinks];
+    }
+
+    return publicNavLinks;
+  }, [user, profile, isJobSeeker, isRecruiter]);
 
   const elevated = variant === "default" || scrolled;
 
@@ -210,6 +217,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 md:px-6">
         <Link
           href="/"
+          prefetch={false}
           aria-label="HireGeneral home"
           className="flex shrink-0 items-center"
         >
@@ -226,6 +234,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
               <Link
                 key={link.href}
                 href={link.href}
+                prefetch={false}
                 className={cn(
                   "relative rounded-full px-3.5 py-1.5 text-sm font-medium tracking-tight transition-colors",
                   active
@@ -246,21 +255,27 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
             <>
               {isRecruiter && (
                 <Button variant="default" size="sm" asChild>
-                  <Link href="/employers/post-job">Post a job</Link>
+                  <Link href="/employers/post-job" prefetch={false}>
+                    Post a job
+                  </Link>
                 </Button>
               )}
 
-              <IconLink href="/messages" label="Messages">
-                <MessageSquare className="size-4.5" />
-              </IconLink>
+              {isJobSeeker && (
+                <>
+                  <IconLink href="/messages" label="Messages">
+                    <MessageSquare className="size-4.5" />
+                  </IconLink>
 
-              <IconLink
-                href="/notifications"
-                label="Notifications"
-                badge={unreadCount}
-              >
-                <Bell className="size-4.5" />
-              </IconLink>
+                  <IconLink
+                    href="/notifications"
+                    label="Notifications"
+                    badge={unreadCount}
+                  >
+                    <Bell className="size-4.5" />
+                  </IconLink>
+                </>
+              )}
 
               <div className="relative">
                 <button
@@ -302,52 +317,54 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
                     </p>
 
                     <Badge variant="soft" className="mt-1 text-xs capitalize">
-                      {profile?.user_type?.replace("_", " ") ?? "job seeker"}
+                      {profile?.user_type?.replace("_", " ") ?? "account"}
                     </Badge>
                   </div>
 
                   <div className="p-1">
-                    <AccountMenuLink
-                      href="/profile"
-                      onClick={() => setAccountMenuOpen(false)}
-                    >
-                      <UserRound className="size-4 text-muted-foreground" />
-                      Profile
-                    </AccountMenuLink>
+                    {isJobSeeker && (
+                      <>
+                        <AccountMenuLink
+                          href="/profile"
+                          onClick={() => setAccountMenuOpen(false)}
+                        >
+                          <UserRound className="size-4 text-muted-foreground" />
+                          Profile
+                        </AccountMenuLink>
 
-                    <AccountMenuLink
-                      href="/saved-jobs"
-                      onClick={() => setAccountMenuOpen(false)}
-                    >
-                      <Bookmark className="size-4 text-muted-foreground" />
-                      Saved & applied
-                    </AccountMenuLink>
+                        <AccountMenuLink
+                          href="/saved"
+                          onClick={() => setAccountMenuOpen(false)}
+                        >
+                          <Bookmark className="size-4 text-muted-foreground" />
+                          Saved & applied
+                        </AccountMenuLink>
 
-                    <AccountMenuLink
-                      href="/messages"
-                      onClick={() => setAccountMenuOpen(false)}
-                    >
-                      <MessageSquare className="size-4 text-muted-foreground" />
-                      Messages
-                    </AccountMenuLink>
+                        <AccountMenuLink
+                          href="/messages"
+                          onClick={() => setAccountMenuOpen(false)}
+                        >
+                          <MessageSquare className="size-4 text-muted-foreground" />
+                          Messages
+                        </AccountMenuLink>
 
-                    {isRecruiter && (
-                      <AccountMenuLink
-                        href="/dashboard"
-                        onClick={() => setAccountMenuOpen(false)}
-                      >
-                        <LayoutDashboard className="size-4 text-muted-foreground" />
-                        Dashboard
-                      </AccountMenuLink>
+                        <AccountMenuLink
+                          href="/applications"
+                          onClick={() => setAccountMenuOpen(false)}
+                        >
+                          <BriefcaseBusiness className="size-4 text-muted-foreground" />
+                          My applications
+                        </AccountMenuLink>
+                      </>
                     )}
 
                     {isRecruiter && (
                       <AccountMenuLink
-                        href="/applications"
+                        href="/employers/dashboard"
                         onClick={() => setAccountMenuOpen(false)}
                       >
-                        <BriefcaseBusiness className="size-4 text-muted-foreground" />
-                        My applications
+                        <LayoutDashboard className="size-4 text-muted-foreground" />
+                        Dashboard
                       </AccountMenuLink>
                     )}
                   </div>
@@ -361,21 +378,25 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
                       Account settings
                     </AccountMenuLink>
 
-                    <AccountMenuLink
-                      href="/settings/notifications"
-                      onClick={() => setAccountMenuOpen(false)}
-                    >
-                      <Bell className="size-4 text-muted-foreground" />
-                      Notification settings
-                    </AccountMenuLink>
+                    {isJobSeeker && (
+                      <>
+                        <AccountMenuLink
+                          href="/settings/notifications"
+                          onClick={() => setAccountMenuOpen(false)}
+                        >
+                          <Bell className="size-4 text-muted-foreground" />
+                          Notification settings
+                        </AccountMenuLink>
 
-                    <AccountMenuLink
-                      href="/settings/privacy"
-                      onClick={() => setAccountMenuOpen(false)}
-                    >
-                      <ShieldCheck className="size-4 text-muted-foreground" />
-                      Privacy
-                    </AccountMenuLink>
+                        <AccountMenuLink
+                          href="/settings/privacy"
+                          onClick={() => setAccountMenuOpen(false)}
+                        >
+                          <ShieldCheck className="size-4 text-muted-foreground" />
+                          Privacy
+                        </AccountMenuLink>
+                      </>
+                    )}
                   </div>
 
                   <div className="border-t border-border/60 p-1">
@@ -394,18 +415,22 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
           ) : (
             <>
               <Button variant="ghost" size="sm" asChild>
-                <Link href="/signin">Sign in</Link>
+                <Link href="/signin" prefetch={false}>
+                  Sign in
+                </Link>
               </Button>
 
               <Button variant="default" size="sm" asChild>
-                <Link href="/employers/post-job">Post a job</Link>
+                <Link href="/employers/post-job" prefetch={false}>
+                  Post a job
+                </Link>
               </Button>
             </>
           )}
         </div>
 
         <div className="flex items-center gap-1 md:hidden">
-          {!authLoading && user && (
+          {!authLoading && isJobSeeker && (
             <IconLink
               href="/notifications"
               label="Notifications"
@@ -463,6 +488,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
             <Link
               key={link.href}
               href={link.href}
+              prefetch={false}
               style={{ transitionDelay: open ? `${index * 30}ms` : "0ms" }}
               className={cn(
                 "flex items-center justify-between rounded-md px-3 py-3 text-base font-medium text-foreground transition-all hover:bg-secondary",
@@ -474,19 +500,12 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
             </Link>
           ))}
 
-          {!authLoading && user && (
+          {!authLoading && isJobSeeker && (
             <>
               <MobileMenuLink href="/messages">
                 <span className="inline-flex items-center gap-2">
                   <MessageSquare className="size-4" />
                   Messages
-                </span>
-              </MobileMenuLink>
-
-              <MobileMenuLink href="/account/settings">
-                <span className="inline-flex items-center gap-2">
-                  <Settings className="size-4" />
-                  Account settings
                 </span>
               </MobileMenuLink>
 
@@ -506,6 +525,15 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
             </>
           )}
 
+          {!authLoading && user && (
+            <MobileMenuLink href="/account/settings">
+              <span className="inline-flex items-center gap-2">
+                <Settings className="size-4" />
+                Account settings
+              </span>
+            </MobileMenuLink>
+          )}
+
           <div className="mt-3 border-t border-border pt-4">
             {authLoading ? (
               <div className="h-10 w-full" aria-hidden="true" />
@@ -521,22 +549,46 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
                   </p>
 
                   <Badge variant="soft" className="mt-2 text-xs capitalize">
-                    {profile?.user_type?.replace("_", " ") ?? "job seeker"}
+                    {profile?.user_type?.replace("_", " ") ?? "account"}
                   </Badge>
                 </div>
 
-                <Button variant="outline" asChild>
-                  <Link href="/profile">Profile</Link>
-                </Button>
+                {isJobSeeker && (
+                  <>
+                    <Button variant="outline" asChild>
+                      <Link href="/profile" prefetch={false}>
+                        Profile
+                      </Link>
+                    </Button>
 
-                <Button variant="outline" asChild>
-                  <Link href="/saved-jobs">Saved & applied</Link>
-                </Button>
+                    <Button variant="outline" asChild>
+                      <Link href="/saved" prefetch={false}>
+                        Saved & applied
+                      </Link>
+                    </Button>
+
+                    <Button variant="outline" asChild>
+                      <Link href="/applications" prefetch={false}>
+                        My applications
+                      </Link>
+                    </Button>
+                  </>
+                )}
 
                 {isRecruiter && (
-                  <Button asChild>
-                    <Link href="/employers/post-job">Post a job</Link>
-                  </Button>
+                  <>
+                    <Button variant="outline" asChild>
+                      <Link href="/employers/dashboard" prefetch={false}>
+                        Dashboard
+                      </Link>
+                    </Button>
+
+                    <Button asChild>
+                      <Link href="/employers/post-job" prefetch={false}>
+                        Post a job
+                      </Link>
+                    </Button>
+                  </>
                 )}
 
                 <Button
@@ -551,11 +603,15 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
             ) : (
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="outline" asChild>
-                  <Link href="/signin">Sign in</Link>
+                  <Link href="/signin" prefetch={false}>
+                    Sign in
+                  </Link>
                 </Button>
 
                 <Button asChild>
-                  <Link href="/employers/post-job">Post a job</Link>
+                  <Link href="/employers/post-job" prefetch={false}>
+                    Post a job
+                  </Link>
                 </Button>
               </div>
             )}
@@ -580,6 +636,7 @@ function IconLink({
   return (
     <Link
       href={href}
+      prefetch={false}
       aria-label={label}
       className="relative grid size-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
     >
@@ -606,6 +663,7 @@ function AccountMenuLink({
   return (
     <Link
       href={href}
+      prefetch={false}
       onClick={onClick}
       className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-secondary"
     >
@@ -624,6 +682,7 @@ function MobileMenuLink({
   return (
     <Link
       href={href}
+      prefetch={false}
       className="flex items-center justify-between rounded-md px-3 py-3 text-base font-medium text-foreground hover:bg-secondary"
     >
       {children}

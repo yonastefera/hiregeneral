@@ -162,7 +162,7 @@ const Index = ({ initialHighlightedJobs }: IndexProps) => {
                 event.preventDefault();
                 searchJobs();
               }}
-              className="mt-6 max-w-3xl text-balance text-5xl font-semibold tracking-[-0.04em] text-foreground md:text-7xl lg:text-[5.25rem] lg:leading-[0.95]"
+              className="mt-6 max-w-3xl"
             >
               <div className="grid gap-2 lg:grid-cols-[1fr_1fr_auto]">
                 <div className="relative rounded-2xl bg-muted/50 transition-colors focus-within:bg-background focus-within:ring-2 focus-within:ring-primary/20">

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -9,10 +10,12 @@ import {
   ShieldCheck,
   UsersRound,
 } from "lucide-react";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { supabase } from "@/lib/supabase/client";
 
 type FooterInfoPageProps = {
   type:
@@ -34,14 +37,59 @@ type FooterInfoPageProps = {
     | "privacy-choices";
 };
 
-const pageContent = {
+type Audience =
+  | "public"
+  | "authenticated"
+  | "job_seeker"
+  | "recruiter"
+  | "admin";
+
+type UserType = "job_seeker" | "recruiter" | "admin" | string;
+
+type PageContent = {
+  label: string;
+  title: string;
+  description: string;
+  action: string;
+  to: string;
+  audience?: Audience;
+  points: string[];
+};
+
+function canSeeAction(
+  audience: Audience | undefined,
+  userType: UserType | null,
+) {
+  if (!audience || audience === "public") return true;
+
+  if (!userType) return false;
+
+  if (audience === "authenticated") return true;
+
+  if (audience === "job_seeker") {
+    return userType === "job_seeker";
+  }
+
+  if (audience === "recruiter") {
+    return userType === "recruiter" || userType === "admin";
+  }
+
+  if (audience === "admin") {
+    return userType === "admin";
+  }
+
+  return false;
+}
+
+const pageContent: Record<FooterInfoPageProps["type"], PageContent> = {
   "saved-jobs": {
     label: "Candidate workspace",
     title: "Saved jobs",
     description:
       "Keep a focused shortlist of roles you want to revisit and apply to when you are ready.",
-    action: "Sign in to view saved jobs",
-    to: "/signin",
+    action: "View saved jobs",
+    to: "/saved",
+    audience: "job_seeker",
     points: [
       "Sync favorites across devices",
       "Compare salary, location, and skills",
@@ -55,6 +103,7 @@ const pageContent = {
       "Research current compensation ranges across engineering, data, design, product, security, and marketing roles.",
     action: "Search roles with salary",
     to: "/jobs",
+    audience: "public",
     points: [
       "Filter roles with salary ranges",
       "Compare remote and local markets",
@@ -68,6 +117,7 @@ const pageContent = {
       "Practical guidance for resumes, interviews, offer evaluation, and building a stronger professional profile.",
     action: "Build your profile",
     to: "/profile",
+    audience: "job_seeker",
     points: [
       "Resume and skills positioning",
       "Interview preparation",
@@ -81,6 +131,7 @@ const pageContent = {
       "Control whether recruiters can discover your profile, resume, skills, and contact information.",
     action: "Manage visibility",
     to: "/profile",
+    audience: "job_seeker",
     points: [
       "Public or private profile setting",
       "Resume and contact controls",
@@ -93,7 +144,8 @@ const pageContent = {
     description:
       "Create clear, searchable listings with title, location, work mode, salary range, skills, and applicant review flow.",
     action: "Start posting",
-    to: "/employers/dashboard",
+    to: "/employers/post-job",
+    audience: "recruiter",
     points: [
       "Company profile and logo",
       "Structured salary and skill fields",
@@ -106,7 +158,8 @@ const pageContent = {
     description:
       "Find qualified technology professionals by skill, location preference, experience area, and profile visibility.",
     action: "Open recruiter tools",
-    to: "/employers/dashboard",
+    to: "/employers/candidates",
+    audience: "recruiter",
     points: [
       "Skill-based candidate discovery",
       "Location and work-mode matching",
@@ -120,6 +173,7 @@ const pageContent = {
       "Manage company information, active jobs, applicants, and hiring team workflows in one place.",
     action: "Go to dashboard",
     to: "/employers/dashboard",
+    audience: "recruiter",
     points: [
       "Job posting workflow",
       "Applicant review queue",
@@ -133,6 +187,7 @@ const pageContent = {
       "Use structured hiring guides for role scoping, interview plans, compensation clarity, and candidate communication.",
     action: "Post a job",
     to: "/employers/post-job",
+    audience: "recruiter",
     points: [
       "Role kickoff checklist",
       "Interview plan templates",
@@ -146,6 +201,7 @@ const pageContent = {
       "Show candidates what your team builds, how you work, and why strong professionals should choose you.",
     action: "Manage brand",
     to: "/employers/dashboard",
+    audience: "recruiter",
     points: [
       "Company summary and logo",
       "Work mode and benefits signals",
@@ -159,6 +215,7 @@ const pageContent = {
       "HireGeneral is a focused job marketplace built for technology professionals and hiring teams that value clarity.",
     action: "Browse jobs",
     to: "/jobs",
+    audience: "public",
     points: [
       "Modern job search",
       "Recruiter posting tools",
@@ -172,6 +229,7 @@ const pageContent = {
       "Send a message to our team about candidate support, employer accounts, privacy, or accessibility.",
     action: "Send message",
     to: "/contact",
+    audience: "public",
     points: [
       "Candidate support",
       "Employer account help",
@@ -185,6 +243,7 @@ const pageContent = {
       "Review how HireGeneral presents profile, resume, saved-job, application, and account privacy controls.",
     action: "Manage profile privacy",
     to: "/profile",
+    audience: "job_seeker",
     points: [
       "Profile visibility choices",
       "Optional demographic fields",
@@ -198,6 +257,7 @@ const pageContent = {
       "Understand the rules for using HireGeneral as a job seeker, recruiter, or employer.",
     action: "Return home",
     to: "/",
+    audience: "public",
     points: [
       "Responsible listing activity",
       "Accurate candidate information",
@@ -211,6 +271,7 @@ const pageContent = {
       "HireGeneral is designed with readable layouts, keyboard-friendly navigation, and clear content hierarchy.",
     action: "Contact support",
     to: "/contact",
+    audience: "public",
     points: [
       "Semantic pages and headings",
       "Accessible form labels",
@@ -224,6 +285,7 @@ const pageContent = {
       "Learn how product preferences and basic experience settings may be used to keep HireGeneral useful.",
     action: "Privacy choices",
     to: "/privacy-choices",
+    audience: "public",
     points: [
       "Essential experience settings",
       "Preference management",
@@ -237,6 +299,7 @@ const pageContent = {
       "Control public profile visibility and review how optional information is presented in your account.",
     action: "Open profile settings",
     to: "/profile",
+    audience: "job_seeker",
     points: [
       "Make profile private",
       "Review contact information",
@@ -249,23 +312,94 @@ export default function FooterInfoPage({ type }: FooterInfoPageProps) {
   const content = pageContent[type];
   const isContact = type === "contact";
 
+  const [userType, setUserType] = useState<UserType | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadUserType = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!mounted) return;
+
+      if (!user?.id) {
+        setUserType(null);
+        setAuthLoading(false);
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("user_type")
+        .eq("user_id", user.id)
+        .single();
+
+      if (!mounted) return;
+
+      setUserType(profile?.user_type ?? null);
+      setAuthLoading(false);
+    };
+
+    loadUserType();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      const userId = session?.user?.id;
+
+      if (!userId) {
+        setUserType(null);
+        setAuthLoading(false);
+        return;
+      }
+
+      supabase
+        .from("profiles")
+        .select("user_type")
+        .eq("user_id", userId)
+        .single()
+        .then(({ data: profile }) => {
+          if (!mounted) return;
+          setUserType(profile?.user_type ?? null);
+          setAuthLoading(false);
+        });
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const showAction = useMemo(() => {
+    return canSeeAction(content.audience, userType);
+  }, [content.audience, userType]);
+
   return (
     <main className="min-h-screen bg-background">
       <section className="bg-hero-gradient px-4 py-14">
         <div className="mx-auto max-w-7xl">
           <Badge variant="soft">{content.label}</Badge>
+
           <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-tight text-balance md:text-6xl">
             {content.title}
           </h1>
+
           <p className="mt-5 max-w-2xl text-lg leading-8 text-muted-foreground">
             {content.description}
           </p>
-          <Button variant="hero" size="lg" className="mt-7" asChild>
-            <Link href={content.to}>
-              {content.action}
-              <ArrowRight className="size-4" />
-            </Link>
-          </Button>
+
+          {!authLoading && showAction && (
+            <Button variant="hero" size="lg" className="mt-7" asChild>
+              <Link href={content.to} prefetch={false}>
+                {content.action}
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+          )}
         </div>
       </section>
 
@@ -273,10 +407,12 @@ export default function FooterInfoPage({ type }: FooterInfoPageProps) {
         <div className="rounded-lg border border-border bg-surface p-6 shadow-soft">
           <div className="flex items-center gap-3">
             <ShieldCheck className="size-6 text-primary" />
+
             <h2 className="text-2xl font-bold tracking-tight">
               What you can do here
             </h2>
           </div>
+
           <div className="mt-6 space-y-4">
             {content.points.map((point) => (
               <p
@@ -297,19 +433,23 @@ export default function FooterInfoPage({ type }: FooterInfoPageProps) {
           >
             <div className="flex items-center gap-3">
               <Mail className="size-6 text-primary" />
+
               <h2 className="text-2xl font-bold tracking-tight">
                 Send a message
               </h2>
             </div>
+
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <Input placeholder="Name" aria-label="Name" />
               <Input placeholder="Email" aria-label="Email" type="email" />
             </div>
+
             <Textarea
               className="mt-4 min-h-36"
               placeholder="How can we help?"
               aria-label="Message"
             />
+
             <Button variant="hero" className="mt-4">
               Submit request
             </Button>
@@ -318,24 +458,31 @@ export default function FooterInfoPage({ type }: FooterInfoPageProps) {
           <div className="rounded-lg border border-border bg-surface p-6 shadow-soft">
             <div className="flex items-center gap-3">
               <UsersRound className="size-6 text-primary" />
+
               <h2 className="text-2xl font-bold tracking-tight">
                 Next best step
               </h2>
             </div>
+
             <p className="mt-4 text-sm leading-6 text-muted-foreground">
               Use this page as a practical entry point into the HireGeneral
               workflow. Public pages explain the feature, while account actions
-              continue through secure sign-in and profile tools.
+              only appear for users with the correct account type.
             </p>
+
             <div className="mt-6 flex items-center gap-2 rounded-lg border border-border bg-background p-3">
               <Search className="size-5 text-muted-foreground" />
+
               <Input
                 className="border-0 bg-transparent shadow-none focus-visible:ring-0"
                 placeholder="Search jobs, skills, or companies"
               />
             </div>
+
             <Button variant="glass" className="mt-4" asChild>
-              <Link href="/jobs">Explore jobs</Link>
+              <Link href="/jobs" prefetch={false}>
+                Explore jobs
+              </Link>
             </Button>
           </div>
         )}
