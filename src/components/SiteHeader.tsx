@@ -32,7 +32,10 @@ interface UserProfile {
   user_type: string;
 }
 
-const publicNavLinks = [{ label: "Find jobs", href: "/jobs" }];
+const publicNavLinks = [
+  { label: "Find jobs", href: "/jobs" },
+  { label: "Salaries", href: "/salaries" },
+];
 
 const jobSeekerNavLinks = [
   { label: "Saved", href: "/saved" },

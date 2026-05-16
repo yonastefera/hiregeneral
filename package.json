@@ -14,7 +14,8 @@
     "ci": "npm run format:check && npm run lint && npm run typecheck && npm run build",
     "prepare": "husky",
     "seed:locations": "tsx scripts/seed-locations-geonames.ts",
-    "seed:schools": "tsx scripts/seed-schools-scorecard.ts"
+    "seed:schools": "tsx scripts/seed-schools-scorecard.ts",
+    "seed:bls-salaries": "tsx scripts/seed-bls-oews.ts"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,css,md,yml,yaml}": [

@@ -126,10 +126,12 @@ async function getFeaturedJobs(): Promise<{
   error: string | null;
 }> {
   try {
+    const seed = `dashboard:${new Date().toISOString().slice(0, 13)}`;
     const params = new URLSearchParams({
       page: FEATURED_JOBS_PAGE,
       pageSize: FEATURED_JOBS_PAGE_SIZE,
       daysAgo: FEATURED_JOBS_LOOKBACK_DAYS,
+      seed,
     });
 
     const response = await fetch(`${SITE_URL}/api/jobs?${params.toString()}`, {

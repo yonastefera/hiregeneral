@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -36,6 +36,9 @@ import type { Job } from "@/lib/db/types";
 const DEFAULT_POSTED = "3650";
 const DEFAULT_DISTANCE = "100";
 const PAGE_SIZE = 20;
+const JOBS_CACHE_TTL_MS = 60_000;
+const JOBS_BROWSE_SEED_KEY = "hg.jobsBrowseSeed.v1";
+const PREFETCH_PAGE_COUNT = 2;
 
 type JobsApiResponse = {
   data?: Job[];
@@ -98,6 +101,163 @@ function getJobsFromApiBody(body: unknown): Job[] {
   return [];
 }
 
+function getStableBrowseSeed() {
+  if (typeof window === "undefined") return "jobs:server";
+
+  try {
+    const existing = window.sessionStorage.getItem(JOBS_BROWSE_SEED_KEY);
+
+    if (existing) return existing;
+
+    const next = `jobs:${Date.now().toString(36)}:${Math.random()
+      .toString(36)
+      .slice(2)}`;
+
+    window.sessionStorage.setItem(JOBS_BROWSE_SEED_KEY, next);
+
+    return next;
+  } catch {
+    return `jobs:${Date.now().toString(36)}`;
+  }
+}
+
+function getJobsCacheKey(params: URLSearchParams) {
+  return `hg.jobs:${params.toString()}`;
+}
+
+function readJobsCache(cacheKey: string) {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const cached = window.sessionStorage.getItem(cacheKey);
+
+    if (!cached) return null;
+
+    const parsed = JSON.parse(cached) as {
+      cachedAt?: number;
+      body?: JobsApiResponse | Job[];
+    };
+
+    if (!parsed.cachedAt || Date.now() - parsed.cachedAt > JOBS_CACHE_TTL_MS) {
+      window.sessionStorage.removeItem(cacheKey);
+      return null;
+    }
+
+    return parsed.body ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function writeJobsCache(cacheKey: string, body: JobsApiResponse | Job[]) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.sessionStorage.setItem(
+      cacheKey,
+      JSON.stringify({
+        cachedAt: Date.now(),
+        body,
+      }),
+    );
+  } catch {
+    // Best effort only. Browsing should still work if storage is unavailable.
+  }
+}
+
+function buildJobsApiParams(params: {
+  page: number;
+  pageSize: number;
+  daysAgo: string;
+  distance: string;
+  seed: string;
+  query: string;
+  location: string;
+}) {
+  const next = new URLSearchParams({
+    page: String(params.page),
+    pageSize: String(params.pageSize),
+    daysAgo: params.daysAgo,
+    distance: params.distance,
+    loadMode: "page",
+    seed: params.seed,
+  });
+
+  if (params.query.trim()) {
+    next.set("query", params.query.trim());
+  }
+
+  if (params.location.trim()) {
+    next.set("location", params.location.trim());
+  }
+
+  return next;
+}
+
+function queueBackgroundTask(task: () => void) {
+  if (typeof window === "undefined") return;
+
+  window.setTimeout(task, 150);
+}
+
+async function prefetchJobPages(params: {
+  currentPage: number;
+  totalPages: number;
+  pageSize: number;
+  daysAgo: string;
+  distance: string;
+  seed: string;
+  query: string;
+  location: string;
+  signal: AbortSignal;
+}) {
+  const lastPage = Math.min(
+    params.totalPages,
+    params.currentPage + PREFETCH_PAGE_COUNT,
+  );
+
+  for (
+    let nextPage = params.currentPage + 1;
+    nextPage <= lastPage;
+    nextPage += 1
+  ) {
+    if (params.signal.aborted) return;
+
+    const nextParams = buildJobsApiParams({
+      page: nextPage,
+      pageSize: params.pageSize,
+      daysAgo: params.daysAgo,
+      distance: params.distance,
+      seed: params.seed,
+      query: params.query,
+      location: params.location,
+    });
+    const cacheKey = getJobsCacheKey(nextParams);
+
+    if (readJobsCache(cacheKey)) continue;
+
+    try {
+      const response = await fetch(`/api/jobs?${nextParams.toString()}`, {
+        cache: "no-store",
+        signal: params.signal,
+      });
+
+      if (!response.ok) continue;
+
+      const body = (await response.json().catch(() => null)) as
+        | JobsApiResponse
+        | Job[]
+        | null;
+
+      if (body) {
+        writeJobsCache(cacheKey, body);
+      }
+    } catch {
+      if (params.signal.aborted) return;
+    }
+  }
+}
+
 function toSelectedKeyword(suggestion: KeywordSuggestion): SelectedKeyword {
   return {
     term: suggestion.term,
@@ -149,8 +309,30 @@ export default function JobsPage() {
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const hasLoadedOnceRef = useRef(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const browseSeedRef = useRef(getStableBrowseSeed());
 
   const { isSaved, toggleSaved, pendingId } = useSavedJobs();
+
+  const applyJobsBody = useCallback((body: JobsApiResponse | Job[] | null) => {
+    const nextJobs = getJobsFromApiBody(body);
+
+    setJobs(nextJobs);
+    setTotalJobs(
+      body && !Array.isArray(body) && typeof body.total === "number"
+        ? body.total
+        : nextJobs.length,
+    );
+    setNewJobs(
+      body && !Array.isArray(body) && typeof body.newJobs === "number"
+        ? body.newJobs
+        : 0,
+    );
+    setTotalPages(
+      body && !Array.isArray(body) && typeof body.totalPages === "number"
+        ? Math.max(1, body.totalPages)
+        : 1,
+    );
+  }, []);
 
   useEffect(() => {
     const next = new URLSearchParams();
@@ -205,24 +387,31 @@ export default function JobsPage() {
     const controller = new AbortController();
 
     async function loadJobs() {
-      setLoading(true);
-      setLoadError(null);
+      let servedCachedBody = false;
 
       try {
-        const params = new URLSearchParams({
-          page: String(page),
-          pageSize: String(PAGE_SIZE),
+        const params = buildJobsApiParams({
+          page,
+          pageSize: PAGE_SIZE,
           daysAgo: dateFilter,
           distance,
+          seed: browseSeedRef.current,
+          query: submittedQuery,
+          location: submittedLocation,
         });
 
-        if (submittedQuery.trim()) {
-          params.set("query", submittedQuery.trim());
+        const cacheKey = getJobsCacheKey(params);
+        const cachedBody = readJobsCache(cacheKey);
+
+        if (cachedBody) {
+          applyJobsBody(cachedBody);
+          hasLoadedOnceRef.current = true;
+          setHasLoadedOnce(true);
+          servedCachedBody = true;
         }
 
-        if (submittedLocation.trim()) {
-          params.set("location", submittedLocation.trim());
-        }
+        setLoading(!servedCachedBody);
+        setLoadError(null);
 
         const response = await fetch(`/api/jobs?${params.toString()}`, {
           cache: "no-store",
@@ -245,24 +434,29 @@ export default function JobsPage() {
 
         if (controller.signal.aborted) return;
 
-        const nextJobs = getJobsFromApiBody(body);
+        applyJobsBody(body);
+        writeJobsCache(cacheKey, body ?? []);
 
-        setJobs(nextJobs);
-        setTotalJobs(
-          body && !Array.isArray(body) && typeof body.total === "number"
-            ? body.total
-            : nextJobs.length,
-        );
-        setNewJobs(
-          body && !Array.isArray(body) && typeof body.newJobs === "number"
-            ? body.newJobs
-            : 0,
-        );
-        setTotalPages(
+        const nextTotalPages =
           body && !Array.isArray(body) && typeof body.totalPages === "number"
             ? Math.max(1, body.totalPages)
-            : 1,
-        );
+            : 1;
+
+        if (nextTotalPages > page) {
+          queueBackgroundTask(() => {
+            void prefetchJobPages({
+              currentPage: page,
+              totalPages: nextTotalPages,
+              pageSize: PAGE_SIZE,
+              daysAgo: dateFilter,
+              distance,
+              seed: browseSeedRef.current,
+              query: submittedQuery,
+              location: submittedLocation,
+              signal: controller.signal,
+            });
+          });
+        }
 
         hasLoadedOnceRef.current = true;
         setHasLoadedOnce(true);
@@ -276,9 +470,11 @@ export default function JobsPage() {
           setTotalPages(1);
         }
 
-        setLoadError(
-          error instanceof Error ? error.message : "Could not load jobs.",
-        );
+        if (!servedCachedBody) {
+          setLoadError(
+            error instanceof Error ? error.message : "Could not load jobs.",
+          );
+        }
       } finally {
         if (!controller.signal.aborted) {
           setLoading(false);
@@ -289,7 +485,14 @@ export default function JobsPage() {
     loadJobs();
 
     return () => controller.abort();
-  }, [page, submittedQuery, submittedLocation, dateFilter, distance]);
+  }, [
+    page,
+    submittedQuery,
+    submittedLocation,
+    dateFilter,
+    distance,
+    applyJobsBody,
+  ]);
 
   const cardJobs = useMemo(() => jobs.map(toJobCardShape), [jobs]);
 

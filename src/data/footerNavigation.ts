@@ -26,7 +26,7 @@ export const footerSections: FooterSection[] = [
     links: [
       { label: "Browse tech jobs", to: "/jobs", audience: "public" },
       { label: "Saved jobs", to: "/saved", audience: "job_seeker" },
-      { label: "Salary guide", to: "/salary-guide", audience: "public" },
+      { label: "Salaries", to: "/salaries", audience: "public" },
       { label: "Profile", to: "/profile", audience: "job_seeker" },
       {
         label: "Profile visibility",

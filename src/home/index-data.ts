@@ -15,10 +15,12 @@ export async function getIndexPageData(): Promise<{
   highlightedJobs: JobCardJob[];
 }> {
   try {
+    const seed = `home:${new Date().toISOString().slice(0, 13)}`;
     const params = new URLSearchParams({
       page: HIGHLIGHTED_JOBS_PAGE,
       pageSize: HIGHLIGHTED_JOBS_PAGE_SIZE,
       daysAgo: HIGHLIGHTED_JOBS_LOOKBACK_DAYS,
+      seed,
     });
 
     const response = await fetch(`${SITE_URL}/api/jobs?${params.toString()}`, {

@@ -14,8 +14,10 @@ const supabaseAdmin = createClient(
 );
 
 const MAX_CANDIDATE_JOBS = 5000;
+const MIN_BROWSE_CANDIDATE_JOBS = 600;
 const NEW_JOBS_WINDOW_DAYS = 7;
 const DEFAULT_COMPANY_BALANCE = "company";
+const DEFAULT_FRESHNESS_WINDOW_DAYS = 30;
 
 const JOB_CANDIDATE_SELECT = `
   id,
@@ -141,6 +143,55 @@ function stripHtml(input: string | null | undefined) {
     .trim();
 }
 
+function seededHash(value: string) {
+  let hash = 2166136261;
+
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return hash >>> 0;
+}
+
+function defaultBrowseSeed() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function freshnessTier(postedAt: string) {
+  const postedTime = new Date(postedAt).getTime();
+
+  if (Number.isNaN(postedTime)) return 3;
+
+  const ageDays = Math.floor((Date.now() - postedTime) / 86_400_000);
+
+  if (ageDays <= NEW_JOBS_WINDOW_DAYS) return 0;
+  if (ageDays <= DEFAULT_FRESHNESS_WINDOW_DAYS) return 1;
+
+  return 2;
+}
+
+function rotateBroadBrowseJobs<
+  T extends { id: string; company_name: string; posted_at: string },
+>(jobs: T[], seed: string) {
+  return [...jobs].sort((a, b) => {
+    const freshnessDiff =
+      freshnessTier(a.posted_at) - freshnessTier(b.posted_at);
+
+    if (freshnessDiff !== 0) return freshnessDiff;
+
+    const companyDiff =
+      seededHash(`${seed}:company:${a.company_name.toLowerCase()}`) -
+      seededHash(`${seed}:company:${b.company_name.toLowerCase()}`);
+
+    if (companyDiff !== 0) return companyDiff;
+
+    return (
+      seededHash(`${seed}:job:${a.id}`) - seededHash(`${seed}:job:${b.id}`)
+    );
+  });
+}
+
 function balanceJobsByCompany<T extends { company_name: string }>(jobs: T[]) {
   const groups = new Map<string, T[]>();
   const order: string[] = [];
@@ -199,6 +250,19 @@ function shouldBalanceCompanyResults(params: {
 
   // Balance broad browsing searches, including location-only searches.
   return !hasKeywordIntent && !hasSpecificCompanyIntent && !hasDetailIntent;
+}
+
+function candidateLimitForRequest(params: {
+  page: number;
+  pageSize: number;
+  shouldBalanceByCompany: boolean;
+}) {
+  if (!params.shouldBalanceByCompany) return MAX_CANDIDATE_JOBS;
+
+  return Math.min(
+    MAX_CANDIDATE_JOBS,
+    Math.max(MIN_BROWSE_CANDIDATE_JOBS, params.page * params.pageSize * 4),
+  );
 }
 
 function locationSearchTerm(value: string) {
@@ -423,9 +487,30 @@ export async function GET(req: NextRequest) {
     const company = searchParams.get("company") ?? "";
     const excludeId = searchParams.get("excludeId") ?? "";
     const balance = searchParams.get("balance") ?? DEFAULT_COMPANY_BALANCE;
+    const loadMode = searchParams.get("loadMode") ?? "pool";
+    const seed = searchParams.get("seed") ?? defaultBrowseSeed();
     const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
     const pageSize = Math.min(25, Number(searchParams.get("pageSize") ?? "10"));
     const keywordCategories = await getKeywordCategories(query);
+    const shouldBalanceByCompany = shouldBalanceCompanyResults({
+      query,
+      location,
+      workMode,
+      employmentType,
+      category,
+      company,
+      excludeId,
+      balance,
+    });
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize;
+    const shouldUseDatabasePage =
+      loadMode === "page" && !shouldBalanceByCompany;
+    const candidateLimit = candidateLimitForRequest({
+      page,
+      pageSize,
+      shouldBalanceByCompany,
+    });
 
     let dbQuery = supabaseAdmin
       .from("jobs")
@@ -436,8 +521,7 @@ export async function GET(req: NextRequest) {
         "posted_at",
         new Date(Date.now() - daysAgo * 86_400_000).toISOString(),
       )
-      .order("posted_at", { ascending: false })
-      .limit(MAX_CANDIDATE_JOBS);
+      .order("posted_at", { ascending: false });
 
     if (query.trim()) {
       const keywordFilter = buildJobSearchFilter(query, keywordCategories);
@@ -475,6 +559,12 @@ export async function GET(req: NextRequest) {
       dbQuery = dbQuery.neq("id", excludeId);
     }
 
+    if (shouldUseDatabasePage) {
+      dbQuery = dbQuery.range(from, to - 1);
+    } else {
+      dbQuery = dbQuery.limit(candidateLimit);
+    }
+
     const { count, data, error } = await dbQuery;
 
     if (error) {
@@ -491,32 +581,53 @@ export async function GET(req: NextRequest) {
 
     const candidateJobs = (data ?? []) as JobCandidateRow[];
 
-    const shouldBalanceByCompany = shouldBalanceCompanyResults({
-      query,
-      location,
-      workMode,
-      employmentType,
-      category,
-      company,
-      excludeId,
-      balance,
-    });
+    const broadBrowseCandidates = shouldBalanceByCompany
+      ? rotateBroadBrowseJobs(candidateJobs, seed)
+      : candidateJobs;
 
     const displayCandidates = shouldBalanceByCompany
-      ? balanceJobsByCompany(candidateJobs)
+      ? balanceJobsByCompany(broadBrowseCandidates)
       : rankExpandedSearchResults(candidateJobs, query, keywordCategories);
 
     const total = count ?? displayCandidates.length;
-    const newJobs = displayCandidates.filter((job) => {
+    let newJobs = displayCandidates.filter((job) => {
       const postedTime = new Date(job.posted_at).getTime();
 
       if (Number.isNaN(postedTime)) return false;
 
       return postedTime >= Date.now() - NEW_JOBS_WINDOW_DAYS * 86_400_000;
     }).length;
-    const from = (page - 1) * pageSize;
-    const to = from + pageSize;
-    const pageJobs = await hydrateJobDetails(displayCandidates.slice(from, to));
+
+    if (loadMode === "page") {
+      const loc = locationSearchTerm(location);
+      const newestAllowedDate = new Date(
+        Math.max(
+          Date.now() - daysAgo * 86_400_000,
+          Date.now() - NEW_JOBS_WINDOW_DAYS * 86_400_000,
+        ),
+      ).toISOString();
+      let newJobsQuery = supabaseAdmin
+        .from("jobs")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "published")
+        .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+        .gte("posted_at", newestAllowedDate);
+
+      if (loc) {
+        newJobsQuery = newJobsQuery.ilike("location", `%${loc}%`);
+      }
+
+      const { count: newJobsCount, error: newJobsError } = await newJobsQuery;
+
+      if (!newJobsError) {
+        newJobs = newJobsCount ?? 0;
+      }
+    }
+
+    const pageCandidates = shouldUseDatabasePage
+      ? displayCandidates
+      : displayCandidates.slice(from, to);
+    const pageJobs = await hydrateJobDetails(pageCandidates);
 
     return NextResponse.json({
       data: pageJobs,
@@ -524,6 +635,7 @@ export async function GET(req: NextRequest) {
       newJobs,
       newJobsWindowDays: NEW_JOBS_WINDOW_DAYS,
       balance: shouldBalanceByCompany ? "company" : "none",
+      seed: shouldBalanceByCompany ? seed : null,
       page,
       pageSize,
       totalPages: Math.max(1, Math.ceil(total / pageSize)),

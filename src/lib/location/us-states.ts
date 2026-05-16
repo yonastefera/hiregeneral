@@ -51,14 +51,26 @@ export const US_STATE_ABBREVIATIONS: Record<string, string> = {
   Wyoming: "WY",
 };
 
+export const US_STATE_NAMES_BY_ABBR = Object.fromEntries(
+  Object.entries(US_STATE_ABBREVIATIONS).map(([name, abbr]) => [abbr, name]),
+) as Record<string, string>;
+
 export function normalizeUsStateRegion(region: string | null): string | null {
   if (!region) return null;
 
   const trimmedRegion = region.trim();
 
+  if (!trimmedRegion) return null;
+
   if (trimmedRegion.length === 2) {
     return trimmedRegion.toUpperCase();
   }
 
-  return US_STATE_ABBREVIATIONS[trimmedRegion] ?? trimmedRegion;
+  const matchedStateName = Object.keys(US_STATE_ABBREVIATIONS).find(
+    (stateName) => stateName.toLowerCase() === trimmedRegion.toLowerCase(),
+  );
+
+  return matchedStateName
+    ? US_STATE_ABBREVIATIONS[matchedStateName]
+    : trimmedRegion;
 }
