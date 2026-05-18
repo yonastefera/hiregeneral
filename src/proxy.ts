@@ -2,13 +2,47 @@ import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 
 // Routes that require any authenticated user
-const PROTECTED_ROUTES = ["/profile", "/saved", "/applications", "/messages"];
+const PROTECTED_ROUTES = [
+  "/profile",
+  "/saved",
+  "/saved-jobs",
+  "/applications",
+  "/messages",
+  "/account",
+  "/settings",
+];
 
-// Routes that require the recruiter or admin role
-const RECRUITER_ROUTES = ["/employers", "/dashboard"];
+const JOB_SEEKER_ROUTES = [
+  "/job-seeker",
+  "/profile",
+  "/saved",
+  "/saved-jobs",
+  "/applications",
+  "/messages",
+];
 
-// Routes that require admin role only
-const ADMIN_ROUTES = ["/admin-control-center"];
+const EMPLOYER_ROUTES = [
+  "/employers",
+  "/employers/dashboard",
+  "/employers/dashboard/post-job",
+];
+
+const ADMIN_ROUTES = ["/admin/dashboard", "/admin-control-center"];
+
+const AUTH_ROUTES = ["/signin", "/signup", "/forgot-password"];
+
+function startsWithAny(pathname: string, routes: string[]) {
+  return routes.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
+  );
+}
+
+function redirect(req: NextRequest, pathname: string) {
+  const url = req.nextUrl.clone();
+  url.pathname = pathname;
+  url.search = "";
+  return NextResponse.redirect(url);
+}
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -48,17 +82,19 @@ export async function proxy(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isProtected = PROTECTED_ROUTES.some((route) =>
-    pathname.startsWith(route),
-  );
+  const isProtected = startsWithAny(pathname, PROTECTED_ROUTES);
+  const isJobSeekerRoute = startsWithAny(pathname, JOB_SEEKER_ROUTES);
+  const isEmployerRoute = startsWithAny(pathname, EMPLOYER_ROUTES);
+  const isAdminRoute = startsWithAny(pathname, ADMIN_ROUTES);
+  const isAuthRoute = startsWithAny(pathname, AUTH_ROUTES);
+  const isChooseRoleRoute = pathname.startsWith("/auth/choose-role");
 
-  const isRecruiter = RECRUITER_ROUTES.some((route) =>
-    pathname.startsWith(route),
-  );
-
-  const isAdminRoute = ADMIN_ROUTES.some((route) => pathname.startsWith(route));
-
-  const requiresAuth = isProtected || isRecruiter || isAdminRoute;
+  const requiresAuth =
+    isProtected ||
+    isJobSeekerRoute ||
+    isEmployerRoute ||
+    isAdminRoute ||
+    isChooseRoleRoute;
 
   // Not logged in — redirect to sign in.
   if (requiresAuth && !user && pathname !== "/signin") {
@@ -69,31 +105,64 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Logged in but checking role for recruiter/admin routes.
-  if (user && (isRecruiter || isAdminRoute)) {
+  if (user) {
     const { data: roles } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id);
 
     const userRoles = roles?.map((role) => role.role) ?? [];
+    const primaryRole = userRoles.includes("admin")
+      ? "admin"
+      : userRoles.includes("recruiter")
+        ? "recruiter"
+        : userRoles.includes("job_seeker")
+          ? "job_seeker"
+          : null;
 
-    if (isAdminRoute && !userRoles.includes("admin")) {
+    if (
+      !primaryRole &&
+      !isChooseRoleRoute &&
+      !pathname.startsWith("/auth/callback")
+    ) {
       const url = req.nextUrl.clone();
-      url.pathname = "/jobs";
+      url.pathname = "/auth/choose-role";
       url.search = "";
+      url.searchParams.set("next", pathname);
       return NextResponse.redirect(url);
     }
 
+    if (isAuthRoute && primaryRole) {
+      if (primaryRole === "admin") return redirect(req, "/admin/dashboard");
+      if (primaryRole === "recruiter")
+        return redirect(req, "/employers/dashboard");
+      return redirect(req, "/job-seeker/dashboard");
+    }
+
+    if (isAdminRoute && primaryRole !== "admin") {
+      return redirect(
+        req,
+        primaryRole === "recruiter" ? "/employers/dashboard" : "/jobs",
+      );
+    }
+
     if (
-      isRecruiter &&
-      !userRoles.includes("recruiter") &&
-      !userRoles.includes("admin")
+      isEmployerRoute &&
+      primaryRole !== "recruiter" &&
+      primaryRole !== "admin"
     ) {
-      const url = req.nextUrl.clone();
-      url.pathname = "/jobs";
-      url.search = "";
-      return NextResponse.redirect(url);
+      return redirect(req, primaryRole ? "/jobs" : "/auth/choose-role");
+    }
+
+    if (
+      isJobSeekerRoute &&
+      primaryRole !== "job_seeker" &&
+      primaryRole !== "admin"
+    ) {
+      return redirect(
+        req,
+        primaryRole === "recruiter" ? "/employers/dashboard" : "/jobs",
+      );
     }
   }
 

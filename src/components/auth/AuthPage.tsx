@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase/client";
+import { routeForRole, type AppRole } from "@/lib/auth/roles";
 import type { UserFlow } from "@/data/jobPlatform";
 
 const roles: { value: UserFlow; label: string }[] = [
@@ -30,6 +31,27 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
   const [role, setRole] = useState<UserFlow>("job_seeker");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  const redirectAfterAuth = async (fallback = nextUrl) => {
+    const response = await fetch("/api/auth/role", { cache: "no-store" });
+
+    if (response.status === 401) {
+      router.push(`/signin?next=${encodeURIComponent(fallback)}`);
+      return;
+    }
+
+    const body = (await response.json()) as {
+      role?: AppRole | null;
+      redirectTo?: string;
+    };
+
+    if (!body.role) {
+      router.push(`/auth/choose-role?next=${encodeURIComponent(fallback)}`);
+      return;
+    }
+
+    router.push(body.redirectTo ?? routeForRole(body.role));
+  };
 
   const title =
     mode === "signup"
@@ -75,7 +97,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
       const { error } = await supabase.auth.resetPasswordForEmail(
         email.trim(),
         {
-          redirectTo: `${window.location.origin}/reset-password`,
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/reset-password")}`,
         },
       );
       setLoading(false);
@@ -88,11 +110,11 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
     }
 
     if (mode === "signup") {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(routeForRole(role))}`,
           data: { full_name: fullName, role },
         },
       });
@@ -101,6 +123,15 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
         toast.error(error.message);
         return;
       }
+
+      if (data.session) {
+        await fetch("/api/auth/role", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role, fullName }),
+        });
+      }
+
       toast.success("Check your email to confirm your account.");
       router.push("/signin");
       return;
@@ -116,7 +147,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
       return;
     }
     toast.success("Signed in successfully.");
-    router.push(nextUrl);
+    await redirectAfterAuth(nextUrl);
   };
 
   return (

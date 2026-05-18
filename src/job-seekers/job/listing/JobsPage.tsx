@@ -675,7 +675,7 @@ export default function JobsPage() {
       </section>
 
       <section
-        className="mx-auto grid max-w-368 gap-8 px-4 py-8 md:px-6 lg:grid-cols-[340px_minmax(0,1fr)] xl:px-8"
+        className="mx-auto grid max-w-368 gap-8 px-4 py-8 md:px-6 lg:grid-cols-[340px_minmax(0,1fr)] xl:px-8 mb-20"
         aria-label="Job search results and filters"
       >
         <aside

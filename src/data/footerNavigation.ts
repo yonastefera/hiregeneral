@@ -41,7 +41,7 @@ export const footerSections: FooterSection[] = [
     links: [
       {
         label: "Post a job",
-        to: "/employers/post-job",
+        to: "/employers/dashboard/post-job",
         audience: "recruiter",
       },
       {

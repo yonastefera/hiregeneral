@@ -17,10 +17,28 @@ export default function ResetPassword() {
   const [hasRecoveryToken, setHasRecoveryToken] = useState(false);
 
   useEffect(() => {
-    setHasRecoveryToken(
-      window.location.hash.includes("type=recovery") ||
-        window.location.search.includes("type=recovery"),
-    );
+    let mounted = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+
+      setHasRecoveryToken(
+        Boolean(data.session) ||
+          window.location.hash.includes("type=recovery") ||
+          window.location.search.includes("type=recovery"),
+      );
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setHasRecoveryToken(Boolean(session));
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleSubmit = async (event: React.SyntheticEvent<HTMLFormElement>) => {

@@ -117,7 +117,7 @@ export const Footer = () => {
   }, [userType]);
 
   return (
-    <footer className="mt-20 bg-[hsl(220_25%_8%)] text-surface-strong-foreground">
+    <footer className="bg-[hsl(220_25%_8%)] text-surface-strong-foreground">
       <div className="h-px w-full bg-white/10" />
 
       <div className="mx-auto max-w-7xl px-6 py-16 md:py-20">

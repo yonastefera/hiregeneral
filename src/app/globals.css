@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @config "../../tailwind.config.mts";
 
+@custom-variant dark (&:is(.dark *));
+
 /* Apple-inspired design system. All colors HSL. */
 
 @layer base {
@@ -101,6 +103,9 @@
     --sidebar-accent-foreground: 220 40% 8%;
     --sidebar-border: 220 14% 91%;
     --sidebar-ring: 188 92% 32%;
+
+    /* Compatibility aliases for dashboard/sidebar components. */
+    --sidebar: var(--sidebar-background);
   }
 
   .dark {
@@ -197,6 +202,9 @@
     --sidebar-accent-foreground: 40 30% 98%;
     --sidebar-border: 222 24% 18%;
     --sidebar-ring: 174 80% 52%;
+
+    /* Compatibility aliases for dashboard/sidebar components. */
+    --sidebar: var(--sidebar-background);
   }
 }
 

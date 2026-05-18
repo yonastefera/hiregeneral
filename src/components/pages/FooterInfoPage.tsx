@@ -144,7 +144,7 @@ const pageContent: Record<FooterInfoPageProps["type"], PageContent> = {
     description:
       "Create clear, searchable listings with title, location, work mode, salary range, skills, and applicant review flow.",
     action: "Start posting",
-    to: "/employers/post-job",
+    to: "/employers/dashboard/post-job",
     audience: "recruiter",
     points: [
       "Company profile and logo",
@@ -186,7 +186,7 @@ const pageContent: Record<FooterInfoPageProps["type"], PageContent> = {
     description:
       "Use structured hiring guides for role scoping, interview plans, compensation clarity, and candidate communication.",
     action: "Post a job",
-    to: "/employers/post-job",
+    to: "/employers/dashboard/post-job",
     audience: "recruiter",
     points: [
       "Role kickoff checklist",

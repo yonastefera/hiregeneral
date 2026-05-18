@@ -26,26 +26,41 @@ type SiteHeaderProps = {
   variant?: "default" | "transparent";
 };
 
+type HeaderNavLink = {
+  label: string;
+  href: string;
+  exact?: boolean;
+};
+
 interface UserProfile {
   full_name: string | null;
   email: string | null;
   user_type: string;
 }
 
-const publicNavLinks = [
+const publicNavLinks: HeaderNavLink[] = [
   { label: "Find jobs", href: "/jobs" },
   { label: "Salaries", href: "/salaries" },
+  { label: "For employers", href: "/employers", exact: true },
 ];
 
-const jobSeekerNavLinks = [
+const jobSeekerNavLinks: HeaderNavLink[] = [
   { label: "Saved", href: "/saved" },
   { label: "Messages", href: "/messages" },
   { label: "Profile", href: "/profile" },
 ];
 
-const recruiterNavLinks = [
-  { label: "For employers", href: "/employers/dashboard" },
+const recruiterNavLinks: HeaderNavLink[] = [
+  { label: "Dashboard", href: "/employers/dashboard" },
 ];
+
+function isHeaderNavLinkActive(pathname: string, link: HeaderNavLink) {
+  if (link.exact) {
+    return pathname === link.href;
+  }
+
+  return pathname === link.href || pathname.startsWith(`${link.href}/`);
+}
 
 export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
   const pathname = usePathname();
@@ -229,9 +244,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
 
         <div className="hidden items-center gap-0.5 rounded-full border border-border/50 bg-background/40 p-1 backdrop-blur-xl md:flex">
           {navLinks.map((link) => {
-            const active =
-              pathname === link.href ||
-              (link.href !== "/" && pathname.startsWith(link.href));
+            const active = isHeaderNavLinkActive(pathname, link);
 
             return (
               <Link
@@ -258,7 +271,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
             <>
               {isRecruiter && (
                 <Button variant="default" size="sm" asChild>
-                  <Link href="/employers/post-job" prefetch={false}>
+                  <Link href="/employers/dashboard/post-job" prefetch={false}>
                     Post a job
                   </Link>
                 </Button>
@@ -424,7 +437,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
               </Button>
 
               <Button variant="default" size="sm" asChild>
-                <Link href="/employers/post-job" prefetch={false}>
+                <Link href="/employers" prefetch={false}>
                   Post a job
                 </Link>
               </Button>
@@ -587,7 +600,10 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
                     </Button>
 
                     <Button asChild>
-                      <Link href="/employers/post-job" prefetch={false}>
+                      <Link
+                        href="/employers/dashboard/post-job"
+                        prefetch={false}
+                      >
                         Post a job
                       </Link>
                     </Button>
@@ -612,7 +628,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
                 </Button>
 
                 <Button asChild>
-                  <Link href="/employers/post-job" prefetch={false}>
+                  <Link href="/employers" prefetch={false}>
                     Post a job
                   </Link>
                 </Button>

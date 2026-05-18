@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
-  BadgeDollarSign,
   BarChart3,
   BriefcaseBusiness,
   Calculator,
@@ -16,9 +15,12 @@ import {
   TrendingUp,
 } from "lucide-react";
 
+import LocationAutocomplete from "@/components/location/LocationAutocomplete";
+import type { LocationSuggestion } from "@/components/location/location-types";
+import KeywordAutocomplete from "@/components/search/KeywordAutocomplete";
+import type { KeywordSuggestion } from "@/components/search/keyword-types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
@@ -105,6 +107,12 @@ function formatInteger(value: number | null) {
   if (value === null) return "Not reported";
 
   return new Intl.NumberFormat("en-US").format(value);
+}
+
+function toSalaryLocationLabel(location: LocationSuggestion) {
+  return (
+    location.label || [location.city, location.state].filter(Boolean).join(", ")
+  ).trim();
 }
 
 export default function SalariesPage() {
@@ -201,11 +209,6 @@ export default function SalariesPage() {
 
         <div className="relative mx-auto grid max-w-7xl gap-10 md:px-6 lg:grid-cols-[1fr_440px] lg:items-center">
           <div>
-            <Badge variant="soft" className="gap-1.5">
-              <BadgeDollarSign className="size-3.5" />
-              Salaries
-            </Badge>
-
             <h1 className="mt-16 max-w-3xl text-balance text-5xl font-semibold tracking-[-0.04em] text-foreground md:text-7xl lg:text-[4.25rem] lg:leading-[0.95]">
               Know your{" "}
               <span className="text-gradient-primary">market rate</span> before
@@ -282,12 +285,16 @@ export default function SalariesPage() {
                 </Label>
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
-                  <Input
+                  <KeywordAutocomplete
                     id="salary-career"
                     value={career}
-                    onChange={(event) => setCareer(event.target.value)}
                     placeholder="Software Engineer"
+                    showClearButton={false}
                     className="h-13 rounded-xl bg-background pl-11 text-base"
+                    onValueChange={setCareer}
+                    onKeywordSelect={(suggestion: KeywordSuggestion) => {
+                      setCareer(suggestion.term);
+                    }}
                   />
                 </div>
               </div>
@@ -301,12 +308,16 @@ export default function SalariesPage() {
                 </Label>
                 <div className="relative">
                   <MapPin className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
-                  <Input
+                  <LocationAutocomplete
                     id="salary-location"
                     value={location}
-                    onChange={(event) => setLocation(event.target.value)}
                     placeholder="Atlanta, GA"
+                    showClearButton={false}
                     className="h-13 rounded-xl bg-background pl-11 text-base"
+                    onValueChange={setLocation}
+                    onLocationSelect={(locationSuggestion) => {
+                      setLocation(toSalaryLocationLabel(locationSuggestion));
+                    }}
                   />
                 </div>
               </div>
@@ -362,7 +373,7 @@ export default function SalariesPage() {
         </div>
       </section>
 
-      <section className="px-4 py-12 md:py-16">
+      <section className="px-4 py-12 md:py-16 mb-20">
         <div className="mx-auto max-w-7xl md:px-6">
           {!result ? (
             <div className="grid gap-5 lg:grid-cols-3">

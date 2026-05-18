@@ -326,7 +326,7 @@ const Index = ({ initialHighlightedJobs }: IndexProps) => {
 
       <section
         aria-labelledby="marketplace-flows-heading"
-        className="mx-auto max-w-7xl px-4 pb-20"
+        className="mx-auto max-w-7xl px-4 pb-20 mb-20"
       >
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -339,8 +339,8 @@ const Index = ({ initialHighlightedJobs }: IndexProps) => {
           </div>
 
           <Button variant="glass" asChild>
-            <Link href="/employers/dashboard" prefetch>
-              Employer dashboard
+            <Link href="/employers" prefetch>
+              For employers
             </Link>
           </Button>
         </div>
