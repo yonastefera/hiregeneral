@@ -16,7 +16,15 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             : "bg-white text-neutral-800"
         }`}
       >
-        {message.text}
+        <p className="whitespace-pre-wrap break-words">{message.text}</p>
+        <time
+          dateTime={message.createdAt}
+          className={`mt-1 block text-[10px] ${
+            isMine ? "text-white/70" : "text-neutral-400"
+          }`}
+        >
+          {message.time}
+        </time>
       </div>
     </div>
   );

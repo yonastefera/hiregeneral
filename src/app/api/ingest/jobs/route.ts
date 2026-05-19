@@ -38,11 +38,16 @@ type SourceResult = {
 
 function missingEnvVars() {
   return [
-    "INGEST_SECRET",
     "SYSTEM_RECRUITER_ID",
     "NEXT_PUBLIC_SUPABASE_URL",
     "SUPABASE_SERVICE_ROLE_KEY",
   ].filter((name) => !process.env[name]);
+}
+
+function expectedAuthHeaders() {
+  return [process.env.INGEST_SECRET, process.env.CRON_SECRET]
+    .filter(Boolean)
+    .map((secret) => `Bearer ${secret}`);
 }
 
 function sourceTimeoutMs() {
@@ -53,9 +58,10 @@ function sourceTimeoutMs() {
     : DEFAULT_SOURCE_TIMEOUT_MS;
 }
 
-export async function POST(request: Request) {
+async function runJobsIngestion(request: Request) {
   try {
     const missing = missingEnvVars();
+    const authHeaders = expectedAuthHeaders();
 
     if (missing.length > 0) {
       return NextResponse.json(
@@ -67,10 +73,19 @@ export async function POST(request: Request) {
       );
     }
 
-    const authHeader = request.headers.get("authorization");
-    const expectedAuthHeader = `Bearer ${process.env.INGEST_SECRET}`;
+    if (authHeaders.length === 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Missing environment variable: INGEST_SECRET or CRON_SECRET",
+        },
+        { status: 500 },
+      );
+    }
 
-    if (authHeader !== expectedAuthHeader) {
+    const authHeader = request.headers.get("authorization");
+
+    if (!authHeaders.includes(authHeader ?? "")) {
       return NextResponse.json(
         {
           ok: false,
@@ -247,4 +262,12 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+}
+
+export async function GET(request: Request) {
+  return runJobsIngestion(request);
+}
+
+export async function POST(request: Request) {
+  return runJobsIngestion(request);
 }

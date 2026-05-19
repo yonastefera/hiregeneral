@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { getEmployerDashboardData } from "@/employer/dashboard/overview/employer-dashboard-data";
 import { DashboardOverviewPage } from "@/employer/dashboard/overview/DashboardOverviewPage";
 
 export const metadata: Metadata = {
@@ -12,6 +13,8 @@ export const metadata: Metadata = {
   },
 };
 
-export default function EmployerDashboardPage() {
-  return <DashboardOverviewPage />;
+export default async function EmployerDashboardPage() {
+  const dashboardData = await getEmployerDashboardData();
+
+  return <DashboardOverviewPage data={dashboardData} />;
 }

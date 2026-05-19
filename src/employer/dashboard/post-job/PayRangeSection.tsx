@@ -8,20 +8,45 @@ import {
   payFrequencyOptions,
 } from "./post-job-content";
 
-export function PayRangeSection() {
+type PayRangeSectionProps = {
+  defaultValues?: {
+    salaryMin?: string;
+    salaryMax?: string;
+    salaryCurrency?: string;
+    payFrequency?: string;
+  };
+};
+
+export function PayRangeSection({ defaultValues }: PayRangeSectionProps) {
   return (
     <PostJobSection title="Pay range" icon={DollarSign}>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <PostJobField label="Minimum">
-          <input placeholder="60,000" className={inputClassName} />
+          <input
+            name="salaryMin"
+            inputMode="numeric"
+            defaultValue={defaultValues?.salaryMin}
+            placeholder="60,000"
+            className={inputClassName}
+          />
         </PostJobField>
 
         <PostJobField label="Maximum">
-          <input placeholder="90,000" className={inputClassName} />
+          <input
+            name="salaryMax"
+            inputMode="numeric"
+            defaultValue={defaultValues?.salaryMax}
+            placeholder="90,000"
+            className={inputClassName}
+          />
         </PostJobField>
 
         <PostJobField label="Currency">
-          <select className={inputClassName}>
+          <select
+            name="salaryCurrency"
+            defaultValue={defaultValues?.salaryCurrency ?? "USD"}
+            className={inputClassName}
+          >
             {currencyOptions.map((currency) => (
               <option key={currency}>{currency}</option>
             ))}
@@ -29,7 +54,11 @@ export function PayRangeSection() {
         </PostJobField>
 
         <PostJobField label="Frequency">
-          <select className={inputClassName}>
+          <select
+            name="payFrequency"
+            defaultValue={defaultValues?.payFrequency ?? "Per year"}
+            className={inputClassName}
+          >
             {payFrequencyOptions.map((frequency) => (
               <option key={frequency}>{frequency}</option>
             ))}

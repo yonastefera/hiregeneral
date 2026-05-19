@@ -1,17 +1,45 @@
-import { MapPin, Search, Star, TrendingUp } from "lucide-react";
+import { Star, TrendingUp } from "lucide-react";
 
 import {
   employerLandingIcons,
   hiringMetrics,
   livePipelineJobs,
 } from "./employer-landing-content";
+import type { HiringCompany } from "./hiring-this-week";
 import { getCompanyInitials } from "./employer-landing-utils";
+import { EmployerTalentSearch } from "./EmployerTalentSearch";
 
 const { CheckCircle2 } = employerLandingIcons;
 
-export function EmployerHero() {
+type EmployerHeroProps = {
+  companies: HiringCompany[];
+};
+
+export function EmployerHero({ companies }: EmployerHeroProps) {
+  const totalOpenRoles = companies.reduce(
+    (total, company) => total + company.roles,
+    0,
+  );
+  const totalNewRoles = companies.reduce(
+    (total, company) => total + company.newRoles,
+    0,
+  );
+  const signalCompanies =
+    companies.length > 0
+      ? companies.slice(0, 3).map((company) => ({
+          company: company.name,
+          role: `${company.roles} open roles`,
+          location: company.industry,
+          applicants: company.newRoles,
+          meta: company.newRoles > 0 ? "new this week" : "active now",
+        }))
+      : livePipelineJobs.map((job) => ({
+          ...job,
+          meta: `${job.ago} ago`,
+        }));
+
   return (
-    <section className="relative overflow-hidden">
+    <section className="relative z-20 overflow-visible">
       <div
         aria-hidden
         className="absolute inset-0 -z-10 bg-[radial-gradient(60%_50%_at_15%_20%,oklch(0.95_0.08_190)_0%,transparent_60%),radial-gradient(50%_40%_at_85%_10%,oklch(0.94_0.08_30)_0%,transparent_60%),radial-gradient(40%_40%_at_50%_90%,oklch(0.96_0.05_150)_0%,transparent_60%)]"
@@ -42,32 +70,7 @@ export function EmployerHero() {
             candidates, and close offers without the spam.
           </p>
 
-          <form className="mt-8 flex max-w-2xl flex-col gap-2 rounded-2xl border border-black/5 bg-white/80 p-2 shadow-sm backdrop-blur sm:flex-row">
-            <label className="flex flex-1 items-center gap-2 px-4">
-              <Search className="size-4 text-neutral-400" />
-              <input
-                placeholder="Role, skill, or department"
-                className="w-full bg-transparent py-3 text-sm outline-none placeholder:text-neutral-400"
-              />
-            </label>
-
-            <div className="hidden w-px bg-black/5 sm:block" />
-
-            <label className="flex flex-1 items-center gap-2 px-4">
-              <MapPin className="size-4 text-neutral-400" />
-              <input
-                placeholder="Location or remote"
-                className="w-full bg-transparent py-3 text-sm outline-none placeholder:text-neutral-400"
-              />
-            </label>
-
-            <button
-              type="button"
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-teal-500 px-6 py-3 font-medium text-white transition hover:bg-teal-600"
-            >
-              Search talent
-            </button>
-          </form>
+          <EmployerTalentSearch />
 
           <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-neutral-500">
             {hiringMetrics.map((metric) => (
@@ -82,7 +85,9 @@ export function EmployerHero() {
         <div className="relative lg:col-span-5">
           <div className="relative rounded-3xl border border-black/5 bg-white p-6 shadow-[0_30px_80px_-30px_rgba(20,30,50,0.25)]">
             <div className="flex items-center justify-between text-xs text-neutral-500">
-              <span className="uppercase tracking-widest">Live pipeline</span>
+              <span className="uppercase tracking-widest">
+                Live hiring signal
+              </span>
               <span className="inline-flex items-center gap-1 text-emerald-600">
                 <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
                 open
@@ -90,16 +95,18 @@ export function EmployerHero() {
             </div>
 
             <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-semibold tracking-tight">284</span>
+              <span className="text-3xl font-semibold tracking-tight">
+                {totalOpenRoles > 0 ? totalOpenRoles : 284}
+              </span>
               <span className="text-sm text-neutral-500">
-                qualified applicants this week
+                open roles across active hiring teams
               </span>
             </div>
 
             <div className="mt-6 space-y-3">
-              {livePipelineJobs.map((job) => (
+              {signalCompanies.map((job) => (
                 <article
-                  key={job.role}
+                  key={`${job.company}-${job.role}`}
                   className="flex items-center gap-3 rounded-xl border border-black/5 p-3 transition hover:bg-neutral-50"
                 >
                   <div className="grid size-9 place-items-center rounded-lg bg-linear-to-br from-neutral-100 to-neutral-200 text-[10px] font-semibold text-neutral-600">
@@ -120,10 +127,10 @@ export function EmployerHero() {
 
                   <div className="text-right">
                     <div className="text-sm font-semibold">
-                      +{job.applicants}
+                      {job.applicants > 0 ? `+${job.applicants}` : "Open"}
                     </div>
                     <div className="text-[11px] text-neutral-400">
-                      {job.ago} ago
+                      {job.meta}
                     </div>
                   </div>
                 </article>
@@ -134,8 +141,10 @@ export function EmployerHero() {
           <div className="absolute -left-6 -top-6 hidden items-center gap-2 rounded-2xl border border-black/5 bg-white px-4 py-3 shadow-lg md:flex">
             <TrendingUp className="size-4 text-emerald-600" />
             <div>
-              <div className="text-[11px] text-neutral-500">Time-to-hire</div>
-              <div className="text-sm font-semibold">−38% vs average</div>
+              <div className="text-[11px] text-neutral-500">Fresh roles</div>
+              <div className="text-sm font-semibold">
+                +{totalNewRoles} this week
+              </div>
             </div>
           </div>
 

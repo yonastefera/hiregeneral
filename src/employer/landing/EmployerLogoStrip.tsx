@@ -3,7 +3,7 @@ import { trustedBrands } from "./employer-landing-content";
 export function EmployerLogoStrip() {
   return (
     <section className="mx-auto max-w-7xl px-6 pb-16">
-      <div className="text-center text-[11px] uppercase tracking-[0.2em] text-neutral-500">
+      <div className="pt-14 text-center text-[11px] uppercase tracking-[0.2em] text-neutral-500">
         Trusted by hiring teams at
       </div>
 

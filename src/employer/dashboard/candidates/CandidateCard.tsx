@@ -29,10 +29,12 @@ export function CandidateCard({ candidate }: CandidateCardProps) {
           <div className="flex items-center gap-2">
             <h2 className="text-[14px] font-semibold">{candidate.name}</h2>
 
-            <span className="inline-flex items-center gap-1 rounded-md bg-gradient-to-r from-teal-50 to-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
-              <Star className="h-2.5 w-2.5" />
-              {candidate.match}% match
-            </span>
+            {candidate.match ? (
+              <span className="inline-flex items-center gap-1 rounded-md bg-gradient-to-r from-teal-50 to-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                <Star className="h-2.5 w-2.5" />
+                {candidate.match}% match
+              </span>
+            ) : null}
           </div>
 
           <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-neutral-500">
@@ -69,12 +71,23 @@ export function CandidateCard({ candidate }: CandidateCardProps) {
           {candidate.status}
         </span>
 
-        <button
-          type="button"
-          className="rounded-lg bg-neutral-100 px-3.5 py-2 text-[12px] font-medium text-neutral-700 transition hover:bg-neutral-200/60"
-        >
-          View
-        </button>
+        {candidate.resumeUrl ? (
+          <a
+            href={candidate.resumeUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-lg bg-neutral-100 px-3.5 py-2 text-[12px] font-medium text-neutral-700 transition hover:bg-neutral-200/60"
+          >
+            Resume
+          </a>
+        ) : (
+          <button
+            type="button"
+            className="rounded-lg bg-neutral-100 px-3.5 py-2 text-[12px] font-medium text-neutral-700 transition hover:bg-neutral-200/60"
+          >
+            View
+          </button>
+        )}
 
         <button
           type="button"

@@ -1,9 +1,15 @@
-export type PaymentCard = {
-  brand: string;
-  last: string;
-  exp: string;
-  primary: boolean;
+export type Receipt = {
+  invoiceNumber: string;
+  date: string;
+  description: string;
+  amountCents: number;
+  currency: string;
+  pdfUrl: string | null;
+  hostedUrl: string | null;
 };
+
+export const billingInputClassName =
+  "h-9 w-full rounded-lg bg-white px-3 text-[13px] outline-none ring-1 ring-black/[0.04] transition-all focus:ring-2 focus:ring-emerald-400/40";
 
 export type PaymentCardFormState = {
   name: string;
@@ -12,28 +18,6 @@ export type PaymentCardFormState = {
   cvc: string;
 };
 
-export type Receipt = {
-  id: string;
-  date: string;
-  description: string;
-  amount: string;
-};
-
-export const initialPaymentCards: PaymentCard[] = [
-  {
-    brand: "Visa",
-    last: "4242",
-    exp: "08/28",
-    primary: true,
-  },
-  {
-    brand: "Mastercard",
-    last: "1187",
-    exp: "11/27",
-    primary: false,
-  },
-];
-
 export const emptyPaymentCardForm: PaymentCardFormState = {
   name: "",
   number: "",
@@ -41,71 +25,31 @@ export const emptyPaymentCardForm: PaymentCardFormState = {
   cvc: "",
 };
 
-export const currentPlanStats = [
-  {
-    label: "Active jobs",
-    value: "5 / 25",
-  },
-  {
-    label: "Account credit",
-    value: "$120.00",
-  },
-  {
-    label: "Boost credits",
-    value: "3",
-  },
-  {
-    label: "Discounts",
-    value: "10% annual",
-  },
-];
+export function formatMoney(cents: number, currency = "usd") {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  }).format(cents / 100);
+}
 
-export const receipts: Receipt[] = [
-  {
-    id: "INV-2104",
-    date: "May 1, 2026",
-    description: "Growth plan — Monthly",
-    amount: "$299.00",
-  },
-  {
-    id: "INV-2087",
-    date: "Apr 1, 2026",
-    description: "Growth plan — Monthly",
-    amount: "$299.00",
-  },
-  {
-    id: "INV-2061",
-    date: "Mar 12, 2026",
-    description: "10-Day Boost",
-    amount: "$45.00",
-  },
-  {
-    id: "INV-2040",
-    date: "Mar 1, 2026",
-    description: "Growth plan — Monthly",
-    amount: "$299.00",
-  },
-];
+export function formatRenewalDate(value: string | null) {
+  if (!value) return "Not scheduled";
 
-export const billingInputClassName =
-  "h-9 w-full rounded-lg bg-white px-3 text-[13px] outline-none ring-1 ring-black/[0.04] transition-all focus:ring-2 focus:ring-emerald-400/40";
+  const date = new Date(value);
 
-export function detectCardBrand(cardNumber: string) {
-  const digits = cardNumber.replace(/\s/g, "");
+  if (Number.isNaN(date.getTime())) return "Not scheduled";
 
-  if (digits.startsWith("4")) {
-    return "Visa";
-  }
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
 
-  if (/^5[1-5]/.test(digits)) {
-    return "Mastercard";
-  }
-
-  if (/^3[47]/.test(digits)) {
-    return "Amex";
-  }
-
-  return "Card";
+export function formatSubscriptionStatus(value: string) {
+  return value
+    .replace(/_/g, " ")
+    .replace(/^\w/, (letter) => letter.toUpperCase());
 }
 
 export function formatCardNumber(value: string) {

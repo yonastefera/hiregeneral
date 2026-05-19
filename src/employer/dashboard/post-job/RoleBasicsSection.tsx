@@ -15,6 +15,13 @@ type RoleBasicsSectionProps = {
   onDistanceChange: (distance: number) => void;
   employmentType: string;
   onEmploymentTypeChange: (employmentType: string) => void;
+  defaultValues?: {
+    title?: string;
+    companyName?: string;
+    location?: string;
+    streetAddress?: string;
+    includeRelocation?: boolean;
+  };
 };
 
 export function RoleBasicsSection({
@@ -24,25 +31,38 @@ export function RoleBasicsSection({
   onDistanceChange,
   employmentType,
   onEmploymentTypeChange,
+  defaultValues,
 }: RoleBasicsSectionProps) {
   return (
     <PostJobSection title="Role basics" icon={Building2}>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <PostJobField label="Job title">
           <input
+            name="title"
+            required
+            defaultValue={defaultValues?.title}
             placeholder="e.g. Senior Product Designer"
             className={inputClassName}
           />
         </PostJobField>
 
         <PostJobField label="Hiring company">
-          <input placeholder="Acme Inc." className={inputClassName} />
+          <input
+            name="companyName"
+            required
+            defaultValue={defaultValues?.companyName}
+            placeholder="Acme Inc."
+            className={inputClassName}
+          />
         </PostJobField>
 
         <PostJobField label="Job location">
           <div className="relative">
             <MapPin className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" />
             <input
+              name="location"
+              required
+              defaultValue={defaultValues?.location}
               placeholder="Atlanta, GA"
               className={`${inputClassName} pl-8`}
             />
@@ -50,7 +70,12 @@ export function RoleBasicsSection({
         </PostJobField>
 
         <PostJobField label="Street address (optional)">
-          <input placeholder="123 Main Street" className={inputClassName} />
+          <input
+            name="streetAddress"
+            defaultValue={defaultValues?.streetAddress}
+            placeholder="123 Main Street"
+            className={inputClassName}
+          />
         </PostJobField>
       </div>
 
@@ -92,8 +117,9 @@ export function RoleBasicsSection({
 
           <label className="mt-1.5 flex items-center gap-1.5 text-[11px] text-neutral-600">
             <input
+              name="includeRelocation"
               type="checkbox"
-              defaultChecked
+              defaultChecked={defaultValues?.includeRelocation ?? true}
               className="h-3 w-3 rounded text-emerald-500"
             />
             Include candidates willing to relocate

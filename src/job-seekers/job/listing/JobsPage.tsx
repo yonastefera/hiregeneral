@@ -568,7 +568,7 @@ export default function JobsPage() {
   const resultEnd = Math.min(currentPage * PAGE_SIZE, totalJobs);
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="min-h-screen overflow-x-hidden bg-background">
       <section
         className="relative overflow-visible bg-hero-gradient px-4 py-12"
         aria-labelledby="jobs-page-title"
@@ -576,7 +576,7 @@ export default function JobsPage() {
         <div className="pointer-events-none absolute -top-24 right-[-10%] size-72 rounded-full bg-accent/15 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 left-[-10%] size-72 rounded-full bg-primary/15 blur-3xl" />
 
-        <div className="relative mx-auto max-w-368 px-4 md:px-6 xl:px-8">
+        <div className="relative mx-auto w-full max-w-368 px-4 md:px-6 xl:px-8">
           <h1
             id="jobs-page-title"
             className="mt-4 text-balance text-4xl font-bold tracking-tight md:text-5xl"
@@ -675,7 +675,7 @@ export default function JobsPage() {
       </section>
 
       <section
-        className="mx-auto grid max-w-368 gap-8 px-4 py-8 md:px-6 lg:grid-cols-[340px_minmax(0,1fr)] xl:px-8 mb-20"
+        className="mx-auto mb-20 grid w-full max-w-368 gap-8 px-4 py-8 md:px-6 lg:grid-cols-[340px_minmax(0,1fr)] xl:px-8"
         aria-label="Job search results and filters"
       >
         <aside
@@ -775,7 +775,10 @@ export default function JobsPage() {
           </div>
         </aside>
 
-        <section className="space-y-5" aria-labelledby="job-results-heading">
+        <section
+          className="min-w-0 space-y-5"
+          aria-labelledby="job-results-heading"
+        >
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p
@@ -853,7 +856,7 @@ export default function JobsPage() {
             </div>
           ) : (
             <>
-              <ul className="space-y-4" aria-label="Job listings">
+              <ul className="min-w-0 space-y-4" aria-label="Job listings">
                 {cardJobs.map((job) => (
                   <li key={job.id}>
                     <JobCard

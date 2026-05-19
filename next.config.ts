@@ -41,6 +41,11 @@ const nextConfig: NextConfig = {
         hostname: "svzsorgmgvvmikrwboaq.supabase.co",
         pathname: "/storage/v1/object/public/avatars/**",
       },
+      {
+        protocol: "https",
+        hostname: "svzsorgmgvvmikrwboaq.supabase.co",
+        pathname: "/storage/v1/object/public/company-logos/**",
+      },
     ],
   },
   poweredByHeader: false,

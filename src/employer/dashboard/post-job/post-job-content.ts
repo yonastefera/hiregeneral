@@ -2,6 +2,36 @@ export type PostJobMode = "new" | "duplicate";
 
 export type RemoteOption = "yes" | "no";
 
+export type ScreeningQuestion = {
+  id: string;
+  question: string;
+  required: boolean;
+};
+
+export type EditableJob = {
+  id: string;
+  slug: string | null;
+  status: "draft" | "published" | "closed";
+  title: string;
+  companyName: string;
+  location: string;
+  streetAddress: string;
+  remote: RemoteOption;
+  distance: number;
+  includeRelocation: boolean;
+  employmentType: string;
+  description: string;
+  skills: string;
+  benefits: string[];
+  salaryMin: string;
+  salaryMax: string;
+  salaryCurrency: string;
+  payFrequency: string;
+  boostId: string;
+  notificationEmail: string;
+  screeningQuestions: ScreeningQuestion[];
+};
+
 export type BoostOption = {
   id: string;
   label: string;

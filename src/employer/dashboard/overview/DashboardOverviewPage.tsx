@@ -5,8 +5,13 @@ import { DashboardAiInsight } from "./DashboardAiInsight";
 import { DashboardCurrentRoles } from "./DashboardCurrentRoles";
 import { DashboardRecentActivity } from "./DashboardRecentActivity";
 import { DashboardStatCards } from "./DashboardStatCards";
+import type { EmployerDashboardData } from "./employer-dashboard-data";
 
-export function DashboardOverviewPage() {
+type DashboardOverviewPageProps = {
+  data: EmployerDashboardData;
+};
+
+export function DashboardOverviewPage({ data }: DashboardOverviewPageProps) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -28,14 +33,14 @@ export function DashboardOverviewPage() {
         </Link>
       </div>
 
-      <DashboardStatCards />
+      <DashboardStatCards stats={data.stats} />
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(360px,1fr)]">
-        <DashboardCurrentRoles />
+        <DashboardCurrentRoles jobs={data.jobs} />
 
         <div className="space-y-4">
           <DashboardAiInsight />
-          <DashboardRecentActivity />
+          <DashboardRecentActivity activity={data.recentActivity} />
         </div>
       </div>
     </div>

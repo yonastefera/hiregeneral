@@ -1,4 +1,5 @@
-import { Eye, MoreHorizontal, Users } from "lucide-react";
+import Link from "next/link";
+import { ArrowUpRight, Edit3, Eye, ShieldQuestion, Users } from "lucide-react";
 
 import type { EmployerJob, JobStatus } from "./jobs-content";
 
@@ -12,7 +13,27 @@ const statusClassNames: Record<JobStatus, string> = {
   Closed: "bg-neutral-100 text-neutral-600",
 };
 
+function formatDaysLive(job: EmployerJob) {
+  if (job.status === "Draft" || job.posted === "—") return "—";
+  if (job.daysLive === 0) return "Today";
+
+  return `${job.daysLive}d`;
+}
+
 export function JobsTable({ jobs }: JobsTableProps) {
+  if (jobs.length === 0) {
+    return (
+      <div className="px-5 py-12 text-center">
+        <h2 className="text-sm font-semibold text-neutral-900">
+          No jobs match this view
+        </h2>
+        <p className="mt-1 text-sm text-neutral-500">
+          Try another status, search term, or post a new role.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -33,11 +54,16 @@ export function JobsTable({ jobs }: JobsTableProps) {
         <tbody>
           {jobs.map((job) => (
             <tr
-              key={job.title}
+              key={job.id}
               className="border-t border-neutral-100 transition-colors hover:bg-neutral-50/60"
             >
               <td className="px-5 py-3.5 text-[13px] font-semibold">
-                {job.title}
+                <div>
+                  <div>{job.title}</div>
+                  <div className="mt-0.5 text-[11px] font-normal text-neutral-500">
+                    {job.location} · {job.employmentType}
+                  </div>
+                </div>
               </td>
 
               <td className="px-5 py-3.5 text-[13px] text-neutral-600">
@@ -45,7 +71,7 @@ export function JobsTable({ jobs }: JobsTableProps) {
               </td>
 
               <td className="px-5 py-3.5 text-[13px] text-neutral-600">
-                {job.daysLive || "—"}
+                {formatDaysLive(job)}
               </td>
 
               <td className="px-5 py-3.5 text-[13px] text-neutral-600">
@@ -73,13 +99,30 @@ export function JobsTable({ jobs }: JobsTableProps) {
               </td>
 
               <td className="px-5 py-3.5 text-right">
-                <button
-                  type="button"
-                  aria-label={`Open actions for ${job.title}`}
-                  className="grid h-7 w-7 place-items-center rounded-md text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </button>
+                <div className="flex justify-end gap-1">
+                  <Link
+                    href={`/employers/dashboard/post-job?jobId=${job.id}`}
+                    aria-label={`Edit ${job.title}`}
+                    title="Edit job and screening questions"
+                    className="grid h-7 w-7 place-items-center rounded-md text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
+                  >
+                    {job.status === "Draft" ? (
+                      <Edit3 className="h-4 w-4" />
+                    ) : (
+                      <ShieldQuestion className="h-4 w-4" />
+                    )}
+                  </Link>
+
+                  {job.slug && job.status === "Active" ? (
+                    <Link
+                      href={`/jobs/${job.slug}`}
+                      aria-label={`View ${job.title}`}
+                      className="grid h-7 w-7 place-items-center rounded-md text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
+                    >
+                      <ArrowUpRight className="h-4 w-4" />
+                    </Link>
+                  ) : null}
+                </div>
               </td>
             </tr>
           ))}

@@ -25,7 +25,7 @@ export type DashboardNavGroup = {
 
 export const dashboardNavGroups: DashboardNavGroup[] = [
   {
-    label: "Overview",
+    label: "",
     items: [
       {
         href: "/employers/dashboard",

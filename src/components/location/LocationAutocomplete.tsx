@@ -180,7 +180,7 @@ export default function LocationAutocomplete({
       )}
 
       {shouldShowDropdown && (
-        <div className="absolute left-0 top-full z-9999 mt-2 w-full min-w-full overflow-hidden rounded-xl border border-[#f2f2f2] bg-white text-sm font-normal leading-5 tracking-normal text-foreground shadow-lg">
+        <div className="absolute left-0 top-full z-[9999] mt-2 w-full min-w-full overflow-hidden rounded-xl border border-[#f2f2f2] bg-white text-sm font-normal leading-5 tracking-normal text-foreground shadow-lg">
           <ul
             id={`${id}-suggestions`}
             className="max-h-64 w-full overflow-y-auto p-1"

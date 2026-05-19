@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { CompanyPage } from "@/employer/dashboard/company/CompanyPage";
+import { getEmployerCompanyProfile } from "@/employer/dashboard/company/employer-company-data";
 
 export const metadata: Metadata = {
   title: "Company Profile — HireGeneral",
@@ -11,6 +12,8 @@ export const metadata: Metadata = {
   },
 };
 
-export default function EmployerCompanyRoute() {
-  return <CompanyPage />;
+export default async function EmployerCompanyRoute() {
+  const company = await getEmployerCompanyProfile();
+
+  return <CompanyPage initialCompany={company} />;
 }

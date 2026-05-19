@@ -1,7 +1,9 @@
+import type { InviteJobOption } from "./invite-content";
+
 type InviteToolbarProps = {
   selectedJob: string;
   onSelectedJobChange: (value: string) => void;
-  jobOptions: readonly string[];
+  jobOptions: InviteJobOption[];
   recommendationCount: number;
 };
 
@@ -22,8 +24,8 @@ export function InviteToolbar({
         aria-label="Select job for candidate recommendations"
       >
         {jobOptions.map((jobOption) => (
-          <option key={jobOption} value={jobOption}>
-            {jobOption}
+          <option key={jobOption.id} value={jobOption.id}>
+            {jobOption.title}
           </option>
         ))}
       </select>

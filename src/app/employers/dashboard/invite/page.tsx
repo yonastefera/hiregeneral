@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { getEmployerInviteData } from "@/employer/dashboard/invite/employer-invite-data";
 import { InvitePage } from "@/employer/dashboard/invite/InvitePage";
 
 export const metadata: Metadata = {
@@ -12,6 +13,8 @@ export const metadata: Metadata = {
   },
 };
 
-export default function EmployerInviteRoute() {
-  return <InvitePage />;
+export default async function EmployerInviteRoute() {
+  const data = await getEmployerInviteData();
+
+  return <InvitePage initialData={data} />;
 }

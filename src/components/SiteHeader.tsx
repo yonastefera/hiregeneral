@@ -232,17 +232,17 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
           : "border-b border-transparent bg-transparent",
       )}
     >
-      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 md:px-6">
+      <nav className="mx-auto grid h-16 max-w-[90rem] grid-cols-[auto_auto] items-center justify-between gap-4 px-4 md:relative md:grid-cols-[1fr_auto_1fr] md:px-6">
         <Link
           href="/"
           prefetch={false}
           aria-label="HireGeneral home"
-          className="flex shrink-0 items-center"
+          className="flex shrink-0 items-center md:justify-self-start"
         >
           <BrandLogo />
         </Link>
 
-        <div className="hidden items-center gap-0.5 rounded-full border border-border/50 bg-background/40 p-1 backdrop-blur-xl md:flex">
+        <div className="hidden items-center gap-0.5 justify-self-center rounded-full border border-border/50 bg-background/40 p-1 backdrop-blur-xl md:flex">
           {navLinks.map((link) => {
             const active = isHeaderNavLinkActive(pathname, link);
 
@@ -264,7 +264,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
           })}
         </div>
 
-        <div className="hidden items-center gap-1 md:flex">
+        <div className="hidden items-center justify-end gap-1 justify-self-end md:absolute md:right-6 md:flex">
           {authLoading ? (
             <div className="h-9 w-45" aria-hidden="true" />
           ) : user ? (
@@ -445,7 +445,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
           )}
         </div>
 
-        <div className="flex items-center gap-1 md:hidden">
+        <div className="flex items-center gap-1 justify-self-end md:hidden">
           {!authLoading && isJobSeeker && (
             <IconLink
               href="/notifications"

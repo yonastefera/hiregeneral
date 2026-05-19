@@ -41,6 +41,12 @@ export function MessageThreadButton({
         <div className="mt-0.5 truncate text-[11px] text-neutral-600">
           {thread.preview}
         </div>
+
+        {thread.jobTitle ? (
+          <div className="mt-1 truncate text-[10px] text-neutral-400">
+            {thread.jobTitle}
+          </div>
+        ) : null}
       </div>
 
       {thread.unread > 0 ? (

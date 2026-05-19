@@ -8,28 +8,115 @@ import { InviteMessageOverlay } from "./InviteMessageOverlay";
 import { InviteToolbar } from "./InviteToolbar";
 import {
   defaultInviteMessage,
-  inviteJobOptions,
-  recommendedCandidates,
+  type InvitePageData,
   type RecommendedCandidate,
 } from "./invite-content";
 
-export function InvitePage() {
-  const [selectedJob, setSelectedJob] = useState("Senior Product Designer");
+type InvitePageProps = {
+  initialData: InvitePageData;
+};
+
+export function InvitePage({ initialData }: InvitePageProps) {
+  const [selectedJob, setSelectedJob] = useState(
+    initialData.selectedJobId ?? "",
+  );
+  const [data, setData] = useState(initialData);
   const [activeCandidate, setActiveCandidate] =
     useState<RecommendedCandidate | null>(null);
   const [sentInvites, setSentInvites] = useState<string[]>([]);
   const [message, setMessage] = useState(defaultInviteMessage);
+  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function sendInvite(candidate: RecommendedCandidate) {
-    setSentInvites((currentInvites) => {
-      if (currentInvites.includes(candidate.name)) {
-        return currentInvites;
+  async function loadRecommendations(jobId: string) {
+    setSelectedJob(jobId);
+    setLoading(true);
+    setError(null);
+
+    try {
+      const params = new URLSearchParams({ jobId });
+      const response = await fetch(`/api/employers/invite?${params}`);
+      const payload = (await response.json()) as
+        | InvitePageData
+        | {
+            error?: string;
+          };
+
+      if (!response.ok) {
+        throw new Error(
+          "error" in payload && payload.error
+            ? payload.error
+            : "Could not load recommendations.",
+        );
       }
 
-      return [...currentInvites, candidate.name];
-    });
+      setData(payload as InvitePageData);
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Could not load recommendations.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
 
-    setActiveCandidate(null);
+  async function sendInvite(candidate: RecommendedCandidate) {
+    if (!selectedJob) {
+      setError("Select a job before sending an invite.");
+      return;
+    }
+
+    setSending(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/employers/invite", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          candidateId: candidate.id,
+          jobId: selectedJob,
+          message,
+        }),
+      });
+      const payload = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Could not send invite.");
+      }
+
+      setSentInvites((currentInvites) => {
+        if (currentInvites.includes(candidate.id)) {
+          return currentInvites;
+        }
+
+        return [...currentInvites, candidate.id];
+      });
+      setData((currentData) => ({
+        ...currentData,
+        recommendedCandidates: currentData.recommendedCandidates.map(
+          (currentCandidate) =>
+            currentCandidate.id === candidate.id
+              ? { ...currentCandidate, invited: true }
+              : currentCandidate,
+        ),
+      }));
+
+      setActiveCandidate(null);
+    } catch (sendError) {
+      setError(
+        sendError instanceof Error
+          ? sendError.message
+          : "Could not send invite.",
+      );
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -46,26 +133,44 @@ export function InvitePage() {
 
         <div className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-teal-50 to-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
           <Sparkles className="h-3 w-3" />
-          AI-matched
+          Skill-ranked
         </div>
       </div>
 
       <InviteToolbar
         selectedJob={selectedJob}
-        onSelectedJobChange={setSelectedJob}
-        jobOptions={inviteJobOptions}
-        recommendationCount={recommendedCandidates.length}
+        onSelectedJobChange={loadRecommendations}
+        jobOptions={data.jobs}
+        recommendationCount={data.recommendedCandidates.length}
       />
 
-      <div className="space-y-2">
-        {recommendedCandidates.map((candidate) => (
+      {error ? (
+        <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {error}
+        </div>
+      ) : null}
+
+      <div className={loading ? "space-y-2 opacity-60" : "space-y-2"}>
+        {data.recommendedCandidates.map((candidate) => (
           <InviteCandidateCard
-            key={candidate.name}
+            key={candidate.id}
             candidate={candidate}
-            invited={sentInvites.includes(candidate.name)}
+            invited={candidate.invited || sentInvites.includes(candidate.id)}
             onConnect={() => setActiveCandidate(candidate)}
           />
         ))}
+
+        {!loading && data.recommendedCandidates.length === 0 ? (
+          <div className="rounded-2xl bg-white px-5 py-10 text-center">
+            <h2 className="text-sm font-semibold text-neutral-900">
+              No recommendations yet
+            </h2>
+            <p className="mt-1 text-sm text-neutral-500">
+              Publish a job and make sure candidates have public profiles to
+              invite them here.
+            </p>
+          </div>
+        ) : null}
       </div>
 
       {activeCandidate ? (
@@ -74,7 +179,11 @@ export function InvitePage() {
           message={message}
           onMessageChange={setMessage}
           onClose={() => setActiveCandidate(null)}
-          onSendInvite={() => sendInvite(activeCandidate)}
+          onSendInvite={() => {
+            if (!sending) {
+              sendInvite(activeCandidate);
+            }
+          }}
         />
       ) : null}
     </div>

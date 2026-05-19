@@ -1,9 +1,13 @@
-import { dashboardStats } from "./dashboard-overview-content";
+import type { DashboardStat } from "./dashboard-overview-content";
 
-export function DashboardStatCards() {
+type DashboardStatCardsProps = {
+  stats: DashboardStat[];
+};
+
+export function DashboardStatCards({ stats }: DashboardStatCardsProps) {
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-      {dashboardStats.map((stat) => {
+      {stats.map((stat) => {
         const Icon = stat.icon;
 
         return (
@@ -13,15 +17,17 @@ export function DashboardStatCards() {
                 <Icon className="h-4 w-4" />
               </div>
 
-              <span
-                className={`text-[11px] font-semibold ${
-                  stat.changeTone === "positive"
-                    ? "text-emerald-600"
-                    : "text-rose-500"
-                }`}
-              >
-                {stat.change}
-              </span>
+              {stat.change ? (
+                <span
+                  className={`text-[11px] font-semibold ${
+                    stat.changeTone === "positive"
+                      ? "text-emerald-600"
+                      : "text-rose-500"
+                  }`}
+                >
+                  {stat.change}
+                </span>
+              ) : null}
             </div>
 
             <div className="mt-4 text-2xl font-semibold tracking-tight">

@@ -22,7 +22,6 @@ const JOB_SEEKER_ROUTES = [
 ];
 
 const EMPLOYER_ROUTES = [
-  "/employers",
   "/employers/dashboard",
   "/employers/dashboard/post-job",
 ];

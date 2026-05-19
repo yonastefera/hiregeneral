@@ -1,20 +1,28 @@
-import { FileText, MapPin, MessageSquare } from "lucide-react";
+import { Check, FileText, MapPin, Send } from "lucide-react";
 
 import type { ResumeMatch } from "./database-content";
 
 type ResumeMatchCardProps = {
   candidate: ResumeMatch;
   onViewResume: () => void;
+  onInvite: () => void;
+  inviting: boolean;
+  canInvite: boolean;
 };
 
 export function ResumeMatchCard({
   candidate,
   onViewResume,
+  onInvite,
+  inviting,
+  canInvite,
 }: ResumeMatchCardProps) {
   const initials = candidate.name
     .split(" ")
     .map((namePart) => namePart[0])
-    .join("");
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <article className="rounded-2xl bg-white p-4 transition-transform hover:scale-[1.01]">
@@ -44,6 +52,12 @@ export function ResumeMatchCard({
             Open to offers
           </span>
         ) : null}
+
+        {candidate.resumeViewUrl ? (
+          <span className="ml-1 rounded-md bg-teal-50 px-1.5 py-0.5 text-[10px] font-medium text-teal-700">
+            Resume
+          </span>
+        ) : null}
       </div>
 
       <div className="mt-2.5 flex flex-wrap gap-1">
@@ -64,15 +78,26 @@ export function ResumeMatchCard({
           className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-gradient-to-b from-teal-500 to-emerald-600 px-3 py-2 text-[12px] font-semibold text-white"
         >
           <FileText className="h-3.5 w-3.5" />
-          View resume
+          View profile
         </button>
 
         <button
           type="button"
-          className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-neutral-100 px-3 py-2 text-[12px] font-medium text-neutral-700 transition hover:bg-neutral-200/60"
+          disabled={!canInvite || candidate.invited || inviting}
+          onClick={onInvite}
+          className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-neutral-100 px-3 py-2 text-[12px] font-medium text-neutral-700 transition hover:bg-neutral-200/60 disabled:cursor-not-allowed disabled:opacity-55"
         >
-          <MessageSquare className="h-3.5 w-3.5" />
-          Message
+          {candidate.invited ? (
+            <>
+              <Check className="h-3.5 w-3.5" />
+              Invited
+            </>
+          ) : (
+            <>
+              <Send className="h-3.5 w-3.5" />
+              {inviting ? "Sending..." : "Invite"}
+            </>
+          )}
         </button>
       </div>
     </article>

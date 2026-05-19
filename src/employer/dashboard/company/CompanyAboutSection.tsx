@@ -1,15 +1,17 @@
 import { Sparkles } from "lucide-react";
 
 import { CompanyField } from "./CompanyField";
-import type { companyProfile } from "./company-content";
-
-type Company = typeof companyProfile;
+import type { CompanyProfile } from "./company-content";
 
 type CompanyAboutSectionProps = {
-  company: Company;
+  company: CompanyProfile;
+  onCompanyChange: (company: CompanyProfile) => void;
 };
 
-export function CompanyAboutSection({ company }: CompanyAboutSectionProps) {
+export function CompanyAboutSection({
+  company,
+  onCompanyChange,
+}: CompanyAboutSectionProps) {
   return (
     <section className="rounded-2xl bg-white p-5">
       <h3 className="mb-3 text-[14px] font-semibold">About</h3>
@@ -17,8 +19,12 @@ export function CompanyAboutSection({ company }: CompanyAboutSectionProps) {
       <CompanyField label="Mission & culture">
         <textarea
           rows={7}
-          defaultValue={company.about}
+          value={company.about}
+          onChange={(event) =>
+            onCompanyChange({ ...company, about: event.target.value })
+          }
           className={`${inputClassName} min-h-40 resize-y py-2`}
+          placeholder="Tell candidates what your team builds, how you work, and why the role matters."
         />
       </CompanyField>
 

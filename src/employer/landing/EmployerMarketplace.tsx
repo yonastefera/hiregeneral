@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 
 import {
@@ -5,12 +6,34 @@ import {
   featuredCompanies,
   marketplaceFilters,
 } from "./employer-landing-content";
+import type { HiringCompany } from "./hiring-this-week";
 
 const { Building2, Briefcase } = employerLandingIcons;
 
-export function EmployerMarketplace() {
+type EmployerMarketplaceProps = {
+  companies: HiringCompany[];
+};
+
+const fallbackCompanies: HiringCompany[] = featuredCompanies.map((company) => ({
+  ...company,
+  newRoles: 0,
+  logoUrl: null,
+  website: null,
+}));
+
+function companyJobsHref(companyName: string) {
+  const params = new URLSearchParams({
+    q: companyName,
+  });
+
+  return `/jobs?${params.toString()}`;
+}
+
+export function EmployerMarketplace({ companies }: EmployerMarketplaceProps) {
+  const displayCompanies = companies.length > 0 ? companies : fallbackCompanies;
+
   return (
-    <section id="companies" className="bg-white">
+    <section id="companies" className="bg-[oklch(0.99_0.01_180)]">
       <div className="mx-auto max-w-7xl px-6 py-24">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div>
@@ -47,7 +70,7 @@ export function EmployerMarketplace() {
         </div>
 
         <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {featuredCompanies.map((company) => (
+          {displayCompanies.map((company) => (
             <article
               key={company.name}
               className="group relative rounded-3xl border border-black/5 bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:-translate-y-1 hover:shadow-[0_24px_70px_-24px_rgba(20,30,50,0.24)]"
@@ -62,7 +85,9 @@ export function EmployerMarketplace() {
                 </div>
 
                 <span className="rounded-full border border-black/5 bg-white/80 px-2.5 py-1 text-[10px] uppercase tracking-widest text-neutral-700 backdrop-blur">
-                  {company.tag}
+                  {company.newRoles > 0
+                    ? `${company.newRoles} new`
+                    : company.tag}
                 </span>
               </div>
 
@@ -85,13 +110,13 @@ export function EmployerMarketplace() {
                   </span>
                 </div>
 
-                <button
-                  type="button"
+                <Link
+                  href={companyJobsHref(company.name)}
                   className="inline-flex items-center gap-1 text-sm font-medium text-teal-700 transition hover:text-teal-800"
                 >
-                  View profile
+                  View open roles
                   <ChevronRight className="size-4" />
-                </button>
+                </Link>
               </div>
             </article>
           ))}

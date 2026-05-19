@@ -1,15 +1,21 @@
 import { Filter, Search } from "lucide-react";
 
+import type { CandidateJobFilter } from "./candidates-content";
+
 type CandidatesToolbarProps = {
-  filters: readonly string[];
+  filters: CandidateJobFilter[];
   selectedJob: string;
   onSelectedJobChange: (value: string) => void;
+  query: string;
+  onQueryChange: (value: string) => void;
 };
 
 export function CandidatesToolbar({
   filters,
   selectedJob,
   onSelectedJobChange,
+  query,
+  onQueryChange,
 }: CandidatesToolbarProps) {
   return (
     <div className="rounded-2xl bg-white p-3">
@@ -18,6 +24,8 @@ export function CandidatesToolbar({
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" />
 
           <input
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
             placeholder="Search candidates by name, skill or location"
             className="h-10 w-full rounded-lg bg-neutral-50 pl-9 pr-3 text-[13px] outline-none transition focus:bg-white focus:ring-2 focus:ring-emerald-400/40"
           />
@@ -30,8 +38,8 @@ export function CandidatesToolbar({
           aria-label="Filter candidates by job"
         >
           {filters.map((filter) => (
-            <option key={filter} value={filter}>
-              {filter}
+            <option key={filter.value} value={filter.value}>
+              {filter.label}
             </option>
           ))}
         </select>

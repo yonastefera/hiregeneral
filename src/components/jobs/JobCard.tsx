@@ -64,7 +64,7 @@ export function JobCard({ job, saved, saving = false, onSave }: JobCardProps) {
   };
 
   return (
-    <article className="group relative overflow-hidden rounded-2xl border border-border/60 bg-card p-5 shadow-xs transition-shadow duration-200 hover:shadow-soft">
+    <article className="group relative max-w-full overflow-hidden rounded-2xl border border-border/60 bg-card p-5 shadow-xs transition-shadow duration-200 hover:shadow-soft">
       <div className="flex items-start gap-4">
         <div
           className={cn(
@@ -89,7 +89,7 @@ export function JobCard({ job, saved, saving = false, onSave }: JobCardProps) {
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                 {job.company}
               </p>
@@ -130,18 +130,18 @@ export function JobCard({ job, saved, saving = false, onSave }: JobCardProps) {
           </div>
 
           <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5">
-              <MapPin className="size-3.5" />
-              <span className="line-clamp-1">{displayLocation}</span>
+            <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">
+              <MapPin className="size-3.5 shrink-0" />
+              <span className="line-clamp-1 min-w-0">{displayLocation}</span>
             </span>
 
-            <span className="inline-flex items-center gap-1.5">
-              <Clock3 className="size-3.5" />
+            <span className="inline-flex shrink-0 items-center gap-1.5">
+              <Clock3 className="size-3.5 shrink-0" />
               {job.postedDaysAgo === 0 ? "Today" : `${job.postedDaysAgo}d ago`}
             </span>
 
-            <span className="inline-flex items-center gap-1.5">
-              <BriefcaseBusiness className="size-3.5" />
+            <span className="inline-flex shrink-0 items-center gap-1.5">
+              <BriefcaseBusiness className="size-3.5 shrink-0" />
               {job.employmentType}
             </span>
           </div>
@@ -166,12 +166,12 @@ export function JobCard({ job, saved, saving = false, onSave }: JobCardProps) {
             )}
           </div>
 
-          <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+          <div className="mt-4 flex flex-col gap-3 border-t border-border/60 pt-3 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-xs text-muted-foreground">
               {job.applicants} applicants
             </span>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
               <Button variant="ghost" size="sm" onClick={goToDetails}>
                 Details <ArrowRight className="size-3.5" />
               </Button>

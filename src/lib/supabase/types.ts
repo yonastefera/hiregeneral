@@ -84,39 +84,146 @@ export type Database = {
       };
       companies: {
         Row: {
+          account_credit_cents: number;
+          active_job_limit: number;
+          billing_email: string | null;
+          billing_plan: string;
+          boost_credits: number;
           created_at: string;
+          current_period_end: string | null;
           description: string | null;
           id: string;
+          industry: string | null;
           location: string | null;
           logo_url: string | null;
           name: string;
           owner_id: string;
+          size: string | null;
+          stripe_customer_id: string | null;
+          stripe_subscription_id: string | null;
+          subscription_status: string;
+          tagline: string | null;
           updated_at: string;
           website: string | null;
         };
         Insert: {
+          account_credit_cents?: number;
+          active_job_limit?: number;
+          billing_email?: string | null;
+          billing_plan?: string;
+          boost_credits?: number;
           created_at?: string;
+          current_period_end?: string | null;
           description?: string | null;
           id?: string;
+          industry?: string | null;
           location?: string | null;
           logo_url?: string | null;
           name: string;
           owner_id: string;
+          size?: string | null;
+          stripe_customer_id?: string | null;
+          stripe_subscription_id?: string | null;
+          subscription_status?: string;
+          tagline?: string | null;
           updated_at?: string;
           website?: string | null;
         };
         Update: {
+          account_credit_cents?: number;
+          active_job_limit?: number;
+          billing_email?: string | null;
+          billing_plan?: string;
+          boost_credits?: number;
           created_at?: string;
+          current_period_end?: string | null;
           description?: string | null;
           id?: string;
+          industry?: string | null;
           location?: string | null;
           logo_url?: string | null;
           name?: string;
           owner_id?: string;
+          size?: string | null;
+          stripe_customer_id?: string | null;
+          stripe_subscription_id?: string | null;
+          subscription_status?: string;
+          tagline?: string | null;
           updated_at?: string;
           website?: string | null;
         };
         Relationships: [];
+      };
+      billing_events: {
+        Row: {
+          event_type: string;
+          id: string;
+          processed_at: string;
+          stripe_event_id: string;
+        };
+        Insert: {
+          event_type: string;
+          id?: string;
+          processed_at?: string;
+          stripe_event_id: string;
+        };
+        Update: {
+          event_type?: string;
+          id?: string;
+          processed_at?: string;
+          stripe_event_id?: string;
+        };
+        Relationships: [];
+      };
+      billing_receipts: {
+        Row: {
+          amount_paid_cents: number;
+          company_id: string;
+          created_at: string;
+          currency: string;
+          description: string | null;
+          hosted_invoice_url: string | null;
+          id: string;
+          invoice_number: string | null;
+          invoice_pdf_url: string | null;
+          paid_at: string | null;
+          stripe_invoice_id: string;
+        };
+        Insert: {
+          amount_paid_cents?: number;
+          company_id: string;
+          created_at?: string;
+          currency?: string;
+          description?: string | null;
+          hosted_invoice_url?: string | null;
+          id?: string;
+          invoice_number?: string | null;
+          invoice_pdf_url?: string | null;
+          paid_at?: string | null;
+          stripe_invoice_id: string;
+        };
+        Update: {
+          amount_paid_cents?: number;
+          company_id?: string;
+          created_at?: string;
+          currency?: string;
+          description?: string | null;
+          hosted_invoice_url?: string | null;
+          id?: string;
+          invoice_number?: string | null;
+          invoice_pdf_url?: string | null;
+          paid_at?: string | null;
+          stripe_invoice_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "billing_receipts_company_id_fkey";
+            columns: ["company_id"];
+            isOneToOne: false;
+            referencedRelation: "companies";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       conversations: {
         Row: {
@@ -145,10 +252,98 @@ export type Database = {
         };
         Relationships: [];
       };
+      employer_candidate_invites: {
+        Row: {
+          candidate_id: string;
+          created_at: string;
+          id: string;
+          job_id: string;
+          message: string;
+          recruiter_id: string;
+          status: string;
+        };
+        Insert: {
+          candidate_id: string;
+          created_at?: string;
+          id?: string;
+          job_id: string;
+          message: string;
+          recruiter_id: string;
+          status?: string;
+        };
+        Update: {
+          candidate_id?: string;
+          created_at?: string;
+          id?: string;
+          job_id?: string;
+          message?: string;
+          recruiter_id?: string;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "employer_candidate_invites_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      job_boosts: {
+        Row: {
+          company_id: string;
+          created_at: string;
+          ends_at: string;
+          id: string;
+          job_id: string;
+          starts_at: string;
+          stripe_payment_intent_id: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          company_id: string;
+          created_at?: string;
+          ends_at: string;
+          id?: string;
+          job_id: string;
+          starts_at?: string;
+          stripe_payment_intent_id?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          company_id?: string;
+          created_at?: string;
+          ends_at?: string;
+          id?: string;
+          job_id?: string;
+          starts_at?: string;
+          stripe_payment_intent_id?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "job_boosts_company_id_fkey";
+            columns: ["company_id"];
+            isOneToOne: false;
+            referencedRelation: "companies";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "job_boosts_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       jobs: {
         Row: {
+          applicant_distance_miles: number;
           apply_url: string | null;
           benefits: string[];
+          boost_id: string;
           category: string | null;
           company_id: string | null;
           company_logo_url: string | null;
@@ -162,28 +357,35 @@ export type Database = {
           experience_level: string | null;
           expires_at: string | null;
           id: string;
+          include_relocation: boolean;
           latitude: number | null;
           location: string;
           longitude: number | null;
+          notification_email: string | null;
           posted_at: string;
           recruiter_id: string;
           requirements: string[];
           responsibilities: string[];
           salary_currency: string;
+          salary_frequency: string;
           salary_max: number | null;
           salary_min: number | null;
+          screening_questions: Json;
           skills: string[];
           slug: string | null;
           source_id: string | null;
           source_name: string | null;
           status: Database["public"]["Enums"]["job_status"];
+          street_address: string | null;
           title: string;
           updated_at: string;
           work_mode: string;
         };
         Insert: {
+          applicant_distance_miles?: number;
           apply_url?: string | null;
           benefits?: string[];
+          boost_id?: string;
           category?: string | null;
           company_id?: string | null;
           company_logo_url?: string | null;
@@ -197,28 +399,35 @@ export type Database = {
           experience_level?: string | null;
           expires_at?: string | null;
           id?: string;
+          include_relocation?: boolean;
           latitude?: number | null;
           location: string;
           longitude?: number | null;
+          notification_email?: string | null;
           posted_at?: string;
           recruiter_id: string;
           requirements?: string[];
           responsibilities?: string[];
           salary_currency?: string;
+          salary_frequency?: string;
           salary_max?: number | null;
           salary_min?: number | null;
+          screening_questions?: Json;
           skills?: string[];
           slug?: string | null;
           source_id?: string | null;
           source_name?: string | null;
           status?: Database["public"]["Enums"]["job_status"];
+          street_address?: string | null;
           title: string;
           updated_at?: string;
           work_mode?: string;
         };
         Update: {
+          applicant_distance_miles?: number;
           apply_url?: string | null;
           benefits?: string[];
+          boost_id?: string;
           category?: string | null;
           company_id?: string | null;
           company_logo_url?: string | null;
@@ -232,21 +441,26 @@ export type Database = {
           experience_level?: string | null;
           expires_at?: string | null;
           id?: string;
+          include_relocation?: boolean;
           latitude?: number | null;
           location?: string;
           longitude?: number | null;
+          notification_email?: string | null;
           posted_at?: string;
           recruiter_id?: string;
           requirements?: string[];
           responsibilities?: string[];
           salary_currency?: string;
+          salary_frequency?: string;
           salary_max?: number | null;
           salary_min?: number | null;
+          screening_questions?: Json;
           skills?: string[];
           slug?: string | null;
           source_id?: string | null;
           source_name?: string | null;
           status?: Database["public"]["Enums"]["job_status"];
+          street_address?: string | null;
           title?: string;
           updated_at?: string;
           work_mode?: string;
@@ -378,14 +592,27 @@ export type Database = {
           deleted_at: string | null;
           deletion_requested_at: string | null;
           disability_status: string | null;
+          education: Json | null;
           email: string | null;
           ethnicity: string | null;
+          executive_summary: string | null;
           full_name: string | null;
           gender: string | null;
+          highest_degree: string | null;
           headline: string | null;
           id: string;
+          industry: string | null;
+          level_of_experience: string | null;
           location: string | null;
+          minimum_desired_pay: string | null;
+          objective: string | null;
+          open_to_relocation: boolean | null;
           phone: string | null;
+          profile_links: Json | null;
+          resume_file_name: string | null;
+          resume_file_size: number | null;
+          resume_scan_status: string | null;
+          resume_uploaded_at: string | null;
           resume_url: string | null;
           skills: string[];
           updated_at: string;
@@ -393,6 +620,7 @@ export type Database = {
           user_type: Database["public"]["Enums"]["app_role"];
           veteran_status: string | null;
           visibility: Database["public"]["Enums"]["profile_visibility"];
+          work_experience: Json | null;
         };
         Insert: {
           additional_info?: string | null;
@@ -400,14 +628,27 @@ export type Database = {
           deleted_at?: string | null;
           deletion_requested_at?: string | null;
           disability_status?: string | null;
+          education?: Json | null;
           email?: string | null;
           ethnicity?: string | null;
+          executive_summary?: string | null;
           full_name?: string | null;
           gender?: string | null;
+          highest_degree?: string | null;
           headline?: string | null;
           id?: string;
+          industry?: string | null;
+          level_of_experience?: string | null;
           location?: string | null;
+          minimum_desired_pay?: string | null;
+          objective?: string | null;
+          open_to_relocation?: boolean | null;
           phone?: string | null;
+          profile_links?: Json | null;
+          resume_file_name?: string | null;
+          resume_file_size?: number | null;
+          resume_scan_status?: string | null;
+          resume_uploaded_at?: string | null;
           resume_url?: string | null;
           skills?: string[];
           updated_at?: string;
@@ -415,6 +656,7 @@ export type Database = {
           user_type?: Database["public"]["Enums"]["app_role"];
           veteran_status?: string | null;
           visibility?: Database["public"]["Enums"]["profile_visibility"];
+          work_experience?: Json | null;
         };
         Update: {
           additional_info?: string | null;
@@ -422,14 +664,27 @@ export type Database = {
           deleted_at?: string | null;
           deletion_requested_at?: string | null;
           disability_status?: string | null;
+          education?: Json | null;
           email?: string | null;
           ethnicity?: string | null;
+          executive_summary?: string | null;
           full_name?: string | null;
           gender?: string | null;
+          highest_degree?: string | null;
           headline?: string | null;
           id?: string;
+          industry?: string | null;
+          level_of_experience?: string | null;
           location?: string | null;
+          minimum_desired_pay?: string | null;
+          objective?: string | null;
+          open_to_relocation?: boolean | null;
           phone?: string | null;
+          profile_links?: Json | null;
+          resume_file_name?: string | null;
+          resume_file_size?: number | null;
+          resume_scan_status?: string | null;
+          resume_uploaded_at?: string | null;
           resume_url?: string | null;
           skills?: string[];
           updated_at?: string;
@@ -437,6 +692,7 @@ export type Database = {
           user_type?: Database["public"]["Enums"]["app_role"];
           veteran_status?: string | null;
           visibility?: Database["public"]["Enums"]["profile_visibility"];
+          work_experience?: Json | null;
         };
         Relationships: [];
       };
