@@ -76,7 +76,7 @@ export function EmployerPricing() {
             <Link
               href={
                 plan.name === "Scale"
-                  ? "/employers/contact"
+                  ? "/contact?topic=employer_sales"
                   : "/employers/dashboard"
               }
               className={`mt-8 inline-flex w-full items-center justify-center rounded-full py-3 text-sm font-medium transition ${

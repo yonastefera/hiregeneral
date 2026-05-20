@@ -29,7 +29,7 @@ export function EmployerWhySection() {
             </Link>
 
             <Link
-              href="/employers/contact"
+              href="/contact?topic=employer_sales"
               className="rounded-full border border-white/10 px-5 py-3 text-sm text-neutral-300 hover:text-white"
             >
               Book a demo

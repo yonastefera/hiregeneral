@@ -154,6 +154,54 @@ export type Database = {
         };
         Relationships: [];
       };
+      contact_messages: {
+        Row: {
+          audience: string;
+          company: string | null;
+          created_at: string;
+          email: string;
+          id: string;
+          message: string;
+          name: string;
+          source_path: string | null;
+          status: string;
+          subject: string | null;
+          topic: string;
+          updated_at: string;
+          user_agent: string | null;
+        };
+        Insert: {
+          audience?: string;
+          company?: string | null;
+          created_at?: string;
+          email: string;
+          id?: string;
+          message: string;
+          name: string;
+          source_path?: string | null;
+          status?: string;
+          subject?: string | null;
+          topic?: string;
+          updated_at?: string;
+          user_agent?: string | null;
+        };
+        Update: {
+          audience?: string;
+          company?: string | null;
+          created_at?: string;
+          email?: string;
+          id?: string;
+          message?: string;
+          name?: string;
+          source_path?: string | null;
+          status?: string;
+          subject?: string | null;
+          topic?: string;
+          updated_at?: string;
+          user_agent?: string | null;
+        };
+        Relationships: [];
+      };
       billing_events: {
         Row: {
           event_type: string;

@@ -26,7 +26,7 @@ export function EmployerFinalCta() {
             </Link>
 
             <Link
-              href="/employers/contact"
+              href="/contact?topic=employer_sales"
               className="inline-flex items-center rounded-full border border-white bg-white/70 px-6 py-3.5 text-sm font-medium text-neutral-900 backdrop-blur transition hover:bg-white"
             >
               Talk to sales

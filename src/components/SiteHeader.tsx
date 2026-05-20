@@ -232,7 +232,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
           : "border-b border-transparent bg-transparent",
       )}
     >
-      <nav className="mx-auto grid h-16 max-w-[90rem] grid-cols-[auto_auto] items-center justify-between gap-4 px-4 md:relative md:grid-cols-[1fr_auto_1fr] md:px-6">
+      <nav className="mx-auto grid h-16 max-w-360 grid-cols-[auto_auto] items-center justify-between gap-4 px-4 md:relative md:grid-cols-[1fr_auto_1fr] md:px-6">
         <Link
           href="/"
           prefetch={false}
@@ -264,7 +264,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
           })}
         </div>
 
-        <div className="hidden items-center justify-end gap-1 justify-self-end md:absolute md:right-6 md:flex">
+        <div className="hidden items-center justify-end gap-1 justify-self-end md:absolute md:right--10 md:flex">
           {authLoading ? (
             <div className="h-9 w-45" aria-hidden="true" />
           ) : user ? (

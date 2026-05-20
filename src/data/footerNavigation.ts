@@ -49,21 +49,6 @@ export const footerSections: FooterSection[] = [
         to: "/employers/candidates",
         audience: "recruiter",
       },
-      {
-        label: "Recruiter dashboard",
-        to: "/employers/dashboard",
-        audience: "recruiter",
-      },
-      {
-        label: "Hiring resources",
-        to: "/employers/resources",
-        audience: "public",
-      },
-      {
-        label: "Employer branding",
-        to: "/employers/branding",
-        audience: "public",
-      },
     ],
   },
   {
@@ -74,7 +59,6 @@ export const footerSections: FooterSection[] = [
       { label: "Contact", to: "/contact", audience: "public" },
       { label: "Privacy", to: "/privacy", audience: "public" },
       { label: "Terms", to: "/terms", audience: "public" },
-      { label: "Accessibility", to: "/accessibility", audience: "public" },
     ],
   },
 ];
@@ -82,10 +66,4 @@ export const footerSections: FooterSection[] = [
 export const legalLinks: FooterLink[] = [
   { label: "Privacy Policy", to: "/privacy", audience: "public" },
   { label: "Terms of Use", to: "/terms", audience: "public" },
-  { label: "Cookie Policy", to: "/cookies", audience: "public" },
-  {
-    label: "Do Not Sell My Info",
-    to: "/privacy-choices",
-    audience: "public",
-  },
 ];

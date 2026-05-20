@@ -874,7 +874,45 @@ export default function JobsPage() {
                   className="flex flex-col items-center gap-3 pt-2"
                   aria-label="Job results pagination"
                 >
-                  <Pagination>
+                  <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-2xl border border-border/70 bg-surface p-2 shadow-xs sm:hidden">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={currentPage === 1}
+                      onClick={() => {
+                        if (currentPage > 1) {
+                          goToPage(currentPage - 1);
+                        }
+                      }}
+                      className="justify-self-start"
+                    >
+                      Previous
+                    </Button>
+
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Page{" "}
+                      <span className="text-foreground">{currentPage}</span> of{" "}
+                      <span className="text-foreground">{totalPages}</span>
+                    </p>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={currentPage === totalPages}
+                      onClick={() => {
+                        if (currentPage < totalPages) {
+                          goToPage(currentPage + 1);
+                        }
+                      }}
+                      className="justify-self-end"
+                    >
+                      Next
+                    </Button>
+                  </div>
+
+                  <Pagination className="hidden sm:flex">
                     <PaginationContent>
                       <PaginationItem>
                         <PaginationPrevious
@@ -946,7 +984,7 @@ export default function JobsPage() {
                     </PaginationContent>
                   </Pagination>
 
-                  <p className="text-xs text-muted-foreground">
+                  <p className="hidden text-xs text-muted-foreground sm:block">
                     Page {currentPage} of {totalPages}
                   </p>
                 </nav>
