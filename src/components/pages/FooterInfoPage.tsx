@@ -11,7 +11,6 @@ import {
   UsersRound,
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -382,8 +381,6 @@ export default function FooterInfoPage({ type }: FooterInfoPageProps) {
     <main className="min-h-screen bg-background">
       <section className="bg-hero-gradient px-4 py-14">
         <div className="mx-auto max-w-7xl">
-          <Badge variant="soft">{content.label}</Badge>
-
           <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-tight text-balance md:text-6xl">
             {content.title}
           </h1>

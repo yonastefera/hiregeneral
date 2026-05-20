@@ -41,7 +41,6 @@ function canSeeLink(
 export const Footer = () => {
   const year = new Date().getFullYear();
   const [userType, setUserType] = useState<UserType | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
@@ -55,7 +54,6 @@ export const Footer = () => {
 
       if (!user?.id) {
         setUserType(null);
-        setAuthLoading(false);
         return;
       }
 
@@ -68,7 +66,6 @@ export const Footer = () => {
       if (!mounted) return;
 
       setUserType(profile?.user_type ?? null);
-      setAuthLoading(false);
     };
 
     loadUser();
@@ -80,7 +77,6 @@ export const Footer = () => {
 
       if (!nextUserId) {
         setUserType(null);
-        setAuthLoading(false);
       } else {
         supabase
           .from("profiles")
@@ -90,7 +86,6 @@ export const Footer = () => {
           .then(({ data: profile }) => {
             if (!mounted) return;
             setUserType(profile?.user_type ?? null);
-            setAuthLoading(false);
           });
       }
     });
@@ -139,38 +134,37 @@ export const Footer = () => {
           </div>
 
           <div className="grid gap-10 sm:grid-cols-3">
-            {!authLoading &&
-              visibleFooterSections.map((section) => (
-                <section
-                  key={section.title}
-                  aria-labelledby={`${section.title}-footer`}
-                >
-                  <div className="flex items-center gap-2">
-                    <section.icon className="size-4 text-surface-strong-foreground/70" />
+            {visibleFooterSections.map((section) => (
+              <section
+                key={section.title}
+                aria-labelledby={`${section.title}-footer`}
+              >
+                <div className="flex items-center gap-2">
+                  <section.icon className="size-4 text-surface-strong-foreground/70" />
 
-                    <h2
-                      id={`${section.title}-footer`}
-                      className="text-xs font-semibold uppercase tracking-wider text-surface-strong-foreground"
-                    >
-                      {section.title}
-                    </h2>
-                  </div>
+                  <h2
+                    id={`${section.title}-footer`}
+                    className="text-xs font-semibold uppercase tracking-wider text-surface-strong-foreground"
+                  >
+                    {section.title}
+                  </h2>
+                </div>
 
-                  <ul className="mt-5 space-y-2.5">
-                    {section.links.map((link) => (
-                      <li key={link.label}>
-                        <Link
-                          href={link.to}
-                          prefetch={false}
-                          className="-mx-2 inline-block rounded-lg px-2 py-1 text-sm text-surface-strong-foreground/60 transition-colors hover:bg-white/5 hover:text-surface-strong-foreground"
-                        >
-                          {link.label}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ))}
+                <ul className="mt-5 space-y-2.5">
+                  {section.links.map((link) => (
+                    <li key={link.label}>
+                      <Link
+                        href={link.to}
+                        prefetch={false}
+                        className="-mx-2 inline-block rounded-lg px-2 py-1 text-sm text-surface-strong-foreground/60 transition-colors hover:bg-white/5 hover:text-surface-strong-foreground"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
           </div>
         </div>
 

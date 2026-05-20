@@ -40,9 +40,14 @@ export const footerSections: FooterSection[] = [
     icon: Building2,
     links: [
       {
+        label: "For employers",
+        to: "/employers",
+        audience: "public",
+      },
+      {
         label: "Post a job",
         to: "/employers/dashboard/post-job",
-        audience: "recruiter",
+        audience: "public",
       },
       {
         label: "Search candidates",

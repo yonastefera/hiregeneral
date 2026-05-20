@@ -102,6 +102,7 @@ export function PublicContactPage({ initialTopic }: PublicContactPageProps) {
   const [form, setForm] = useState<ContactFormState>(initialFormState);
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
+  const [submittedId, setSubmittedId] = useState<string | null>(null);
 
   const selectedTopicLabel = useMemo(() => {
     const labels: Record<ContactFormState["topic"], string> = {
@@ -122,6 +123,7 @@ export function PublicContactPage({ initialTopic }: PublicContactPageProps) {
     value: ContactFormState[Key],
   ) => {
     setSent(false);
+    setSubmittedId(null);
     setForm((current) => ({ ...current, [key]: value }));
   };
 
@@ -148,6 +150,7 @@ export function PublicContactPage({ initialTopic }: PublicContactPageProps) {
       }
 
       setSent(true);
+      setSubmittedId(payload?.id ?? null);
       setForm(initialFormState);
       toast.success(
         payload?.id
@@ -332,9 +335,35 @@ export function PublicContactPage({ initialTopic }: PublicContactPageProps) {
             </label>
 
             {sent ? (
-              <div className="mt-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-                <CheckCircle2 className="size-4" />
-                Your message was sent successfully.
+              <div className="mt-5 overflow-hidden rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-white to-teal-50 shadow-soft">
+                <div className="flex gap-4 p-4 sm:p-5">
+                  <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-emerald-500 text-white shadow-pop">
+                    <CheckCircle2 className="size-5" />
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-emerald-950">
+                      Message sent successfully
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-emerald-900/75">
+                      Thanks for reaching out. We routed your request to the
+                      right HireGeneral team and will follow up shortly.
+                    </p>
+
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-2.5 py-1 font-medium text-emerald-900 ring-1 ring-emerald-200">
+                        <Clock3 className="size-3.5" />
+                        Usually within 1 business day
+                      </span>
+
+                      {submittedId ? (
+                        <span className="rounded-full bg-white/80 px-2.5 py-1 font-medium text-emerald-900 ring-1 ring-emerald-200">
+                          Ref {submittedId.slice(0, 8)}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
               </div>
             ) : null}
 

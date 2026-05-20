@@ -405,7 +405,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
                         </AccountMenuLink>
 
                         <AccountMenuLink
-                          href="/settings/privacy"
+                          href="/privacy"
                           onClick={() => setAccountMenuOpen(false)}
                         >
                           <ShieldCheck className="size-4 text-muted-foreground" />
