@@ -56,8 +56,12 @@ type WorkdayConfig = {
   apiBase: string;
   publicBase: string;
   searchText: string;
+  searchTexts: string[];
+  pageSize: number;
+  maxPages: number;
   tenant: string;
   site: string;
+  sourceSlug: string;
   appliedFacets: Record<string, string[]>;
 };
 
@@ -69,6 +73,25 @@ type WorkdaySearchHttpResponse = {
 function metadataString(source: JobSource, key: string) {
   const value = source.metadata[key];
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function metadataNumber(source: JobSource, key: string) {
+  const value = source.metadata[key];
+
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function metadataStringArray(source: JobSource, key: string) {
+  const value = source.metadata[key];
+
+  if (!Array.isArray(value)) return null;
+
+  const values = value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return values.length > 0 ? values : null;
 }
 
 function metadataStringArrayMap(source: JobSource, key: string) {
@@ -114,18 +137,36 @@ function workdayConfig(source: JobSource): WorkdayConfig {
     );
   }
 
+  const searchText = metadataString(source, "searchText") ?? "";
+  const searchTexts = uniqueItems(
+    [...(metadataStringArray(source, "searchTexts") ?? []), searchText].filter(
+      Boolean,
+    ),
+  );
+
   return {
     apiBase: apiBase.replace(/\/$/, ""),
     publicBase,
-    searchText: metadataString(source, "searchText") ?? "",
+    searchText,
+    searchTexts: searchTexts.length > 0 ? searchTexts : [""],
+    pageSize: Math.min(
+      Math.max(metadataNumber(source, "pageSize") ?? PAGE_SIZE, 1),
+      100,
+    ),
+    maxPages: Math.min(
+      Math.max(metadataNumber(source, "maxPages") ?? MAX_PAGES, 1),
+      50,
+    ),
     tenant,
     site,
+    sourceSlug: source.sourceSlug,
     appliedFacets: metadataStringArrayMap(source, "appliedFacets"),
   };
 }
 
 async function fetchWorkdaySearchPage(
   config: WorkdayConfig,
+  searchText: string,
   offset: number,
   signal?: AbortSignal,
 ) {
@@ -134,7 +175,12 @@ async function fetchWorkdaySearchPage(
     attempt <= SEARCH_RETRY_DELAYS_MS.length;
     attempt += 1
   ) {
-    const response = await postWorkdaySearch(config, offset, signal);
+    const response = await postWorkdaySearch(
+      config,
+      searchText,
+      offset,
+      signal,
+    );
 
     if (response.status >= 200 && response.status < 300) {
       try {
@@ -167,14 +213,15 @@ async function fetchWorkdaySearchPage(
 
 function postWorkdaySearch(
   config: WorkdayConfig,
+  searchText: string,
   offset: number,
   signal?: AbortSignal,
 ) {
   const body = JSON.stringify({
     appliedFacets: config.appliedFacets,
-    limit: PAGE_SIZE,
+    limit: config.pageSize,
     offset,
-    searchText: config.searchText,
+    searchText,
   });
 
   return new Promise<WorkdaySearchHttpResponse>((resolve, reject) => {
@@ -570,23 +617,30 @@ async function fetchWorkdayPostings(
   config: WorkdayConfig,
   signal?: AbortSignal,
 ) {
-  const postings: WorkdaySearchPosting[] = [];
+  const postingsBySourceId = new Map<string, WorkdaySearchPosting>();
 
-  for (let page = 0; page < MAX_PAGES; page += 1) {
-    const response = await fetchWorkdaySearchPage(
-      config,
-      page * PAGE_SIZE,
-      signal,
-    );
-    const pagePostings = response.jobPostings ?? [];
+  for (const searchText of config.searchTexts) {
+    for (let page = 0; page < config.maxPages; page += 1) {
+      const response = await fetchWorkdaySearchPage(
+        config,
+        searchText,
+        page * config.pageSize,
+        signal,
+      );
+      const pagePostings = response.jobPostings ?? [];
 
-    postings.push(...pagePostings);
+      for (const posting of pagePostings) {
+        postingsBySourceId.set(sourceId(config.sourceSlug, posting), posting);
+      }
 
-    if (pagePostings.length < PAGE_SIZE) break;
-    if (response.total && postings.length >= response.total) break;
+      if (pagePostings.length < config.pageSize) break;
+      if (response.total && (page + 1) * config.pageSize >= response.total) {
+        break;
+      }
+    }
   }
 
-  return postings;
+  return [...postingsBySourceId.values()];
 }
 
 async function mapWithConcurrency<T, R>(

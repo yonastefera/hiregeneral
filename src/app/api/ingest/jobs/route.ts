@@ -50,7 +50,22 @@ function expectedAuthHeaders() {
     .map((secret) => `Bearer ${secret}`);
 }
 
-function sourceTimeoutMs() {
+function metadataNumber(
+  metadata: Record<string, unknown> | undefined,
+  key: string,
+) {
+  const value = metadata?.[key];
+
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function sourceTimeoutMs(source?: { metadata?: Record<string, unknown> }) {
+  const sourceValue = metadataNumber(source?.metadata, "sourceTimeoutMs");
+
+  if (sourceValue && sourceValue > 0) {
+    return sourceValue;
+  }
+
   const value = Number(process.env.INGEST_SOURCE_TIMEOUT_MS);
 
   return Number.isFinite(value) && value > 0
@@ -155,7 +170,7 @@ async function runJobsIngestion(request: Request) {
         const abortController = new AbortController();
         const timeout = setTimeout(
           () => abortController.abort(),
-          sourceTimeoutMs(),
+          sourceTimeoutMs(source),
         );
 
         let rawJobs;

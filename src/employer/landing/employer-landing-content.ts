@@ -70,7 +70,7 @@ export const plans = [
   },
   {
     name: "Growth",
-    price: "$299",
+    price: "$29",
     cadence: "/ month",
     desc: "For teams hiring 5–20 roles a quarter.",
     features: [
