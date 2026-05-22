@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type SyntheticEvent } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -127,7 +127,7 @@ export function PublicContactPage({ initialTopic }: PublicContactPageProps) {
     setForm((current) => ({ ...current, [key]: value }));
   };
 
-  async function submitContact(event: FormEvent<HTMLFormElement>) {
+  async function submitContact(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
 

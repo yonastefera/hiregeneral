@@ -51,15 +51,37 @@ type OracleHcmConfig = {
   apiBase: string;
   publicBase: string;
   siteNumber: string;
-  searchText: string;
+  searchTexts: string[];
   selectedCategoriesFacet: string | null;
   selectedLocationsFacet: string | null;
   countryCode: string | null;
+  pageSize: number;
+  maxPages: number;
 };
 
 function metadataString(source: JobSource, key: string) {
   const value = source.metadata[key];
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function metadataNumber(source: JobSource, key: string) {
+  const value = source.metadata[key];
+
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return null;
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function metadataStringArray(source: JobSource, key: string) {
+  const value = source.metadata[key];
+
+  if (!Array.isArray(value)) return null;
+
+  return value
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter(Boolean);
 }
 
 function oracleHcmConfig(source: JobSource): OracleHcmConfig {
@@ -83,10 +105,20 @@ function oracleHcmConfig(source: JobSource): OracleHcmConfig {
     apiBase: apiBase.replace(/\/$/, ""),
     publicBase: publicBase.replace(/\/$/, ""),
     siteNumber,
-    searchText: metadataString(source, "searchText") ?? "technology",
+    searchTexts: metadataStringArray(source, "searchTexts") ?? [
+      metadataString(source, "searchText") ?? "technology",
+    ],
     selectedCategoriesFacet: metadataString(source, "selectedCategoriesFacet"),
     selectedLocationsFacet: metadataString(source, "selectedLocationsFacet"),
     countryCode: metadataString(source, "countryCode") ?? "US",
+    pageSize: Math.min(
+      Math.max(metadataNumber(source, "pageSize") ?? PAGE_SIZE, 1),
+      100,
+    ),
+    maxPages: Math.min(
+      Math.max(metadataNumber(source, "maxPages") ?? MAX_PAGES, 1),
+      40,
+    ),
   };
 }
 
@@ -94,11 +126,15 @@ function finderValue(value: string) {
   return value.replace(/[,;]/g, " ");
 }
 
-function searchUrl(config: OracleHcmConfig, offset: number) {
+function searchUrl(
+  config: OracleHcmConfig,
+  searchText: string,
+  offset: number,
+) {
   const finderParts = [
     `siteNumber=${finderValue(config.siteNumber)}`,
-    `keyword=${finderValue(config.searchText)}`,
-    `limit=${PAGE_SIZE}`,
+    `keyword=${finderValue(searchText)}`,
+    `limit=${config.pageSize}`,
     `offset=${offset}`,
     "sortBy=POSTING_DATES_DESC",
   ];
@@ -132,10 +168,11 @@ function searchUrl(config: OracleHcmConfig, offset: number) {
 
 async function fetchOracleSearchPage(
   config: OracleHcmConfig,
+  searchText: string,
   offset: number,
   signal?: AbortSignal,
 ) {
-  const response = await fetch(searchUrl(config, offset), {
+  const response = await fetch(searchUrl(config, searchText, offset), {
     headers: {
       Accept: "application/json",
       "User-Agent": "HireGeneralJobBoard/1.0",
@@ -220,26 +257,31 @@ async function fetchOracleRequisitions(
   config: OracleHcmConfig,
   signal?: AbortSignal,
 ) {
-  const requisitions: OracleRequisition[] = [];
+  const requisitionsById = new Map<string, OracleRequisition>();
 
-  for (let page = 0; page < MAX_PAGES; page += 1) {
-    const offset = page * PAGE_SIZE;
-    const response = await fetchOracleSearchPage(config, offset, signal);
-    const searchItem = response.items?.[0];
-    const pageRequisitions = searchItem?.requisitionList ?? [];
+  for (const searchText of config.searchTexts) {
+    for (let page = 0; page < config.maxPages; page += 1) {
+      const offset = page * config.pageSize;
+      const response = await fetchOracleSearchPage(
+        config,
+        searchText,
+        offset,
+        signal,
+      );
+      const searchItem = response.items?.[0];
+      const pageRequisitions = searchItem?.requisitionList ?? [];
 
-    requisitions.push(...pageRequisitions);
+      for (const requisition of pageRequisitions) {
+        if (requisition.Id) {
+          requisitionsById.set(String(requisition.Id), requisition);
+        }
+      }
 
-    if (pageRequisitions.length < PAGE_SIZE) break;
-    if (
-      searchItem?.TotalJobsCount &&
-      requisitions.length >= searchItem.TotalJobsCount
-    ) {
-      break;
+      if (pageRequisitions.length < config.pageSize) break;
     }
   }
 
-  return requisitions;
+  return [...requisitionsById.values()];
 }
 
 export async function fetchOracleHcmJobs(

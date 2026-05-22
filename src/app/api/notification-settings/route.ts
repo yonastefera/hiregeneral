@@ -6,7 +6,6 @@ type NotificationPreferenceKey =
   | "jobAlerts"
   | "applicationUpdates"
   | "savedJobReminders"
-  | "profileVisibility"
   | "marketingEmails";
 
 type NotificationPreferences = Record<NotificationPreferenceKey, boolean>;
@@ -15,7 +14,6 @@ const defaultPreferences: NotificationPreferences = {
   jobAlerts: true,
   applicationUpdates: true,
   savedJobReminders: true,
-  profileVisibility: true,
   marketingEmails: false,
 };
 
@@ -41,10 +39,6 @@ function normalizePreferences(value: unknown): NotificationPreferences {
       typeof maybePrefs.savedJobReminders === "boolean"
         ? maybePrefs.savedJobReminders
         : defaultPreferences.savedJobReminders,
-    profileVisibility:
-      typeof maybePrefs.profileVisibility === "boolean"
-        ? maybePrefs.profileVisibility
-        : defaultPreferences.profileVisibility,
     marketingEmails:
       typeof maybePrefs.marketingEmails === "boolean"
         ? maybePrefs.marketingEmails

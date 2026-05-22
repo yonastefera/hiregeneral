@@ -21,7 +21,6 @@ type FooterInfoPageProps = {
     | "saved-jobs"
     | "salary-guide"
     | "career-advice"
-    | "profile-visibility"
     | "post-job"
     | "candidates"
     | "recruiter-dashboard"
@@ -123,28 +122,14 @@ const pageContent: Record<FooterInfoPageProps["type"], PageContent> = {
       "Offer and career move checklists",
     ],
   },
-  "profile-visibility": {
-    label: "Privacy controls",
-    title: "Profile visibility",
-    description:
-      "Control whether recruiters can discover your profile, resume, skills, and contact information.",
-    action: "Manage visibility",
-    to: "/profile",
-    audience: "job_seeker",
-    points: [
-      "Public or private profile setting",
-      "Resume and contact controls",
-      "Demographic information stays optional",
-    ],
-  },
   "post-job": {
     label: "Recruiting",
     title: "Post a job",
     description:
       "Create clear, searchable listings with title, location, work mode, salary range, skills, and applicant review flow.",
     action: "Start posting",
-    to: "/employers/dashboard/post-job",
-    audience: "recruiter",
+    to: "/employers",
+    audience: "public",
     points: [
       "Company profile and logo",
       "Structured salary and skill fields",
@@ -155,7 +140,7 @@ const pageContent: Record<FooterInfoPageProps["type"], PageContent> = {
     label: "Talent search",
     title: "Search candidates",
     description:
-      "Find qualified technology professionals by skill, location preference, experience area, and profile visibility.",
+      "Find qualified technology professionals by skill, location preference, experience area, and hiring fit.",
     action: "Open recruiter tools",
     to: "/employers/candidates",
     audience: "recruiter",
@@ -185,8 +170,8 @@ const pageContent: Record<FooterInfoPageProps["type"], PageContent> = {
     description:
       "Use structured hiring guides for role scoping, interview plans, compensation clarity, and candidate communication.",
     action: "Post a job",
-    to: "/employers/dashboard/post-job",
-    audience: "recruiter",
+    to: "/employers",
+    audience: "public",
     points: [
       "Role kickoff checklist",
       "Interview plan templates",
@@ -244,7 +229,7 @@ const pageContent: Record<FooterInfoPageProps["type"], PageContent> = {
     to: "/profile",
     audience: "job_seeker",
     points: [
-      "Profile visibility choices",
+      "Profile privacy controls",
       "Optional demographic fields",
       "Saved jobs require sign in",
     ],
@@ -295,7 +280,7 @@ const pageContent: Record<FooterInfoPageProps["type"], PageContent> = {
     label: "Privacy",
     title: "Privacy choices",
     description:
-      "Control public profile visibility and review how optional information is presented in your account.",
+      "Review how optional profile information is presented in your account.",
     action: "Open profile settings",
     to: "/profile",
     audience: "job_seeker",

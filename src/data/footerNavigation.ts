@@ -28,11 +28,6 @@ export const footerSections: FooterSection[] = [
       { label: "Saved jobs", to: "/saved", audience: "job_seeker" },
       { label: "Salaries", to: "/salaries", audience: "public" },
       { label: "Profile", to: "/profile", audience: "job_seeker" },
-      {
-        label: "Profile visibility",
-        to: "/profile-visibility",
-        audience: "job_seeker",
-      },
     ],
   },
   {
@@ -46,7 +41,7 @@ export const footerSections: FooterSection[] = [
       },
       {
         label: "Post a job",
-        to: "/employers/dashboard/post-job",
+        to: "/employers",
         audience: "public",
       },
       {

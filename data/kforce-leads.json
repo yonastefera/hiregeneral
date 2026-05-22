@@ -1,0 +1,1135 @@
+{
+  "generatedAt": "2026-05-21T18:58:32.050Z",
+  "source": "kforce_public_search",
+  "query": "software",
+  "sampledJobs": 100,
+  "filter": {
+    "candidatesOnly": true,
+    "top": 25
+  },
+  "purpose": "Offline lead intelligence only. Use these signals to decide which direct company career boards to investigate. Do not publish or ingest Kforce agency postings.",
+  "statusLegend": {
+    "candidate": "New company to investigate.",
+    "researching": "Someone is checking the direct career board.",
+    "confirmed_direct_source": "Official company career source found; ready for job_sources migration.",
+    "added_to_pool": "Official company source has been added to HireGeneral.",
+    "rejected": "Not useful, blocked, duplicated, or not a good fit.",
+    "ready_for_review": "Official company career source and technology hiring signal found; waiting for explicit approval before adding to HireGeneral.",
+    "already_in_pool": "Official company source already exists in HireGeneral.",
+    "existing_backlog": "A disabled/backlog source already exists, but it is not live in ingestion.",
+    "needs_manual_review": "Official careers page found, but source shape or current tech-job signal needs manual review before ingestion.",
+    "low_priority": "Official careers page found, but current tech-job signal is weak for our pool."
+  },
+  "leads": [
+    {
+      "company": "Mastercard",
+      "status": "added_to_pool",
+      "confidence": "high",
+      "score": 272,
+      "inCurrentPool": true,
+      "signals": [
+        "payments and fintech",
+        "client industry matches financial services",
+        "client industry matches bank",
+        "location matches atlanta"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "AI Software Engineer",
+          "location": "Minneapolis, MN",
+          "clientIndustry": "Banking and Consumer Lending"
+        },
+        {
+          "title": "Software Architect",
+          "location": "Miramar, FL",
+          "clientIndustry": "Financial Services"
+        },
+        {
+          "title": "Software Developer Team Lead",
+          "location": "Miramar, FL",
+          "clientIndustry": "Banking and Consumer Lending"
+        }
+      ],
+      "directCareerUrl": "https://careers.mastercard.com/us/en/c/software-engineering-jobs",
+      "notes": "Approved by user and added as an official direct company source in file59.sql.",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Run file59.sql, then ingest this source directly by sourceSlug.",
+      "poolStatus": "enabled_source_added_in_migration",
+      "officialSourceEvidence": "Official Mastercard software engineering careers page is live; Mastercard also exposes a Phenom search board at careers.mastercard.com.",
+      "suggestedSourceType": "phenom",
+      "suggestedSourceSlug": "mastercard-phenom",
+      "suggestedMetadata": {
+        "widgetApiEndpoint": "https://careers.mastercard.com/widgets",
+        "refNum": "MASRUS",
+        "locale": "en_us",
+        "country": "us",
+        "pageName": "search-results",
+        "siteType": "external",
+        "baseUrl": "https://careers.mastercard.com/us/en/search-results",
+        "searchTerms": ["software", "developer", "engineer", "technology"]
+      },
+      "techHiringSignal": "strong",
+      "reviewedAt": "2026-05-21T21:20:09.650Z",
+      "sourcePolicy": "research_only_not_ingested",
+      "migrationFile": "src/lib/migrations/file59.sql",
+      "approvedAt": "2026-05-21T21:20:09.650Z"
+    },
+    {
+      "company": "FIS",
+      "status": "added_to_pool",
+      "confidence": "high",
+      "score": 272,
+      "inCurrentPool": true,
+      "signals": [
+        "payments and fintech",
+        "client industry matches financial services",
+        "client industry matches bank",
+        "location matches atlanta"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "AI Software Engineer",
+          "location": "Minneapolis, MN",
+          "clientIndustry": "Banking and Consumer Lending"
+        },
+        {
+          "title": "Software Architect",
+          "location": "Miramar, FL",
+          "clientIndustry": "Financial Services"
+        },
+        {
+          "title": "Software Developer Team Lead",
+          "location": "Miramar, FL",
+          "clientIndustry": "Banking and Consumer Lending"
+        }
+      ],
+      "directCareerUrl": "https://careers.fisglobal.com/us/en/search-results",
+      "notes": "Approved by user and added as an official direct company source in file59.sql.",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Run file59.sql, then ingest this source directly by sourceSlug.",
+      "poolStatus": "enabled_source_added_in_migration",
+      "officialSourceEvidence": "Official FIS careers board is Phenom; extracted refNum FIGLUS from the public page.",
+      "suggestedSourceType": "phenom",
+      "suggestedSourceSlug": "fis-phenom",
+      "suggestedMetadata": {
+        "widgetApiEndpoint": "https://careers.fisglobal.com/widgets",
+        "refNum": "FIGLUS",
+        "locale": "en_us",
+        "country": "us",
+        "pageName": "search-results",
+        "siteType": "external",
+        "baseUrl": "https://careers.fisglobal.com/us/en/search-results",
+        "searchTerms": ["software", "developer", "engineer", "technology"]
+      },
+      "techHiringSignal": "strong",
+      "reviewedAt": "2026-05-21T21:20:09.650Z",
+      "sourcePolicy": "research_only_not_ingested",
+      "migrationFile": "src/lib/migrations/file59.sql",
+      "approvedAt": "2026-05-21T21:20:09.650Z"
+    },
+    {
+      "company": "Fiserv",
+      "status": "ready_for_review",
+      "confidence": "high",
+      "score": 272,
+      "inCurrentPool": false,
+      "signals": [
+        "payments and fintech",
+        "client industry matches financial services",
+        "client industry matches bank",
+        "location matches atlanta"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "AI Software Engineer",
+          "location": "Minneapolis, MN",
+          "clientIndustry": "Banking and Consumer Lending"
+        },
+        {
+          "title": "Software Architect",
+          "location": "Miramar, FL",
+          "clientIndustry": "Financial Services"
+        },
+        {
+          "title": "Software Developer Team Lead",
+          "location": "Miramar, FL",
+          "clientIndustry": "Banking and Consumer Lending"
+        }
+      ],
+      "directCareerUrl": "https://www.careers.fiserv.com/search-jobs/",
+      "notes": "",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Good candidate, but source shape needs adapter confirmation before adding.",
+      "poolStatus": "missing_from_pool",
+      "officialSourceEvidence": "Official Fiserv search page shows technology categories including Tech - Software Engineering and Tech - IT Architecture.",
+      "suggestedSourceType": "scraper",
+      "suggestedSourceSlug": "fiserv-careers",
+      "suggestedMetadata": {
+        "adapterNeeded": "fiserv_or_scraper",
+        "searchText": "software engineering",
+        "country": "United States"
+      },
+      "techHiringSignal": "strong",
+      "reviewedAt": "2026-05-21T21:08:19.273Z",
+      "sourcePolicy": "research_only_not_ingested"
+    },
+    {
+      "company": "Global Payments",
+      "status": "ready_for_review",
+      "confidence": "high",
+      "score": 272,
+      "inCurrentPool": false,
+      "signals": [
+        "payments and fintech",
+        "client industry matches financial services",
+        "client industry matches bank",
+        "location matches atlanta"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "AI Software Engineer",
+          "location": "Minneapolis, MN",
+          "clientIndustry": "Banking and Consumer Lending"
+        },
+        {
+          "title": "Software Architect",
+          "location": "Miramar, FL",
+          "clientIndustry": "Financial Services"
+        },
+        {
+          "title": "Software Developer Team Lead",
+          "location": "Miramar, FL",
+          "clientIndustry": "Banking and Consumer Lending"
+        }
+      ],
+      "directCareerUrl": "https://jobs.globalpayments.com/",
+      "notes": "",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Promising fintech candidate; verify API/source shape before adding.",
+      "poolStatus": "missing_from_pool",
+      "officialSourceEvidence": "Official Global Payments careers page positions the company as a technology/payment organization and exposes a job search.",
+      "suggestedSourceType": "scraper",
+      "suggestedSourceSlug": "global-payments-careers",
+      "suggestedMetadata": {
+        "adapterNeeded": "global_payments_or_scraper",
+        "searchText": "software engineering",
+        "country": "United States"
+      },
+      "techHiringSignal": "medium",
+      "reviewedAt": "2026-05-21T21:08:19.273Z",
+      "sourcePolicy": "research_only_not_ingested"
+    },
+    {
+      "company": "Citi",
+      "status": "existing_backlog",
+      "confidence": "high",
+      "score": 262,
+      "inCurrentPool": true,
+      "signals": [
+        "capital markets and enterprise finance",
+        "client industry matches financial services",
+        "client industry matches bank",
+        "location matches jersey city"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "AI Software Engineer",
+          "location": "Minneapolis, MN",
+          "clientIndustry": "Banking and Consumer Lending"
+        },
+        {
+          "title": "Software Architect",
+          "location": "Miramar, FL",
+          "clientIndustry": "Financial Services"
+        },
+        {
+          "title": "Software Developer Team Lead",
+          "location": "Miramar, FL",
+          "clientIndustry": "Banking and Consumer Lending"
+        }
+      ],
+      "directCareerUrl": "https://jobs.citi.com/tech/",
+      "notes": "",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Do not duplicate. Revisit the existing disabled Citi backlog source if you want Citi live.",
+      "poolStatus": "disabled_backlog_source_exists",
+      "officialSourceEvidence": "Official Citi technology careers page exists. Current HireGeneral row is disabled as citi-eightfold-careers pending adapter work.",
+      "suggestedSourceType": "scraper",
+      "suggestedSourceSlug": "citi-eightfold-careers",
+      "suggestedMetadata": {
+        "existingDisabledSource": true,
+        "adapterNeeded": "eightfold_or_scraper"
+      },
+      "techHiringSignal": "strong",
+      "reviewedAt": "2026-05-21T21:08:19.273Z",
+      "sourcePolicy": "research_only_not_ingested"
+    },
+    {
+      "company": "Goldman Sachs",
+      "status": "ready_for_review",
+      "confidence": "high",
+      "score": 262,
+      "inCurrentPool": false,
+      "signals": [
+        "capital markets and enterprise finance",
+        "client industry matches financial services",
+        "client industry matches bank",
+        "location matches jersey city"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "AI Software Engineer",
+          "location": "Minneapolis, MN",
+          "clientIndustry": "Banking and Consumer Lending"
+        },
+        {
+          "title": "Software Architect",
+          "location": "Miramar, FL",
+          "clientIndustry": "Financial Services"
+        },
+        {
+          "title": "Software Developer Team Lead",
+          "location": "Miramar, FL",
+          "clientIndustry": "Banking and Consumer Lending"
+        }
+      ],
+      "directCareerUrl": "https://www.goldmansachs.com/careers/our-firm/engineering",
+      "notes": "",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Good candidate; verify job-search backend before adding.",
+      "poolStatus": "missing_from_pool",
+      "officialSourceEvidence": "Official Goldman Sachs Engineering page lists Software Engineering, Systems Engineering, Cyber Security, and Quantitative Strategists.",
+      "suggestedSourceType": "scraper",
+      "suggestedSourceSlug": "goldman-sachs-engineering",
+      "suggestedMetadata": {
+        "adapterNeeded": "goldman_sachs_or_scraper",
+        "searchText": "software engineering",
+        "country": "United States"
+      },
+      "techHiringSignal": "strong",
+      "reviewedAt": "2026-05-21T21:08:19.273Z",
+      "sourcePolicy": "research_only_not_ingested"
+    },
+    {
+      "company": "Home Depot",
+      "status": "already_in_pool",
+      "confidence": "medium",
+      "score": 106,
+      "inCurrentPool": true,
+      "signals": [
+        "retail and customer commerce platforms",
+        "client industry matches retail",
+        "location matches seattle",
+        "text matches supply chain"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "Software Engineer (Node.js)",
+          "location": "San Diego, CA",
+          "clientIndustry": "Advertising and PR Services"
+        },
+        {
+          "title": "Software Development Engineer",
+          "location": "Irving, TX",
+          "clientIndustry": "Retail"
+        },
+        {
+          "title": "Software Engineer",
+          "location": "Austin, TX",
+          "clientIndustry": "Retail"
+        }
+      ],
+      "directCareerUrl": "https://careers.homedepot.com/job-search-results/?category[]=Technology",
+      "notes": "",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "No action needed unless we want to tune the existing Home Depot scraper.",
+      "poolStatus": "enabled_source_exists",
+      "officialSourceEvidence": "Already added as The Home Depot via home-depot-mcloud-technology.",
+      "suggestedSourceType": "scraper",
+      "suggestedSourceSlug": "home-depot-mcloud-technology",
+      "techHiringSignal": "strong",
+      "reviewedAt": "2026-05-21T21:08:19.273Z",
+      "sourcePolicy": "research_only_not_ingested"
+    },
+    {
+      "company": "Lowe's",
+      "status": "added_to_pool",
+      "confidence": "medium",
+      "score": 106,
+      "inCurrentPool": true,
+      "signals": [
+        "retail and customer commerce platforms",
+        "client industry matches retail",
+        "location matches seattle",
+        "text matches supply chain"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "Software Engineer (Node.js)",
+          "location": "San Diego, CA",
+          "clientIndustry": "Advertising and PR Services"
+        },
+        {
+          "title": "Software Development Engineer",
+          "location": "Irving, TX",
+          "clientIndustry": "Retail"
+        },
+        {
+          "title": "Software Engineer",
+          "location": "Austin, TX",
+          "clientIndustry": "Retail"
+        }
+      ],
+      "directCareerUrl": "https://talent.lowes.com/us/en/c/technology-jobs/",
+      "notes": "Approved by user and added as an official direct company source in file59.sql.",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Run file59.sql, then ingest this source directly by sourceSlug.",
+      "poolStatus": "enabled_source_added_in_migration",
+      "officialSourceEvidence": "Official Lowe's Technology jobs page exists.",
+      "suggestedSourceType": "scraper",
+      "suggestedSourceSlug": "lowes-technology-phenom",
+      "suggestedMetadata": {
+        "adapterNeeded": "lowes_or_scraper",
+        "searchText": "technology",
+        "country": "United States"
+      },
+      "techHiringSignal": "strong",
+      "reviewedAt": "2026-05-21T21:20:09.650Z",
+      "sourcePolicy": "research_only_not_ingested",
+      "migrationFile": "src/lib/migrations/file59.sql",
+      "approvedAt": "2026-05-21T21:20:09.650Z"
+    },
+    {
+      "company": "Target",
+      "status": "ready_for_review",
+      "confidence": "medium",
+      "score": 106,
+      "inCurrentPool": false,
+      "signals": [
+        "retail and customer commerce platforms",
+        "client industry matches retail",
+        "location matches seattle",
+        "text matches supply chain"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "Software Engineer (Node.js)",
+          "location": "San Diego, CA",
+          "clientIndustry": "Advertising and PR Services"
+        },
+        {
+          "title": "Software Development Engineer",
+          "location": "Irving, TX",
+          "clientIndustry": "Retail"
+        },
+        {
+          "title": "Software Engineer",
+          "location": "Austin, TX",
+          "clientIndustry": "Retail"
+        }
+      ],
+      "directCareerUrl": "https://corporate.target.com/careers/job-search/corporate/tech/technology",
+      "notes": "",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Good candidate; verify source backend before adding.",
+      "poolStatus": "missing_from_pool",
+      "officialSourceEvidence": "Official Target Technology jobs page exists.",
+      "suggestedSourceType": "scraper",
+      "suggestedSourceSlug": "target-technology-careers",
+      "suggestedMetadata": {
+        "adapterNeeded": "target_or_scraper",
+        "searchText": "technology",
+        "country": "United States"
+      },
+      "techHiringSignal": "strong",
+      "reviewedAt": "2026-05-21T21:08:19.273Z",
+      "sourcePolicy": "research_only_not_ingested"
+    },
+    {
+      "company": "Best Buy",
+      "status": "needs_manual_review",
+      "confidence": "medium",
+      "score": 106,
+      "inCurrentPool": false,
+      "signals": [
+        "retail and customer commerce platforms",
+        "client industry matches retail",
+        "location matches seattle",
+        "text matches supply chain"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "Software Engineer (Node.js)",
+          "location": "San Diego, CA",
+          "clientIndustry": "Advertising and PR Services"
+        },
+        {
+          "title": "Software Development Engineer",
+          "location": "Irving, TX",
+          "clientIndustry": "Retail"
+        },
+        {
+          "title": "Software Engineer",
+          "location": "Austin, TX",
+          "clientIndustry": "Retail"
+        }
+      ],
+      "directCareerUrl": "https://careers.bestbuy.com/",
+      "notes": "",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Manual review before adding; confirm live US tech roles and source API.",
+      "poolStatus": "missing_from_pool",
+      "officialSourceEvidence": "Official Best Buy careers site exists, but current public search evidence for US corporate technology roles is less clean than the other retail candidates.",
+      "suggestedSourceType": "scraper",
+      "suggestedSourceSlug": "best-buy-careers",
+      "suggestedMetadata": {
+        "adapterNeeded": "best_buy_servicenow_or_scraper",
+        "searchText": "software engineering",
+        "country": "United States"
+      },
+      "techHiringSignal": "medium",
+      "reviewedAt": "2026-05-21T21:08:19.273Z",
+      "sourcePolicy": "research_only_not_ingested"
+    },
+    {
+      "company": "CBRE",
+      "status": "ready_for_review",
+      "confidence": "low",
+      "score": 52,
+      "inCurrentPool": false,
+      "signals": [
+        "real estate and property management software",
+        "location matches miami",
+        "client industry matches construction",
+        "client industry matches real estate"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "Software Engineer Front End",
+          "location": "Miami, FL",
+          "clientIndustry": "Real Estate and Property Management"
+        },
+        {
+          "title": "Senior Salesforce Software Engineer",
+          "location": "Miami, FL",
+          "clientIndustry": "Construction - Residential & Commercial/Office"
+        },
+        {
+          "title": "Software Engineer in Test",
+          "location": "Miami, FL",
+          "clientIndustry": "Construction - Residential & Commercial/Office"
+        }
+      ],
+      "directCareerUrl": "https://careers.cbre.com/en_US/careers/SearchJobs",
+      "notes": "",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Good candidate; verify whether the existing Oracle HCM adapter can support this site before adding.",
+      "poolStatus": "missing_from_pool",
+      "officialSourceEvidence": "Official CBRE careers site includes Digital & Technology as a career path and has public job search results.",
+      "suggestedSourceType": "oracle_hcm",
+      "suggestedSourceSlug": "cbre-careers",
+      "suggestedMetadata": {
+        "adapterNeeded": "oracle_hcm_or_cbre_scraper",
+        "searchText": "technology",
+        "country": "United States"
+      },
+      "techHiringSignal": "strong",
+      "reviewedAt": "2026-05-21T21:08:19.273Z",
+      "sourcePolicy": "research_only_not_ingested"
+    },
+    {
+      "company": "JLL",
+      "status": "ready_for_review",
+      "confidence": "low",
+      "score": 52,
+      "inCurrentPool": false,
+      "signals": [
+        "real estate and property management software",
+        "location matches miami",
+        "client industry matches construction",
+        "client industry matches real estate"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "Software Engineer Front End",
+          "location": "Miami, FL",
+          "clientIndustry": "Real Estate and Property Management"
+        },
+        {
+          "title": "Senior Salesforce Software Engineer",
+          "location": "Miami, FL",
+          "clientIndustry": "Construction - Residential & Commercial/Office"
+        },
+        {
+          "title": "Software Engineer in Test",
+          "location": "Miami, FL",
+          "clientIndustry": "Construction - Residential & Commercial/Office"
+        }
+      ],
+      "directCareerUrl": "https://www.jll.com/en-us/careers/technology",
+      "notes": "",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Good candidate; verify source backend before adding.",
+      "poolStatus": "missing_from_pool",
+      "officialSourceEvidence": "Official JLL Technology careers page exists and points candidates to search jobs.",
+      "suggestedSourceType": "scraper",
+      "suggestedSourceSlug": "jll-technology-careers",
+      "suggestedMetadata": {
+        "adapterNeeded": "jll_or_scraper",
+        "searchText": "technology",
+        "country": "United States"
+      },
+      "techHiringSignal": "strong",
+      "reviewedAt": "2026-05-21T21:08:19.273Z",
+      "sourcePolicy": "research_only_not_ingested"
+    },
+    {
+      "company": "AvalonBay Communities",
+      "status": "needs_manual_review",
+      "confidence": "low",
+      "score": 52,
+      "inCurrentPool": false,
+      "signals": [
+        "real estate and property management software",
+        "location matches miami",
+        "client industry matches construction",
+        "client industry matches real estate"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "Software Engineer Front End",
+          "location": "Miami, FL",
+          "clientIndustry": "Real Estate and Property Management"
+        },
+        {
+          "title": "Senior Salesforce Software Engineer",
+          "location": "Miami, FL",
+          "clientIndustry": "Construction - Residential & Commercial/Office"
+        },
+        {
+          "title": "Software Engineer in Test",
+          "location": "Miami, FL",
+          "clientIndustry": "Construction - Residential & Commercial/Office"
+        }
+      ],
+      "directCareerUrl": "https://jobs.avalonbay.com/search-jobs",
+      "notes": "",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Manual review before adding; verify enough active technology roles.",
+      "poolStatus": "missing_from_pool",
+      "officialSourceEvidence": "Official AvalonBay search page exists and references technology direction, but current tech-role volume needs confirmation.",
+      "suggestedSourceType": "scraper",
+      "suggestedSourceSlug": "avalonbay-careers",
+      "suggestedMetadata": {
+        "adapterNeeded": "avalonbay_or_scraper",
+        "searchText": "technology",
+        "country": "United States"
+      },
+      "techHiringSignal": "medium",
+      "reviewedAt": "2026-05-21T21:08:19.273Z",
+      "sourcePolicy": "research_only_not_ingested"
+    },
+    {
+      "company": "Related Group",
+      "status": "low_priority",
+      "confidence": "low",
+      "score": 52,
+      "inCurrentPool": false,
+      "signals": [
+        "real estate and property management software",
+        "location matches miami",
+        "client industry matches construction",
+        "client industry matches real estate"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "Software Engineer Front End",
+          "location": "Miami, FL",
+          "clientIndustry": "Real Estate and Property Management"
+        },
+        {
+          "title": "Senior Salesforce Software Engineer",
+          "location": "Miami, FL",
+          "clientIndustry": "Construction - Residential & Commercial/Office"
+        },
+        {
+          "title": "Software Engineer in Test",
+          "location": "Miami, FL",
+          "clientIndustry": "Construction - Residential & Commercial/Office"
+        }
+      ],
+      "directCareerUrl": "https://relatedgroup.com/careers/",
+      "notes": "",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Skip for now unless we see direct tech roles.",
+      "poolStatus": "missing_from_pool",
+      "officialSourceEvidence": "Official careers page exists, but public evidence points more to real-estate/property roles than a strong recurring technology job feed.",
+      "suggestedSourceType": "scraper",
+      "suggestedSourceSlug": "related-group-careers",
+      "suggestedMetadata": {
+        "adapterNeeded": "related_group_or_scraper",
+        "searchText": "technology",
+        "country": "United States"
+      },
+      "techHiringSignal": "weak",
+      "reviewedAt": "2026-05-21T21:08:19.273Z",
+      "sourcePolicy": "research_only_not_ingested"
+    },
+    {
+      "company": "Verizon",
+      "status": "ready_for_review",
+      "confidence": "low",
+      "score": 40,
+      "inCurrentPool": false,
+      "signals": [
+        "telecom and network platforms",
+        "client industry matches telecom",
+        "client industry matches communications"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "Software Developer",
+          "location": "Maryland Heights, MO",
+          "clientIndustry": "Telecommunications Services"
+        },
+        {
+          "title": "SDET/Full Stack Engineer",
+          "location": "Greenwood Village, CO",
+          "clientIndustry": "Telecommunications Services"
+        }
+      ],
+      "directCareerUrl": "https://mycareer.verizon.com/career-paths/technology/",
+      "notes": "",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Good candidate; extract Phenom config before adding.",
+      "poolStatus": "missing_from_pool",
+      "officialSourceEvidence": "Official Verizon Technology career path exists with keyword search.",
+      "suggestedSourceType": "phenom",
+      "suggestedSourceSlug": "verizon-phenom",
+      "suggestedMetadata": {
+        "adapterNeeded": "phenom_config_lookup",
+        "searchText": "software engineering",
+        "country": "United States"
+      },
+      "techHiringSignal": "strong",
+      "reviewedAt": "2026-05-21T21:08:19.273Z",
+      "sourcePolicy": "research_only_not_ingested"
+    },
+    {
+      "company": "Lumen",
+      "status": "ready_for_review",
+      "confidence": "low",
+      "score": 40,
+      "inCurrentPool": false,
+      "signals": [
+        "telecom and network platforms",
+        "client industry matches telecom",
+        "client industry matches communications"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "Software Developer",
+          "location": "Maryland Heights, MO",
+          "clientIndustry": "Telecommunications Services"
+        },
+        {
+          "title": "SDET/Full Stack Engineer",
+          "location": "Greenwood Village, CO",
+          "clientIndustry": "Telecommunications Services"
+        }
+      ],
+      "directCareerUrl": "https://jobs.lumen.com/global/en/",
+      "notes": "",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Good candidate; verify source backend before adding.",
+      "poolStatus": "missing_from_pool",
+      "officialSourceEvidence": "Official Lumen careers page includes High Tech and Technology/Network careers.",
+      "suggestedSourceType": "scraper",
+      "suggestedSourceSlug": "lumen-careers",
+      "suggestedMetadata": {
+        "adapterNeeded": "lumen_or_scraper",
+        "searchText": "software engineering",
+        "country": "United States"
+      },
+      "techHiringSignal": "strong",
+      "reviewedAt": "2026-05-21T21:08:19.273Z",
+      "sourcePolicy": "research_only_not_ingested"
+    },
+    {
+      "company": "Kaseya",
+      "status": "ready_for_review",
+      "confidence": "low",
+      "score": 18,
+      "inCurrentPool": false,
+      "signals": [
+        "South Florida technology hiring",
+        "location matches miami",
+        "location matches boca raton"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "Software Engineer Front End",
+          "location": "Miami, FL",
+          "clientIndustry": "Real Estate and Property Management"
+        },
+        {
+          "title": "Senior Salesforce Software Engineer",
+          "location": "Miami, FL",
+          "clientIndustry": "Construction - Residential & Commercial/Office"
+        },
+        {
+          "title": "Software Engineer in Test",
+          "location": "Miami, FL",
+          "clientIndustry": "Construction - Residential & Commercial/Office"
+        }
+      ],
+      "directCareerUrl": "https://www.kaseya.com/careers/jobs/",
+      "notes": "",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Good candidate; verify source backend before adding.",
+      "poolStatus": "missing_from_pool",
+      "officialSourceEvidence": "Official Kaseya careers site is live and public search evidence shows software engineering roles.",
+      "suggestedSourceType": "scraper",
+      "suggestedSourceSlug": "kaseya-careers",
+      "suggestedMetadata": {
+        "adapterNeeded": "kaseya_or_scraper",
+        "searchText": "software engineering",
+        "country": "United States"
+      },
+      "techHiringSignal": "strong",
+      "reviewedAt": "2026-05-21T21:08:19.273Z",
+      "sourcePolicy": "research_only_not_ingested"
+    },
+    {
+      "company": "Ryder",
+      "status": "ready_for_review",
+      "confidence": "low",
+      "score": 18,
+      "inCurrentPool": false,
+      "signals": [
+        "South Florida technology hiring",
+        "location matches miami",
+        "location matches boca raton"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "Software Engineer Front End",
+          "location": "Miami, FL",
+          "clientIndustry": "Real Estate and Property Management"
+        },
+        {
+          "title": "Senior Salesforce Software Engineer",
+          "location": "Miami, FL",
+          "clientIndustry": "Construction - Residential & Commercial/Office"
+        },
+        {
+          "title": "Software Engineer in Test",
+          "location": "Miami, FL",
+          "clientIndustry": "Construction - Residential & Commercial/Office"
+        }
+      ],
+      "directCareerUrl": "https://www.ryder.com/en-us/careers",
+      "notes": "",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Good candidate; verify source backend before adding.",
+      "poolStatus": "missing_from_pool",
+      "officialSourceEvidence": "Official Ryder careers page explicitly lists Information Technology roles such as DevOps, IT Application Development Lead, and .NET Developers.",
+      "suggestedSourceType": "scraper",
+      "suggestedSourceSlug": "ryder-careers",
+      "suggestedMetadata": {
+        "adapterNeeded": "ryder_or_scraper",
+        "searchText": "information technology",
+        "country": "United States"
+      },
+      "techHiringSignal": "strong",
+      "reviewedAt": "2026-05-21T21:08:19.273Z",
+      "sourcePolicy": "research_only_not_ingested"
+    },
+    {
+      "company": "Lennar",
+      "status": "needs_manual_review",
+      "confidence": "low",
+      "score": 18,
+      "inCurrentPool": false,
+      "signals": [
+        "South Florida technology hiring",
+        "location matches miami",
+        "location matches boca raton"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "Software Engineer Front End",
+          "location": "Miami, FL",
+          "clientIndustry": "Real Estate and Property Management"
+        },
+        {
+          "title": "Senior Salesforce Software Engineer",
+          "location": "Miami, FL",
+          "clientIndustry": "Construction - Residential & Commercial/Office"
+        },
+        {
+          "title": "Software Engineer in Test",
+          "location": "Miami, FL",
+          "clientIndustry": "Construction - Residential & Commercial/Office"
+        }
+      ],
+      "directCareerUrl": "https://careers.lennar.com/en-US/search?facetdiscretefield5=corporate+technology",
+      "notes": "",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Manual review before adding; confirm current active tech roles.",
+      "poolStatus": "missing_from_pool",
+      "officialSourceEvidence": "Official Lennar search can be filtered to corporate technology, but active software-role volume needs confirmation.",
+      "suggestedSourceType": "scraper",
+      "suggestedSourceSlug": "lennar-corporate-technology",
+      "suggestedMetadata": {
+        "adapterNeeded": "lennar_or_scraper",
+        "searchText": "technology",
+        "country": "United States"
+      },
+      "techHiringSignal": "medium",
+      "reviewedAt": "2026-05-21T21:08:19.273Z",
+      "sourcePolicy": "research_only_not_ingested"
+    },
+    {
+      "company": "Royal Caribbean Group",
+      "status": "ready_for_review",
+      "confidence": "low",
+      "score": 18,
+      "inCurrentPool": false,
+      "signals": [
+        "South Florida technology hiring",
+        "location matches miami",
+        "location matches boca raton"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "Software Engineer Front End",
+          "location": "Miami, FL",
+          "clientIndustry": "Real Estate and Property Management"
+        },
+        {
+          "title": "Senior Salesforce Software Engineer",
+          "location": "Miami, FL",
+          "clientIndustry": "Construction - Residential & Commercial/Office"
+        },
+        {
+          "title": "Software Engineer in Test",
+          "location": "Miami, FL",
+          "clientIndustry": "Construction - Residential & Commercial/Office"
+        }
+      ],
+      "directCareerUrl": "https://careers.royalcaribbeangroup.com/shore/",
+      "notes": "",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Good candidate; verify source backend before adding.",
+      "poolStatus": "missing_from_pool",
+      "officialSourceEvidence": "Official Royal Caribbean Group shore careers page includes Technology and public examples include cybersecurity roles.",
+      "suggestedSourceType": "successfactors",
+      "suggestedSourceSlug": "royal-caribbean-successfactors",
+      "suggestedMetadata": {
+        "adapterNeeded": "successfactors_or_scraper",
+        "searchText": "technology",
+        "country": "United States"
+      },
+      "techHiringSignal": "strong",
+      "reviewedAt": "2026-05-21T21:08:19.273Z",
+      "sourcePolicy": "research_only_not_ingested"
+    },
+    {
+      "company": "Citadel Securities",
+      "status": "candidate",
+      "confidence": "low",
+      "score": 18,
+      "inCurrentPool": false,
+      "signals": [
+        "South Florida technology hiring",
+        "location matches miami",
+        "location matches boca raton"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "Software Engineer Front End",
+          "location": "Miami, FL",
+          "clientIndustry": "Real Estate and Property Management"
+        },
+        {
+          "title": "Senior Salesforce Software Engineer",
+          "location": "Miami, FL",
+          "clientIndustry": "Construction - Residential & Commercial/Office"
+        },
+        {
+          "title": "Software Engineer in Test",
+          "location": "Miami, FL",
+          "clientIndustry": "Construction - Residential & Commercial/Office"
+        }
+      ],
+      "directCareerUrl": null,
+      "notes": "",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Verify the official company career board and add only direct-source jobs."
+    },
+    {
+      "company": "Amazon",
+      "status": "candidate",
+      "confidence": "low",
+      "score": 15,
+      "inCurrentPool": false,
+      "signals": [
+        "Seattle-area technology hiring",
+        "location matches seattle",
+        "location matches bellevue"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "Software Dev Engineer",
+          "location": "Bellevue, WA",
+          "clientIndustry": "Retail"
+        },
+        {
+          "title": "Software Development Engineer",
+          "location": "Seattle, WA",
+          "clientIndustry": "Retail"
+        },
+        {
+          "title": "Software Development Engineer",
+          "location": "Seattle, WA",
+          "clientIndustry": "Retail"
+        }
+      ],
+      "directCareerUrl": null,
+      "notes": "",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Verify the official company career board and add only direct-source jobs."
+    },
+    {
+      "company": "Microsoft",
+      "status": "candidate",
+      "confidence": "low",
+      "score": 15,
+      "inCurrentPool": false,
+      "signals": [
+        "Seattle-area technology hiring",
+        "location matches seattle",
+        "location matches bellevue"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "Software Dev Engineer",
+          "location": "Bellevue, WA",
+          "clientIndustry": "Retail"
+        },
+        {
+          "title": "Software Development Engineer",
+          "location": "Seattle, WA",
+          "clientIndustry": "Retail"
+        },
+        {
+          "title": "Software Development Engineer",
+          "location": "Seattle, WA",
+          "clientIndustry": "Retail"
+        }
+      ],
+      "directCareerUrl": null,
+      "notes": "",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Verify the official company career board and add only direct-source jobs."
+    },
+    {
+      "company": "Costco",
+      "status": "candidate",
+      "confidence": "low",
+      "score": 15,
+      "inCurrentPool": false,
+      "signals": [
+        "Seattle-area technology hiring",
+        "location matches seattle",
+        "location matches bellevue"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "Software Dev Engineer",
+          "location": "Bellevue, WA",
+          "clientIndustry": "Retail"
+        },
+        {
+          "title": "Software Development Engineer",
+          "location": "Seattle, WA",
+          "clientIndustry": "Retail"
+        },
+        {
+          "title": "Software Development Engineer",
+          "location": "Seattle, WA",
+          "clientIndustry": "Retail"
+        }
+      ],
+      "directCareerUrl": null,
+      "notes": "",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Verify the official company career board and add only direct-source jobs."
+    },
+    {
+      "company": "Toyota",
+      "status": "candidate",
+      "confidence": "low",
+      "score": 9,
+      "inCurrentPool": false,
+      "signals": [
+        "Dallas and Plano technology hiring",
+        "location matches irving",
+        "location matches dallas"
+      ],
+      "exampleAgencyRoles": [
+        {
+          "title": "Software Development Engineer",
+          "location": "Irving, TX",
+          "clientIndustry": "Retail"
+        },
+        {
+          "title": "Software Dev Engineer",
+          "location": "Dallas, TX",
+          "clientIndustry": "Retail"
+        },
+        {
+          "title": "API Developer",
+          "location": "Irving, TX",
+          "clientIndustry": "Banking and Consumer Lending"
+        }
+      ],
+      "directCareerUrl": null,
+      "notes": "",
+      "firstSeenAt": "2026-05-21T18:58:32.050Z",
+      "lastSeenAt": "2026-05-21T18:58:32.050Z",
+      "nextAction": "Verify the official company career board and add only direct-source jobs."
+    }
+  ],
+  "reviewPolicy": "Kforce-derived leads are offline research only. Do not create job_sources rows or ingest jobs from these leads until a specific company is explicitly approved.",
+  "firstTwentyReview": {
+    "reviewedAt": "2026-05-21T21:08:19.273Z",
+    "scope": "First 20 Kforce lead candidates only.",
+    "actionTaken": "Updated this JSON research notebook with direct career-board evidence and pool status. No job_sources rows were added."
+  }
+}

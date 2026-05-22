@@ -7,8 +7,6 @@ import {
   Award,
   BadgeCheck,
   BriefcaseBusiness,
-  Eye,
-  EyeOff,
   FileText,
   GraduationCap,
   Link as LinkIcon,
@@ -40,7 +38,7 @@ import type {
   ResumeViewState,
   WorkExperience,
 } from "./profile-types";
-import { buildLocation, getInitials, getVisibility } from "./profile-utils";
+import { buildLocation, getInitials } from "./profile-utils";
 
 type ProfileInfoSectionProps = {
   profile: JobSeekerProfile;
@@ -119,7 +117,6 @@ function hasProfileChanges(
     normalizeText(profile.phone) !== normalizeText(draft.phone) ||
     normalizeText(profile.headline) !== normalizeText(draft.headline) ||
     Boolean(profile.open_to_relocation) !== Boolean(draft.open_to_relocation) ||
-    getVisibility(profile.visibility) !== getVisibility(draft.visibility) ||
     initialLocationQuery.trim() !== locationQuery.trim()
   );
 }
@@ -265,8 +262,6 @@ export default function ProfileInfoSection({
   const initials = getInitials(profile);
   const draftInitials = getInitials(draft);
   const location = buildLocation(profile);
-  const visibility = getVisibility(profile.visibility);
-  const isPublic = visibility === "public";
 
   const canSave =
     normalizeText(draft.full_name).length > 0 &&
@@ -287,13 +282,6 @@ export default function ProfileInfoSection({
     });
 
     setOpen(false);
-  };
-
-  const toggleVisibility = () => {
-    onProfileChange({
-      ...profile,
-      visibility: isPublic ? "private" : "public",
-    });
   };
 
   return (
@@ -322,10 +310,6 @@ export default function ProfileInfoSection({
                 />
 
                 <div className="min-w-0">
-                  <div className="inline-flex rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-muted-foreground ring-1 ring-border">
-                    Job seeker profile
-                  </div>
-
                   <h1
                     id="profile-info-heading"
                     className="mt-4 text-4xl font-bold tracking-tight text-foreground sm:text-5xl"
@@ -373,69 +357,15 @@ export default function ProfileInfoSection({
                 <Pencil aria-hidden="true" className="size-4" />
                 Edit
               </Button>
-            </div>
 
-            <div className="mt-8 border border-[#f2f2f2] bg-white/90 p-5 shadow-none backdrop-blur [border-radius:3px]">
-              <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-start gap-3">
-                  <div
-                    className={[
-                      "grid size-11 shrink-0 place-items-center rounded-2xl",
-                      isPublic
-                        ? "bg-emerald-50 text-emerald-700"
-                        : "bg-muted text-muted-foreground",
-                    ].join(" ")}
-                    aria-hidden="true"
-                  >
-                    {isPublic ? (
-                      <Eye className="size-5" />
-                    ) : (
-                      <EyeOff className="size-5" />
-                    )}
-                  </div>
-
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold text-foreground">
-                        Your profile is {isPublic ? "public" : "private"}
-                      </p>
-
-                      {isPublic && (
-                        <BadgeCheck
-                          aria-hidden="true"
-                          className="size-4 text-emerald-700"
-                        />
-                      )}
-                    </div>
-
-                    <p className="mt-1 max-w-xl text-sm leading-6 text-muted-foreground">
-                      {isPublic
-                        ? "Employers can find your profile and contact you about relevant opportunities."
-                        : "Only employers you apply to can see your application details."}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setEmployerPreviewOpen(true)}
-                    className="border border-[#f2f2f2] px-5 font-semibold shadow-none [border-radius:3px]"
-                  >
-                    View as Employer
-                  </Button>
-
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={toggleVisibility}
-                    className="font-semibold [border-radius:3px]"
-                  >
-                    {isPublic ? "Set to Private" : "Set to Public"}
-                  </Button>
-                </div>
-              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEmployerPreviewOpen(true)}
+                className="border border-[#f2f2f2] bg-white px-5 font-semibold shadow-none [border-radius:3px]"
+              >
+                View as Employer
+              </Button>
             </div>
           </div>
         </div>
@@ -448,8 +378,8 @@ export default function ProfileInfoSection({
               About Me
             </DialogTitle>
             <DialogDescription className="mt-2 text-sm text-muted-foreground">
-              Update your profile photo, contact details, location, and profile
-              visibility.
+              Update your profile photo, contact details, location, and
+              relocation preference.
             </DialogDescription>
           </div>
 
@@ -639,59 +569,6 @@ export default function ProfileInfoSection({
                 </div>
               </fieldset>
             </section>
-
-            <section aria-labelledby="visibility-heading">
-              <h2
-                id="visibility-heading"
-                className="text-xl font-bold tracking-tight"
-              >
-                Profile visibility
-              </h2>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setDraft({
-                    ...draft,
-                    visibility:
-                      getVisibility(draft.visibility) === "public"
-                        ? "private"
-                        : "public",
-                  })
-                }
-                className="mt-3 flex w-full items-start gap-3 rounded-2xl border border-border bg-white p-4 text-left transition hover:bg-muted/40"
-              >
-                <div
-                  className={[
-                    "grid size-10 shrink-0 place-items-center rounded-xl",
-                    getVisibility(draft.visibility) === "public"
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "bg-muted text-muted-foreground",
-                  ].join(" ")}
-                  aria-hidden="true"
-                >
-                  {getVisibility(draft.visibility) === "public" ? (
-                    <Eye className="size-5" />
-                  ) : (
-                    <EyeOff className="size-5" />
-                  )}
-                </div>
-
-                <span>
-                  <span className="block text-sm font-semibold">
-                    Your profile is{" "}
-                    {getVisibility(draft.visibility) === "public"
-                      ? "public"
-                      : "private"}
-                  </span>
-                  <span className="mt-1 block text-sm leading-6 text-muted-foreground">
-                    {getVisibility(draft.visibility) === "public"
-                      ? "Employers may discover your profile and contact you about relevant opportunities."
-                      : "Only employers you apply to can see your application details."}
-                  </span>
-                </span>
-              </button>
-            </section>
           </div>
 
           <div className="sticky bottom-0 border-t border-border bg-background px-7 py-5">
@@ -750,20 +627,6 @@ export default function ProfileInfoSection({
                       <span>Willing to relocate</span>
                     ) : (
                       <span>Open to local opportunities</span>
-                    )}
-                  </div>
-
-                  <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                    {isPublic ? (
-                      <>
-                        <Eye aria-hidden="true" className="size-3.5" />
-                        Public profile
-                      </>
-                    ) : (
-                      <>
-                        <EyeOff aria-hidden="true" className="size-3.5" />
-                        Private profile
-                      </>
                     )}
                   </div>
                 </div>

@@ -94,15 +94,17 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
     setLoading(true);
 
     if (mode === "forgot") {
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        email.trim(),
-        {
-          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/reset-password")}`,
-        },
-      );
+      const response = await fetch("/api/auth/password-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
       setLoading(false);
-      if (error) {
-        toast.error(error.message);
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        toast.error(body?.error ?? "Could not send reset link.");
         return;
       }
       toast.success("Password reset link sent.");
@@ -110,26 +112,23 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
     }
 
     if (mode === "signup") {
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(routeForRole(role))}`,
-          data: { full_name: fullName, role },
-        },
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          fullName,
+          password,
+          role,
+        }),
       });
       setLoading(false);
-      if (error) {
-        toast.error(error.message);
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        toast.error(body?.error ?? "Could not create account.");
         return;
-      }
-
-      if (data.session) {
-        await fetch("/api/auth/role", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ role, fullName }),
-        });
       }
 
       toast.success("Check your email to confirm your account.");

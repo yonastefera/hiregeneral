@@ -21,6 +21,7 @@ type PhenomConfig = {
   selectedFields: Record<string, string[]>;
   pageSize: number;
   maxPages: number;
+  preferPublicJobUrl: boolean;
 };
 
 type PhenomJob = {
@@ -85,6 +86,11 @@ function metadataNumber(source: JobSource, key: string) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function metadataBoolean(source: JobSource, key: string) {
+  const value = source.metadata[key];
+  return typeof value === "boolean" ? value : false;
+}
+
 function metadataStringArray(source: JobSource, key: string) {
   const value = source.metadata[key];
 
@@ -144,6 +150,7 @@ function phenomConfig(source: JobSource): PhenomConfig {
       Math.max(metadataNumber(source, "maxPages") ?? 4, 1),
       20,
     ),
+    preferPublicJobUrl: metadataBoolean(source, "preferPublicJobUrl"),
   };
 }
 
@@ -222,14 +229,29 @@ function postedAt(job: PhenomJob) {
     : parsed.toISOString();
 }
 
+function publicJobUrl(config: PhenomConfig, job: PhenomJob) {
+  const id = job.jobSeqNo ?? job.jobId ?? job.reqId;
+
+  if (!id) return config.baseUrl;
+
+  const slug = compact(job.title)
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
+
+  return [config.baseUrl, "job", encodeURIComponent(id), slug]
+    .filter(Boolean)
+    .join("/");
+}
+
 function applyUrl(config: PhenomConfig, job: PhenomJob) {
+  if (config.preferPublicJobUrl) return publicJobUrl(config, job);
+
   if (job.applyUrl) return job.applyUrl;
 
-  const seq = job.jobSeqNo ?? job.jobId ?? job.reqId;
-
-  return seq
-    ? `${config.baseUrl}/job/${encodeURIComponent(seq)}`
-    : config.baseUrl;
+  return publicJobUrl(config, job);
 }
 
 async function fetchSearchPage(params: {

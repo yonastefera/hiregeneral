@@ -10,7 +10,6 @@ import {
   Mail,
   RotateCcw,
   Save,
-  ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -22,7 +21,6 @@ type NotificationPreferenceKey =
   | "jobAlerts"
   | "applicationUpdates"
   | "savedJobReminders"
-  | "profileVisibility"
   | "marketingEmails";
 
 type NotificationPreferences = Record<NotificationPreferenceKey, boolean>;
@@ -38,7 +36,6 @@ const defaultPreferences: NotificationPreferences = {
   jobAlerts: true,
   applicationUpdates: true,
   savedJobReminders: true,
-  profileVisibility: true,
   marketingEmails: false,
 };
 
@@ -63,13 +60,6 @@ const preferenceSections: PreferenceConfig[] = [
     description:
       "Get reminders about saved jobs before they become inactive or close.",
     icon: Bell,
-  },
-  {
-    key: "profileVisibility",
-    title: "Profile visibility updates",
-    description:
-      "Receive updates related to recruiter discovery and profile visibility.",
-    icon: ShieldCheck,
   },
   {
     key: "marketingEmails",
@@ -102,10 +92,6 @@ function normalizePreferences(value: unknown): NotificationPreferences {
       typeof maybePrefs.savedJobReminders === "boolean"
         ? maybePrefs.savedJobReminders
         : defaultPreferences.savedJobReminders,
-    profileVisibility:
-      typeof maybePrefs.profileVisibility === "boolean"
-        ? maybePrefs.profileVisibility
-        : defaultPreferences.profileVisibility,
     marketingEmails:
       typeof maybePrefs.marketingEmails === "boolean"
         ? maybePrefs.marketingEmails

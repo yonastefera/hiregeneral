@@ -136,9 +136,9 @@ export const livePipelineJobs = [
 ];
 
 export const trustedBrands = [
-  "Linear",
-  "Notion",
-  "Ramp",
+  "Kiser Permanente",
+  "Capital One",
+  "UMMS",
   "Vercel",
   "Figma",
   "Stripe",
