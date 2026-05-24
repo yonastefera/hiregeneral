@@ -55,7 +55,7 @@ export const footerSections: FooterSection[] = [
     title: "Company Information",
     icon: Globe2,
     links: [
-      { label: "About HireGeneral", to: "/about", audience: "public" },
+      { label: "About HireGeneral", to: "/why-us", audience: "public" },
       { label: "Contact", to: "/contact", audience: "public" },
       { label: "Privacy", to: "/privacy", audience: "public" },
       { label: "Terms", to: "/terms", audience: "public" },

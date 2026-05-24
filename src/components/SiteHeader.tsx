@@ -42,6 +42,7 @@ const publicNavLinks: HeaderNavLink[] = [
   { label: "Find jobs", href: "/jobs" },
   { label: "Salaries", href: "/salaries" },
   { label: "For employers", href: "/employers", exact: true },
+  { label: "Why us", href: "/why-us" },
 ];
 
 const jobSeekerNavLinks: HeaderNavLink[] = [

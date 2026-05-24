@@ -140,7 +140,7 @@ export const trustedBrands = [
   "Capital One",
   "UMMS",
   "Vercel",
-  "Figma",
+  "Cisco",
   "Stripe",
 ];
 

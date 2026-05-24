@@ -1,7 +1,3 @@
-// lib/email/send.ts
-// Central email helper — uses Resend + React Email templates
-// Install: npm install @react-email/components react-email resend
-
 import { Resend } from "resend";
 import { render } from "@react-email/components";
 import ConfirmEmail from "@/emails/confirm-email";
