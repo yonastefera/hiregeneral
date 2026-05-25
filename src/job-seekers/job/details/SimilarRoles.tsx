@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
+  ArrowUpRight,
   Bookmark,
   Clock3,
   ExternalLink,
@@ -15,9 +16,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
 import type { Job } from "@/lib/db/types";
+import { cn } from "@/lib/utils";
 import {
   daysAgoLabel,
-  formatSalary,
   getDisplayLocation,
   getDisplayTitle,
   similarSummary,
@@ -28,6 +29,22 @@ type SimilarRolesProps = {
   jobs: Job[];
 };
 
+const accentClasses = [
+  "from-teal-400 to-emerald-500",
+  "from-emerald-600 to-teal-800",
+  "from-orange-500 to-rose-500",
+  "from-sky-500 to-cyan-500",
+  "from-violet-500 to-fuchsia-500",
+];
+
+function accentFor(value: string) {
+  const index =
+    value.split("").reduce((total, char) => total + char.charCodeAt(0), 0) %
+    accentClasses.length;
+
+  return accentClasses[index];
+}
+
 function SimilarRoleCard({ job }: { job: Job }) {
   const { isSaved, toggleSaved, pendingId } = useSavedJobs();
 
@@ -36,11 +53,6 @@ function SimilarRoleCard({ job }: { job: Job }) {
   const displayTitle = getDisplayTitle(job);
   const postedDays = daysAgoLabel(job.posted_at);
   const isExternal = Boolean(job.apply_url);
-  const salary = formatSalary(
-    job.salary_min,
-    job.salary_max,
-    job.salary_currency,
-  );
   const logoUrl = supportedLogoUrl(job.company_logo_url);
   const displayLocation = getDisplayLocation(job);
   const saved = isSaved(job.id);
@@ -56,91 +68,98 @@ function SimilarRoleCard({ job }: { job: Job }) {
   };
 
   return (
-    <article className="rounded-xl border border-border bg-card p-5 shadow-soft transition-colors hover:border-primary/40 hover:shadow-lift">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex min-w-0 items-start gap-4">
-          {logoUrl ? (
-            <Image
-              src={logoUrl}
-              alt={`${job.company_name} logo`}
-              width={40}
-              height={40}
-              className="size-10 shrink-0 rounded-lg object-contain"
-            />
-          ) : (
-            <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-secondary text-xs font-bold text-secondary-foreground">
-              {logoInitials}
+    <article className="group rounded-[1.35rem] border border-black/5 bg-white p-4 shadow-[0_14px_40px_-30px_rgba(15,23,42,0.35)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_60px_-34px_rgba(15,23,42,0.45)]">
+      <div className="flex items-start gap-3.5">
+        {logoUrl ? (
+          <Image
+            src={logoUrl}
+            alt={`${job.company_name} logo`}
+            width={40}
+            height={40}
+            className="size-11 shrink-0 rounded-xl object-contain ring-1 ring-black/5"
+          />
+        ) : (
+          <div
+            className={cn(
+              "grid size-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br text-[11px] font-bold text-white shadow-sm",
+              accentFor(job.company_name),
+            )}
+          >
+            {logoInitials}
+          </div>
+        )}
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-[11px] font-semibold text-teal-700">
+                {job.company_name}
+              </p>
+
+              <Link
+                href={href}
+                className="mt-1 line-clamp-2 block text-[15px] font-semibold leading-snug tracking-tight text-neutral-950 transition-colors hover:text-teal-700"
+              >
+                {displayTitle}
+              </Link>
             </div>
-          )}
 
-          <div className="min-w-0">
-            <p className="truncate text-xs font-semibold text-primary">
-              {job.company_name}
-            </p>
-
-            <Link
-              href={href}
-              className="mt-1 line-clamp-2 block text-base font-bold leading-snug tracking-tight text-foreground transition-colors hover:text-primary"
+            <button
+              type="button"
+              aria-label={saved ? "Remove saved job" : "Save job"}
+              aria-pressed={saved}
+              disabled={saving}
+              onClick={onSaveClick}
+              className="grid size-9 shrink-0 place-items-center rounded-2xl border border-black/5 text-neutral-500 transition hover:bg-teal-50 hover:text-teal-700 disabled:cursor-wait disabled:opacity-70 aria-pressed:border-teal-200 aria-pressed:bg-teal-50 aria-pressed:text-teal-700"
             >
-              {displayTitle}
-            </Link>
+              {saving ? (
+                <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+              ) : (
+                <Bookmark
+                  aria-hidden="true"
+                  className={cn("size-5", saved && "fill-current")}
+                />
+              )}
+            </button>
+          </div>
+
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-neutral-500">
+            <span className="inline-flex min-w-0 items-center gap-1">
+              <MapPin aria-hidden="true" className="size-3 shrink-0" />
+              <span className="line-clamp-1" title={job.location}>
+                {displayLocation}
+              </span>
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Clock3 aria-hidden="true" className="size-3" />
+              {postedDays === 0 ? "Today" : `${postedDays}d ago`}
+            </span>
+          </div>
+
+          <p className="mt-3 line-clamp-2 text-[13px] leading-5 text-neutral-600">
+            {similarSummary(job)}
+          </p>
+
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <Badge variant="success">{job.employment_type}</Badge>
+            <Badge variant="soft">{job.work_mode}</Badge>
           </div>
         </div>
-
-        <button
-          type="button"
-          aria-label={saved ? "Remove saved job" : "Save job"}
-          aria-pressed={saved}
-          disabled={saving}
-          onClick={onSaveClick}
-          className="grid size-10 shrink-0 place-items-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:cursor-wait disabled:opacity-70 aria-pressed:border-primary/40 aria-pressed:bg-primary/10 aria-pressed:text-primary"
-        >
-          {saving ? (
-            <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-          ) : (
-            <Bookmark
-              aria-hidden="true"
-              className={saved ? "size-5 fill-current" : "size-5"}
-            />
-          )}
-        </button>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
-        <span className="inline-flex min-w-0 items-center gap-1.5">
-          <MapPin aria-hidden="true" className="size-3.5 shrink-0" />
-          <span className="line-clamp-1" title={job.location}>
-            {displayLocation}
-          </span>
-        </span>
-
-        <span className="inline-flex items-center gap-1.5">
-          <Clock3 aria-hidden="true" className="size-3.5" />
-          {postedDays === 0 ? "Today" : `${postedDays}d ago`}
-        </span>
-      </div>
-
-      <div className="mt-5 border-t border-dashed border-border" />
-
-      <p className="mt-5 line-clamp-3 text-sm leading-6 text-muted-foreground">
-        {similarSummary(job)}
-      </p>
-
-      <div className="mt-5 flex flex-wrap items-center gap-2">
-        <Badge variant="secondary">{job.employment_type}</Badge>
-        <Badge variant="soft">{job.work_mode}</Badge>
-        {salary && <Badge variant="secondary">{salary}</Badge>}
-      </div>
-
-      <div className="mt-5 flex items-center justify-between gap-3 border-t border-border/60 pt-4">
+      <div className="mt-3 flex items-center justify-between gap-3 border-t border-black/5 pt-3">
         <Link
           href={href}
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground transition-colors hover:text-primary"
+          className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-neutral-700 transition hover:text-teal-700"
         >
           Details <ArrowRight aria-hidden="true" className="size-3.5" />
         </Link>
 
-        <Button size="sm" asChild={!isExternal}>
+        <Button
+          size="sm"
+          className="min-w-[88px] gap-1.5 bg-neutral-950 px-3 text-white hover:bg-neutral-800 [&_svg]:size-3.5"
+          asChild
+        >
           {isExternal && job.apply_url ? (
             <a href={job.apply_url} target="_blank" rel="noopener noreferrer">
               Apply
@@ -149,7 +168,7 @@ function SimilarRoleCard({ job }: { job: Job }) {
           ) : (
             <Link href={`${href}/apply`}>
               Apply
-              <ArrowRight aria-hidden="true" className="size-3.5" />
+              <ArrowUpRight aria-hidden="true" className="size-3.5" />
             </Link>
           )}
         </Button>
@@ -162,8 +181,8 @@ export default function SimilarRoles({ jobs }: SimilarRolesProps) {
   if (jobs.length === 0) return null;
 
   return (
-    <section className="space-y-4">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+    <section className="space-y-3">
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-teal-700">
         Similar roles
       </h2>
 

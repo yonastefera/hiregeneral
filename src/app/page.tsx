@@ -5,7 +5,8 @@ import { getIndexPageSchema, indexPageMetadata } from "@/home/index-metadata";
 export const metadata = indexPageMetadata;
 
 export default async function HomePage() {
-  const { highlightedJobs } = await getIndexPageData();
+  const { highlightedJobs, salaryBands, marketCategories } =
+    await getIndexPageData();
 
   return (
     <>
@@ -16,7 +17,11 @@ export default async function HomePage() {
         }}
       />
 
-      <Index initialHighlightedJobs={highlightedJobs} />
+      <Index
+        initialHighlightedJobs={highlightedJobs}
+        initialMarketCategories={marketCategories}
+        initialSalaryBands={salaryBands}
+      />
     </>
   );
 }

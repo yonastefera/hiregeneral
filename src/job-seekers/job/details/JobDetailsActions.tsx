@@ -12,6 +12,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
+import { cn } from "@/lib/utils";
 
 type JobDetailsActionsProps = {
   jobId: string;
@@ -19,7 +20,7 @@ type JobDetailsActionsProps = {
   companyName: string;
   title: string;
   applyUrl?: string | null;
-  variant?: "hero" | "cta";
+  variant?: "hero" | "cta" | "apply-card";
 };
 
 export default function JobDetailsActions({
@@ -41,7 +42,6 @@ export default function JobDetailsActions({
   const onApply = () => {
     if (isExternal && applyUrl) {
       window.open(applyUrl, "_blank", "noopener,noreferrer");
-      toast.success(`Opening ${companyName} careers page in a new tab.`);
       return;
     }
 
@@ -76,8 +76,12 @@ export default function JobDetailsActions({
 
   if (variant === "cta") {
     return (
-      <div className="mt-5 flex flex-wrap gap-2">
-        <Button variant="warm" size="lg" onClick={onApply}>
+      <div className="flex flex-wrap gap-3">
+        <Button
+          className="h-13 bg-white px-7 text-emerald-900 shadow-xl shadow-emerald-950/20 hover:bg-white/95"
+          size="lg"
+          onClick={onApply}
+        >
           {isExternal ? (
             <>
               Apply on {companyName}
@@ -92,7 +96,10 @@ export default function JobDetailsActions({
         </Button>
 
         <Button
-          variant={saved ? "warm" : "glass"}
+          className={cn(
+            "h-13 border-white/25 bg-white/10 px-7 text-white hover:bg-white/15",
+            saved && "bg-white text-emerald-900 hover:bg-white/95",
+          )}
           size="lg"
           onClick={onSave}
           disabled={saving}
@@ -107,6 +114,54 @@ export default function JobDetailsActions({
           )}
           {saving ? "Saving…" : saved ? "Saved" : "Save for later"}
         </Button>
+      </div>
+    );
+  }
+
+  if (variant === "apply-card") {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={onApply}
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-br from-teal-500 via-emerald-500 to-teal-700 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/30 transition hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 active:scale-[0.99]"
+        >
+          {isExternal ? `Apply on ${companyName}` : "Apply now"}
+          {isExternal ? (
+            <ExternalLink aria-hidden="true" className="size-4" />
+          ) : (
+            <ArrowUpRight aria-hidden="true" className="size-4" />
+          )}
+        </button>
+
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            aria-pressed={saved}
+            onClick={onSave}
+            disabled={saving}
+            className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-teal-50 px-4 py-2.5 text-[13px] font-medium text-teal-800 ring-1 ring-teal-200/60 transition hover:bg-teal-100 disabled:cursor-wait disabled:opacity-70"
+          >
+            {saving ? (
+              <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
+            ) : (
+              <Bookmark
+                aria-hidden="true"
+                className={cn("size-3.5", saved && "fill-current")}
+              />
+            )}
+            {saving ? "Saving..." : saved ? "Saved" : "Save"}
+          </button>
+
+          <button
+            type="button"
+            onClick={onShare}
+            className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-orange-50 px-4 py-2.5 text-[13px] font-medium text-orange-800 ring-1 ring-orange-200/60 transition hover:bg-orange-100"
+          >
+            <Share2 aria-hidden="true" className="size-3.5" />
+            Share
+          </button>
+        </div>
       </div>
     );
   }

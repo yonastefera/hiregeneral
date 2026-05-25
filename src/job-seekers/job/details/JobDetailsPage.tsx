@@ -2,19 +2,22 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowLeft,
-  BriefcaseBusiness,
-  Building2,
+  Briefcase,
+  Check,
   CheckCircle2,
   Clock3,
   Globe,
+  Heart,
   MapPin,
   Sparkles,
+  Star,
   Users,
 } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import type { Job } from "@/lib/db/types";
+import { cn } from "@/lib/utils";
 import JobDetailsActions from "./JobDetailsActions";
 import JobPostingJsonLd from "./JobPostingJsonLd";
 import SimilarRoles from "./SimilarRoles";
@@ -32,6 +35,93 @@ type JobDetailsPageProps = {
   jobId: string;
 };
 
+function LogoMark({
+  job,
+  size = "lg",
+  dark = false,
+}: {
+  job: Job;
+  size?: "md" | "lg";
+  dark?: boolean;
+}) {
+  const logoUrl = supportedLogoUrl(job.company_logo_url);
+  const logoInitials = job.company_name.slice(0, 2).toUpperCase();
+  const sizeClass =
+    size === "lg" ? "size-24 rounded-3xl" : "size-10 rounded-xl";
+
+  if (logoUrl) {
+    return (
+      <Image
+        src={logoUrl}
+        alt={`${job.company_name} logo`}
+        width={size === "lg" ? 96 : 40}
+        height={size === "lg" ? 96 : 40}
+        className={cn(
+          sizeClass,
+          "shrink-0 object-contain ring-1 ring-black/5",
+          dark ? "bg-white/10" : "bg-white",
+        )}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "grid shrink-0 place-items-center bg-gradient-to-br from-teal-400 to-emerald-500 font-bold text-white shadow-[0_24px_60px_-18px_rgba(13,148,136,0.35)] ring-1 ring-teal-900/10",
+        sizeClass,
+        size === "lg" ? "text-xl" : "text-[11px]",
+      )}
+    >
+      {logoInitials}
+    </div>
+  );
+}
+
+function postedLabel(days: number) {
+  if (days === 0) return "Posted today";
+  if (days === 1) return "Posted 1 day ago";
+  return `Posted ${days} days ago`;
+}
+
+function HeroPill({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 backdrop-blur",
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+function SectionCard({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <article
+      className={cn(
+        "relative overflow-hidden rounded-3xl bg-white p-6 ring-1 ring-black/[0.06] shadow-[0_1px_0_rgba(0,0,0,0.02)] md:p-8",
+        className,
+      )}
+    >
+      {children}
+    </article>
+  );
+}
+
 export default async function JobDetailsPage({ jobId }: JobDetailsPageProps) {
   const { job, related } = await getJobDetailsPageData(jobId);
 
@@ -45,335 +135,448 @@ export default async function JobDetailsPage({ jobId }: JobDetailsPageProps) {
     job.salary_max,
     job.salary_currency,
   );
-
   const postedDays = daysAgoLabel(job.posted_at);
-  const logoInitials = job.company_name.slice(0, 2).toUpperCase();
-  const logoUrl = supportedLogoUrl(job.company_logo_url);
   const displayTitle = getDisplayTitle(job);
   const heroLocation = getDisplayLocation(job);
+  const applicantCount = job.applicant_count ?? 0;
+  const heroPills = [
+    {
+      label: job.work_mode,
+      className: "bg-white/80 text-neutral-800 ring-black/5",
+    },
+    job.category && {
+      label: job.category,
+      className: "bg-teal-50 text-teal-800 ring-teal-200/60",
+    },
+    salary && {
+      label: salary,
+      className: "bg-emerald-50 text-emerald-800 ring-emerald-200/70",
+    },
+    job.experience_level && {
+      label: job.experience_level,
+      className: "bg-orange-50 text-orange-800 ring-orange-200/70",
+    },
+  ].filter((pill): pill is { label: string; className: string } =>
+    Boolean(pill),
+  );
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="min-h-screen bg-[#f0f6f7] text-neutral-950 antialiased">
       <JobPostingJsonLd job={job} />
 
-      <section className="border-b border-border bg-hero-gradient px-4 pb-10 pt-8">
-        <div className="mx-auto max-w-416 px-4 md:px-6 xl:px-8">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="mb-4 -ml-3 text-muted-foreground hover:text-foreground"
-            asChild
+      <section className="relative overflow-hidden bg-[#f0f6f7]">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(60% 55% at 10% 20%, rgba(94, 234, 212, 0.22) 0%, transparent 60%), radial-gradient(50% 45% at 90% 10%, rgba(251, 146, 60, 0.18) 0%, transparent 55%), radial-gradient(45% 50% at 50% 100%, rgba(110, 231, 183, 0.20) 0%, transparent 60%)",
+          }}
+        />
+
+        <div className="relative mx-auto max-w-7xl px-4 pt-8 md:px-6">
+          <Link
+            href="/jobs"
+            className="inline-flex items-center gap-1.5 text-[13px] text-neutral-600 transition hover:text-neutral-900"
           >
-            <Link href="/jobs">
-              <ArrowLeft aria-hidden="true" className="size-4" />
-              Back to results
-            </Link>
-          </Button>
+            <ArrowLeft aria-hidden="true" className="size-3.5" />
+            Back to results
+          </Link>
+        </div>
 
-          <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-            <div className="flex items-start gap-4">
-              {logoUrl ? (
-                <Image
-                  src={logoUrl}
-                  alt={`${job.company_name} logo`}
-                  width={64}
-                  height={64}
-                  className="size-16 shrink-0 rounded-xl object-contain shadow-lift"
-                />
-              ) : (
-                <div className="grid size-16 shrink-0 place-items-center rounded-xl bg-primary-gradient text-lg font-bold text-primary-foreground shadow-lift">
-                  {logoInitials}
+        <div className="relative mx-auto max-w-7xl px-4 pb-12 pt-6 md:px-6">
+          <div className="grid items-start gap-6 lg:grid-cols-12">
+            <div className="lg:col-span-8">
+              <div className="flex flex-wrap items-start gap-6">
+                <div className="relative">
+                  <LogoMark job={job} />
+                  <span className="absolute -bottom-1 -right-1 grid size-7 place-items-center rounded-full bg-emerald-500 text-white ring-2 ring-white">
+                    <Check
+                      aria-hidden="true"
+                      className="size-3.5"
+                      strokeWidth={3}
+                    />
+                  </span>
                 </div>
-              )}
 
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-muted-foreground">
-                  {job.company_name}
-                </p>
-
-                <h1 className="mt-1 text-balance text-3xl font-bold tracking-tight md:text-4xl">
-                  {displayTitle}
-                </h1>
-
-                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
-                  <span className="inline-flex items-center gap-1.5">
-                    <MapPin aria-hidden="true" className="size-4" />
-                    <span className="line-clamp-2" title={job.location}>
-                      {heroLocation}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2 text-[13px] font-semibold text-teal-700">
+                    <span className="rounded-md bg-teal-50 px-2 py-0.5 ring-1 ring-teal-200/60">
+                      {job.company_name}
                     </span>
-                  </span>
+                    <span className="text-neutral-300">/</span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm shadow-emerald-500/30">
+                      <Sparkles aria-hidden="true" className="size-3" />
+                      Curated role
+                    </span>
+                  </div>
 
-                  <span className="inline-flex items-center gap-1.5">
-                    <BriefcaseBusiness aria-hidden="true" className="size-4" />
-                    {job.employment_type}
-                  </span>
+                  <h1 className="mt-3 text-balance text-4xl font-semibold leading-[1.05] tracking-tight md:text-5xl">
+                    {displayTitle}
+                  </h1>
 
-                  <span className="inline-flex items-center gap-1.5">
-                    <Clock3 aria-hidden="true" className="size-4" />
-                    Posted{" "}
-                    {postedDays === 0 ? "today" : `${postedDays} days ago`}
-                  </span>
+                  <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-neutral-700">
+                    <span className="inline-flex items-center gap-1.5">
+                      <MapPin
+                        aria-hidden="true"
+                        className="size-3.5 text-teal-600"
+                      />
+                      <span className="line-clamp-2" title={job.location}>
+                        {heroLocation}
+                      </span>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Briefcase
+                        aria-hidden="true"
+                        className="size-3.5 text-orange-500"
+                      />
+                      {job.employment_type}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Clock3
+                        aria-hidden="true"
+                        className="size-3.5 text-emerald-600"
+                      />
+                      {postedLabel(postedDays)}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Users
+                        aria-hidden="true"
+                        className="size-3.5 text-rose-500"
+                      />
+                      {applicantCount} applicants
+                    </span>
+                  </div>
 
-                  <span className="inline-flex items-center gap-1.5">
-                    <Users aria-hidden="true" className="size-4" />
-                    {job.applicant_count ?? 0} applicants
-                  </span>
-                </div>
-
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  {salary && <Badge variant="success">{salary}</Badge>}
-
-                  <Badge variant="soft">{job.work_mode}</Badge>
-
-                  {job.experience_level && (
-                    <Badge variant="soft">{job.experience_level}</Badge>
+                  {heroPills.length > 0 && (
+                    <div className="mt-4 flex flex-wrap gap-1.5">
+                      {heroPills.map((pill) => (
+                        <HeroPill key={pill.label} className={pill.className}>
+                          {pill.label}
+                        </HeroPill>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>
             </div>
 
-            <JobDetailsActions
-              jobId={job.id}
-              slug={job.slug}
-              companyName={job.company_name}
-              title={displayTitle}
-              applyUrl={job.apply_url}
-            />
+            <div className="space-y-4 lg:col-span-4">
+              <div className="relative overflow-hidden rounded-3xl border border-teal-900/10 bg-white p-5 shadow-[0_30px_80px_-30px_rgba(13,148,136,0.35)]">
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -right-16 -top-16 size-40 rounded-full bg-gradient-to-br from-teal-300/40 to-emerald-400/30 blur-2xl"
+                />
+                <div className="relative">
+                  <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-emerald-700">
+                    <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
+                    Accepting applications
+                  </div>
+
+                  {salary && (
+                    <div className="mt-2 flex items-baseline gap-1.5">
+                      <span className="bg-gradient-to-br from-neutral-900 to-teal-800 bg-clip-text text-3xl font-semibold tracking-tight text-transparent">
+                        {salary}
+                      </span>
+                      <span className="text-xs text-neutral-500">/ year</span>
+                    </div>
+                  )}
+
+                  <div className="mt-4">
+                    <JobDetailsActions
+                      jobId={job.id}
+                      slug={job.slug}
+                      companyName={job.company_name}
+                      title={displayTitle}
+                      applyUrl={job.apply_url}
+                      variant="apply-card"
+                    />
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-3 gap-2 border-t border-dashed border-teal-900/10 pt-4">
+                    {[
+                      { k: "Type", v: job.employment_type, c: "text-teal-700" },
+                      { k: "Mode", v: job.work_mode, c: "text-orange-600" },
+                      {
+                        k: "Level",
+                        v: job.experience_level ?? "Open",
+                        c: "text-emerald-700",
+                      },
+                    ].map((item) => (
+                      <div key={item.k} className="min-w-0">
+                        <div className="text-[10px] uppercase tracking-wider text-neutral-400">
+                          {item.k}
+                        </div>
+                        <div
+                          className={cn(
+                            "mt-0.5 truncate text-[13px] font-semibold",
+                            item.c,
+                          )}
+                          title={item.v}
+                        >
+                          {item.v}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-black/5 bg-gradient-to-br from-neutral-950 to-neutral-800 p-5 text-white shadow-[0_30px_80px_-40px_rgba(15,23,42,0.7)]">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-500">
+                  Company
+                </div>
+                <div className="mt-3 flex items-center gap-3">
+                  <LogoMark job={job} size="md" dark />
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold">
+                      {job.company_name}
+                    </div>
+                    <div className="text-[12px] text-neutral-400">
+                      {heroLocation}
+                      {job.company_size ? ` / ${job.company_size}` : ""}
+                    </div>
+                  </div>
+                </div>
+
+                {job.company_website && (
+                  <a
+                    href={job.company_website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 inline-flex items-center gap-1 text-[13px] font-medium text-teal-300 hover:text-teal-200"
+                  >
+                    <Globe aria-hidden="true" className="size-3.5" />
+                    Visit careers site
+                  </a>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-416 gap-8 px-4 py-10 md:px-6 lg:grid-cols-[minmax(0,64rem)_minmax(26rem,32rem)] xl:px-8">
-        <article className="space-y-8">
-          {sections.about && (
-            <div className="rounded-xl border border-border bg-surface p-6 shadow-soft md:p-8">
-              <h2 className="text-2xl font-bold tracking-tight">
-                About the role
-              </h2>
-
-              <p className="mt-4 text-base leading-7 text-muted-foreground">
-                {sections.about}
-              </p>
-            </div>
-          )}
-
-          {sections.responsibilities.length > 0 && (
-            <div className="rounded-xl border border-border bg-surface p-6 shadow-soft md:p-8">
-              <h2 className="text-2xl font-bold tracking-tight">
-                What you&apos;ll do
-              </h2>
-
-              <ul className="mt-5 space-y-3">
-                {sections.responsibilities.map((item) => (
-                  <li
-                    key={item}
-                    className="flex items-start gap-3 text-sm leading-6 text-muted-foreground"
-                  >
-                    <CheckCircle2
-                      aria-hidden="true"
-                      className="mt-0.5 size-4 shrink-0 text-success"
-                    />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {sections.requirements.length > 0 && (
-            <div className="rounded-xl border border-border bg-surface p-6 shadow-soft md:p-8">
-              <h2 className="text-2xl font-bold tracking-tight">
-                What we&apos;re looking for
-              </h2>
-
-              <ul className="mt-5 space-y-3">
-                {sections.requirements.map((item) => (
-                  <li
-                    key={item}
-                    className="flex items-start gap-3 text-sm leading-6 text-muted-foreground"
-                  >
-                    <CheckCircle2
-                      aria-hidden="true"
-                      className="mt-0.5 size-4 shrink-0 text-primary"
-                    />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {sections.benefits.length > 0 && (
-            <div className="rounded-xl border border-border bg-surface p-6 shadow-soft md:p-8">
-              <h2 className="text-2xl font-bold tracking-tight">Benefits</h2>
-
-              <ul className="mt-5 grid gap-3 md:grid-cols-2">
-                {sections.benefits.map((item) => (
-                  <li
-                    key={item}
-                    className="flex items-start gap-3 rounded-lg bg-background/70 p-4 text-sm leading-6 text-muted-foreground ring-1 ring-inset ring-border/70"
-                  >
-                    <Sparkles
-                      aria-hidden="true"
-                      className="mt-0.5 size-4 shrink-0 text-accent"
-                    />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {sections.extra.length > 0 && (
-            <div className="rounded-xl border border-border bg-surface p-6 shadow-soft md:p-8">
-              <h2 className="text-2xl font-bold tracking-tight">
-                Additional details
-              </h2>
-
-              <div className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground">
-                {sections.extra.map((item) => (
-                  <p key={item}>{item}</p>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {job.skills.length > 0 && (
-            <div className="rounded-xl border border-border bg-surface p-6 shadow-soft md:p-8">
-              <h2 className="text-2xl font-bold tracking-tight">Skills</h2>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                {job.skills.map((skill) => (
-                  <Badge key={skill} variant="secondary" className="gap-1">
-                    <Sparkles aria-hidden="true" className="size-3" />
-                    {skill}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="rounded-xl border border-primary/20 bg-primary-gradient p-6 text-primary-foreground shadow-lift md:p-8">
-            <h2 className="text-2xl font-bold tracking-tight">
-              Ready to apply?
-            </h2>
-
-            <p className="mt-3 max-w-xl text-sm leading-6 text-primary-foreground/80">
-              {job.apply_url
-                ? `Applications are reviewed directly by the ${job.company_name} hiring team. You'll be redirected to their careers page.`
-                : "Submit your HireGeneral profile and resume to apply in one click."}
-            </p>
-
-            <JobDetailsActions
-              jobId={job.id}
-              slug={job.slug}
-              companyName={job.company_name}
-              title={displayTitle}
-              applyUrl={job.apply_url}
-              variant="cta"
-            />
-          </div>
-        </article>
-
-        <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
-          <div className="rounded-xl border border-border bg-surface p-6 shadow-soft">
-            <div className="flex items-center gap-3">
-              {logoUrl ? (
-                <Image
-                  src={logoUrl}
-                  alt={`${job.company_name} logo`}
-                  width={40}
-                  height={40}
-                  className="size-10 rounded-lg object-contain"
+      <section className="bg-gradient-to-b from-[#f0f6f7] via-[#f5f9fa] to-[#f0f6f7]">
+        <div className="mx-auto grid max-w-7xl gap-8 px-4 pb-12 pt-2 md:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(390px,430px)] xl:grid-cols-[minmax(0,1fr)_minmax(420px,460px)]">
+          <div className="space-y-6">
+            {sections.about && (
+              <SectionCard>
+                <span
+                  aria-hidden="true"
+                  className="absolute left-0 top-8 h-12 w-1 rounded-r bg-gradient-to-b from-teal-500 to-emerald-600"
                 />
-              ) : (
-                <div className="grid size-10 place-items-center rounded-lg bg-secondary text-sm font-bold text-secondary-foreground">
-                  {logoInitials}
+                <div className="text-[11px] uppercase tracking-[0.18em] text-emerald-700">
+                  About the role
                 </div>
-              )}
-
-              <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Company
+                <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+                  A closer look at this opportunity.
+                </h2>
+                <p className="mt-4 text-[15px] leading-[1.75] text-neutral-700">
+                  {sections.about}
                 </p>
-                <p className="font-semibold">{job.company_name}</p>
-              </div>
-            </div>
-
-            {job.company_tagline && (
-              <p className="mt-4 text-sm leading-6 text-muted-foreground">
-                {job.company_tagline}
-              </p>
+              </SectionCard>
             )}
 
-            <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-              {job.company_size && (
-                <p className="flex items-center gap-2">
-                  <Building2 aria-hidden="true" className="size-4" />
-                  {job.company_size}
+            {sections.responsibilities.length > 0 && (
+              <SectionCard>
+                <div className="flex items-center gap-2">
+                  <span className="grid size-6 place-items-center rounded-lg bg-teal-100 text-teal-700">
+                    <Briefcase aria-hidden="true" className="size-3.5" />
+                  </span>
+                  <h2 className="text-lg font-semibold tracking-tight">
+                    What you&apos;ll do
+                  </h2>
+                </div>
+                <ul className="mt-4 space-y-3">
+                  {sections.responsibilities.map((item) => (
+                    <li
+                      key={item}
+                      className="flex gap-3 text-[14.5px] leading-[1.65] text-neutral-700"
+                    >
+                      <span className="mt-1.5 grid size-4 shrink-0 place-items-center rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 text-white">
+                        <Check
+                          aria-hidden="true"
+                          className="size-2.5"
+                          strokeWidth={3.5}
+                        />
+                      </span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </SectionCard>
+            )}
+
+            {sections.requirements.length > 0 && (
+              <SectionCard className="bg-gradient-to-br from-neutral-950 to-neutral-800 text-white ring-black/10">
+                <div className="flex items-center gap-2">
+                  <span className="grid size-6 place-items-center rounded-lg bg-white/10 text-teal-300">
+                    <Star aria-hidden="true" className="size-3.5" />
+                  </span>
+                  <h2 className="text-lg font-semibold tracking-tight">
+                    What we&apos;re looking for
+                  </h2>
+                </div>
+                <ul className="mt-4 space-y-3">
+                  {sections.requirements.map((item) => (
+                    <li
+                      key={item}
+                      className="flex gap-3 text-[14.5px] leading-[1.65] text-neutral-200"
+                    >
+                      <span className="mt-2 size-1.5 shrink-0 rounded-full bg-teal-400" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </SectionCard>
+            )}
+
+            {job.skills.length > 0 && (
+              <SectionCard>
+                <div className="flex items-center gap-2">
+                  <span className="grid size-6 place-items-center rounded-lg bg-emerald-100 text-emerald-700">
+                    <Sparkles aria-hidden="true" className="size-3.5" />
+                  </span>
+                  <h2 className="text-lg font-semibold tracking-tight">
+                    Skills mentioned
+                  </h2>
+                </div>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {job.skills.map((skill) => (
+                    <Badge key={skill} variant="secondary">
+                      {skill}
+                    </Badge>
+                  ))}
+                </div>
+              </SectionCard>
+            )}
+
+            {sections.benefits.length > 0 && (
+              <SectionCard className="bg-gradient-to-br from-orange-100 via-amber-50 to-rose-100 ring-orange-200/60">
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -right-20 -top-20 size-60 rounded-full bg-orange-300/40 blur-3xl"
+                />
+                <div className="relative flex items-center gap-2">
+                  <span className="grid size-6 place-items-center rounded-lg bg-orange-500 text-white">
+                    <Heart aria-hidden="true" className="size-3.5" />
+                  </span>
+                  <h2 className="text-lg font-semibold tracking-tight">
+                    Benefits and perks
+                  </h2>
+                </div>
+                <div className="relative mt-5 grid gap-3 sm:grid-cols-2">
+                  {sections.benefits.map((item) => (
+                    <div
+                      key={item}
+                      className="flex items-center gap-2.5 rounded-2xl bg-white/80 px-4 py-3 text-[13.5px] font-medium text-neutral-800 ring-1 ring-orange-200/40 backdrop-blur"
+                    >
+                      <CheckCircle2
+                        aria-hidden="true"
+                        className="size-4 shrink-0 text-orange-600"
+                      />
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </SectionCard>
+            )}
+
+            {sections.extra.length > 0 && (
+              <SectionCard>
+                <h2 className="text-lg font-semibold tracking-tight">
+                  Additional details
+                </h2>
+                <div className="mt-4 space-y-3 text-[14.5px] leading-[1.7] text-neutral-700">
+                  {sections.extra.map((item) => (
+                    <p key={item}>{item}</p>
+                  ))}
+                </div>
+              </SectionCard>
+            )}
+          </div>
+
+          <aside className="min-w-0">
+            <div className="sticky top-24 space-y-4">
+              <SimilarRoles jobs={related} />
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section className="bg-[#f0f6f7] px-4 pb-16 md:px-6 md:pb-24">
+        <div className="mx-auto max-w-7xl">
+          <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-teal-500 via-emerald-500 to-teal-700 p-8 text-white md:p-14">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -right-40 -top-40 size-[480px] rounded-full bg-orange-400/30 blur-3xl"
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -bottom-32 -left-20 size-[360px] rounded-full bg-teal-300/30 blur-3xl"
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 opacity-[0.08]"
+              style={{
+                backgroundImage:
+                  "linear-gradient(white 1px, transparent 1px), linear-gradient(90deg, white 1px, transparent 1px)",
+                backgroundSize: "44px 44px",
+              }}
+            />
+
+            <div className="relative grid items-center gap-10 md:grid-cols-12">
+              <div className="md:col-span-7">
+                <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-white ring-1 ring-white/25 backdrop-blur">
+                  <Sparkles aria-hidden="true" className="size-3" />
+                  Ready to apply?
+                </div>
+                <h2 className="mt-5 text-4xl font-semibold leading-[1.05] tracking-tight md:text-5xl">
+                  Take the next step.
+                  <br />
+                  <span className="italic text-orange-200">
+                    It takes 90 seconds.
+                  </span>
+                </h2>
+                <p className="mt-5 max-w-lg text-[15px] leading-relaxed text-teal-50/90">
+                  {job.apply_url
+                    ? `Applications are reviewed directly by the ${job.company_name} hiring team. You will be redirected to their careers page.`
+                    : "Submit your HireGeneral profile and resume to apply in one place."}
                 </p>
-              )}
+                <div className="mt-7 flex flex-wrap items-center gap-6 text-[12px] text-teal-50/90">
+                  {[
+                    { k: String(applicantCount), v: "applicants so far" },
+                    { k: job.employment_type, v: "role type" },
+                    { k: job.work_mode, v: "work mode" },
+                  ].map((item) => (
+                    <div key={item.v} className="flex items-baseline gap-1.5">
+                      <span className="text-xl font-semibold text-white">
+                        {item.k}
+                      </span>
+                      <span>{item.v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-              <p className="flex items-center gap-2">
-                <MapPin aria-hidden="true" className="size-4 shrink-0" />
-                <span title={job.location}>{heroLocation}</span>
-              </p>
-
-              {job.company_website && (
-                <a
-                  href={job.company_website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 font-medium text-primary hover:underline"
-                >
-                  <Globe aria-hidden="true" className="size-4" />
-                  Visit careers site
-                </a>
-              )}
+              <div className="md:col-span-5">
+                <div className="rounded-3xl bg-white/10 p-2 ring-1 ring-white/20 backdrop-blur">
+                  <JobDetailsActions
+                    jobId={job.id}
+                    slug={job.slug}
+                    companyName={job.company_name}
+                    title={displayTitle}
+                    applyUrl={job.apply_url}
+                    variant="cta"
+                  />
+                </div>
+                <p className="mt-3 text-center text-[11px] text-white/70">
+                  You can return to this role from saved jobs any time.
+                </p>
+              </div>
             </div>
           </div>
-
-          <div className="rounded-xl border border-border bg-surface p-6 shadow-soft">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Job snapshot
-            </h3>
-
-            <dl className="mt-4 space-y-3 text-sm">
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">Type</dt>
-                <dd className="font-medium">{job.employment_type}</dd>
-              </div>
-
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">Work mode</dt>
-                <dd className="font-medium">{job.work_mode}</dd>
-              </div>
-
-              {job.experience_level && (
-                <div className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">Experience</dt>
-                  <dd className="font-medium">{job.experience_level}</dd>
-                </div>
-              )}
-
-              {salary && (
-                <div className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">Salary</dt>
-                  <dd className="font-medium">{salary}</dd>
-                </div>
-              )}
-
-              {job.category && (
-                <div className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">Category</dt>
-                  <dd className="text-right font-medium">{job.category}</dd>
-                </div>
-              )}
-            </dl>
-          </div>
-
-          <SimilarRoles jobs={related} />
-        </aside>
+        </div>
       </section>
     </main>
   );

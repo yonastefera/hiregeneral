@@ -199,6 +199,106 @@ type TalentBrewSearchJob = {
   title: string;
 };
 
+type AppcastSearchJob = {
+  applyUrl: string;
+  category: string;
+  location: string;
+  sourceId: string;
+  title: string;
+};
+
+type FoxSearchJob = {
+  applyUrl: string;
+  brand: string;
+  dateText: string;
+  location: string;
+  sourceId: string;
+  title: string;
+};
+
+type FedExPreloadJob = {
+  applyURL?: string;
+  brandName?: string;
+  companyName?: string;
+  customFields?: Array<{
+    cfKey?: string;
+    value?: string;
+  }>;
+  employmentType?: string[];
+  isRemote?: boolean;
+  locations?: Array<{
+    city?: string;
+    country?: string;
+    countryAbbr?: string;
+    locationParsedText?: string;
+    locationText?: string;
+    state?: string;
+    stateAbbr?: string;
+  }>;
+  reference?: string;
+  requisitionID?: string;
+  title?: string;
+  uniqueID?: string;
+};
+
+type JibeJobData = {
+  category?: string | string[];
+  city?: string;
+  country?: string;
+  country_code?: string;
+  description?: string;
+  employment_type?: string;
+  location?: string;
+  posted_date?: string;
+  postedDate?: string;
+  req_id?: string;
+  remote_eligible?: boolean | string;
+  slug?: string;
+  state?: string;
+  tags2?: string | Array<{ name?: string }>;
+  title?: string;
+  updated?: string;
+  updated_at?: string;
+};
+
+type JibeJob = {
+  data?: JibeJobData;
+};
+
+type JibeSearchResponse = {
+  count?: number;
+  jobs?: JibeJob[];
+  totalCount?: number;
+};
+
+type KulaJob = {
+  ats_job?: {
+    ats_department?: {
+      name?: string;
+    };
+    compensation?: {
+      base_salary?: {
+        currency?: string;
+        max_amount?: string;
+        min_amount?: string;
+      };
+    };
+    employment_type?: string;
+    offices?: Array<{
+      city?: string;
+      country?: string;
+      location?: string;
+      name?: string;
+      remote?: boolean;
+      state?: string;
+    }>;
+    workplace?: string;
+  };
+  id?: number | string;
+  listed?: boolean;
+  title?: string;
+};
+
 const PLAYRIX_DEFAULT_API_URL =
   "https://playrix.com/api/v1/index.php?action=job/getList";
 const AVATURE_DEFAULT_PAGE_SIZE = 10;
@@ -222,6 +322,11 @@ const YAHOO_DEFAULT_PAGE_SIZE = 20;
 const YAHOO_DEFAULT_MAX_PAGES = 5;
 const TALENTBREW_DEFAULT_ORG_ID = "185";
 const TALENTBREW_DEFAULT_MAX_PAGES = 6;
+const APPCAST_DEFAULT_MAX_PAGES = 1;
+const FOX_DEFAULT_API_URL = "https://www.foxcareers.com/Search/JobsList/";
+const FOX_DEFAULT_MAX_PAGES = 4;
+const ATTRAX_DEFAULT_MAX_PAGES = 3;
+const JIBE_DEFAULT_MAX_PAGES = 8;
 
 function metadataString(source: JobSource, key: string) {
   const value = source.metadata[key];
@@ -333,6 +438,33 @@ function decodeHtml(value: string) {
     .replace(/&nbsp;/g, " ")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">");
+}
+
+function htmlAttribute(value: string, attribute: string) {
+  const match = value.match(new RegExp(`${attribute}=["']([^"']+)["']`, "i"));
+
+  return match?.[1] ? decodeHtml(match[1]).trim() : "";
+}
+
+function numberRangeFromText(value: string) {
+  const amounts = [...value.matchAll(/\$?\s*([\d,]+)(?:\.\d{2})?/g)]
+    .map((match) => Number(match[1].replace(/,/g, "")))
+    .filter((amount) => Number.isFinite(amount) && amount > 0);
+
+  if (amounts.length === 0) return { min: null, max: null };
+
+  const min = Math.min(...amounts);
+  const max = Math.max(...amounts);
+
+  return { min, max: max === min ? null : max };
+}
+
+function isoDateFromText(value: string | null | undefined) {
+  if (!value) return null;
+
+  const parsed = new Date(value);
+
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
 function playrixPostedAt(value: string | null | undefined) {
@@ -555,7 +687,7 @@ function avaturePageUrl(source: JobSource, pageSize: number, offset: number) {
 
 function parseAvatureArticle(source: JobSource, article: string) {
   const linkMatch = article.match(
-    /<a class=["']link["'] href=["']([^"']+)["']>([\s\S]*?)<\/a>/i,
+    /<a\b(?=[^>]*class=["'][^"']*\blink\b)(?=[^>]*href=["']([^"']+)["'])[^>]*>([\s\S]*?)<\/a>/i,
   );
 
   if (!linkMatch) return null;
@@ -586,13 +718,21 @@ function parseAvatureArticle(source: JobSource, article: string) {
   };
 }
 
-function parseAvatureJobs(source: JobSource, html: string) {
-  return [
+function avatureArticleBlocks(html: string) {
+  const starts = [
     ...html.matchAll(
-      /<article\b[^>]*class=["'][^"']*\barticle--result\b[^"']*["'][^>]*>([\s\S]*?)<\/article>/gi,
+      /<article\b[^>]*class=["'][^"']*\barticle--result\b[^"']*["'][^>]*>/gi,
     ),
-  ]
-    .map((match) => parseAvatureArticle(source, match[1]))
+  ].map((match) => match.index ?? 0);
+
+  return starts.map((start, index) =>
+    html.slice(start, starts[index + 1] ?? html.length),
+  );
+}
+
+function parseAvatureJobs(source: JobSource, html: string) {
+  return avatureArticleBlocks(html)
+    .map((article) => parseAvatureArticle(source, article))
     .filter((job): job is NonNullable<typeof job> => Boolean(job));
 }
 
@@ -619,6 +759,7 @@ async function fetchAvatureJobs(
   const maxPages =
     metadataNumber(source, "maxPages") ?? AVATURE_DEFAULT_MAX_PAGES;
   const category = metadataString(source, "category") ?? "Technology";
+  const country = metadataString(source, "country");
   const jobs: ImportedJob[] = [];
   const seenSourceIds = new Set<string>();
 
@@ -647,8 +788,9 @@ async function fetchAvatureJobs(
       if (seenSourceIds.has(sourceId)) continue;
       seenSourceIds.add(sourceId);
 
-      const searchText = `${job.title} ${job.location} ${category}`;
-      if (!isUsText(job.location)) continue;
+      const locationText = [job.location, country].filter(Boolean).join(", ");
+      const searchText = `${job.title} ${locationText} ${category}`;
+      if (!isUsText(locationText)) continue;
       if (!isEngineeringText(searchText)) continue;
       if (isInternshipText(searchText)) continue;
 
@@ -666,7 +808,10 @@ async function fetchAvatureJobs(
           title: job.title,
           companyName: source.companyName,
         }),
-        location: job.location || "United States",
+        location:
+          job.location && job.location !== "Multiple Locations"
+            ? locationText
+            : country || "United States",
 
         latitude: null,
         longitude: null,
@@ -2504,8 +2649,41 @@ function talentBrewPostedAt(value: string) {
     : parsed.toISOString();
 }
 
-function talentBrewResults(html: string, publicBase: string) {
+function talentBrewCitiResults(html: string, publicBase: string) {
   return [
+    ...html.matchAll(
+      /<li\b[^>]*class=["'][^"']*\bsr-job-item\b[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi,
+    ),
+  ]
+    .map((match) => {
+      const item = match[1];
+      const link = item.match(
+        /<a\b[^>]*class=["'][^"']*\bsr-job-item__link\b[^"']*["'][^>]*href=["']([^"']+)["'][^>]*data-job-id=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i,
+      );
+
+      if (!link) return null;
+
+      const [, href, sourceId, titleHtml] = link;
+      const location = item.match(
+        /<span\b[^>]*class=["'][^"']*\bsr-job-location\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i,
+      )?.[1];
+      const dateText = item.match(
+        /<span\b[^>]*class=["'][^"']*\bsr-job-date\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i,
+      )?.[1];
+
+      return {
+        applyUrl: new URL(decodeHtml(href), publicBase).toString(),
+        dateText: htmlToText(decodeHtml(dateText ?? "")).trim(),
+        location: htmlToText(decodeHtml(location ?? "")).trim(),
+        sourceId,
+        title: htmlToText(decodeHtml(titleHtml)).trim(),
+      };
+    })
+    .filter((job): job is TalentBrewSearchJob => Boolean(job?.title));
+}
+
+function talentBrewResults(html: string, publicBase: string) {
+  const defaultJobs = [
     ...html.matchAll(
       /<li\b[^>]*>([\s\S]*?<a class=["']search-results__job-link["'][\s\S]*?)<\/li>/gi,
     ),
@@ -2535,6 +2713,692 @@ function talentBrewResults(html: string, publicBase: string) {
       };
     })
     .filter((job): job is TalentBrewSearchJob => Boolean(job?.title));
+
+  return [...defaultJobs, ...talentBrewCitiResults(html, publicBase)];
+}
+
+function appcastPageUrl(source: JobSource, page: number) {
+  const url = new URL(
+    source.sourceUrl ?? "https://careers.expediagroup.com/jobs/",
+  );
+  const pageParam = metadataString(source, "pageParam") ?? "pg";
+
+  if (page > 1) {
+    url.searchParams.set(pageParam, String(page));
+  }
+
+  return url;
+}
+
+function appcastResults(html: string, publicBase: string) {
+  return [
+    ...html.matchAll(
+      /<li\b[^>]*class=["'][^"']*\bResults__list__item\b[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi,
+    ),
+  ]
+    .map((match) => {
+      const item = match[1];
+      const link = item.match(
+        /<a\b(?=[^>]*class=["'][^"']*\bview-job-button\b)(?=[^>]*href=["']([^"']+)["'])[^>]*>/i,
+      );
+      const title = item.match(
+        /<h3\b[^>]*class=["'][^"']*\bResults__list__title\b[^"']*["'][^>]*>([\s\S]*?)<\/h3>/i,
+      )?.[1];
+      const location = item.match(
+        /<h4\b[^>]*class=["'][^"']*\bResults__list__location\b[^"']*["'][^>]*>([\s\S]*?)<\/h4>/i,
+      )?.[1];
+      const category = item.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i)?.[1];
+
+      if (!link || !title) return null;
+
+      const [, href] = link;
+      const sourceId =
+        decodeHtml(href).match(/\/job\/[^/]+\/[^/]+\/([^/?#]+)/)?.[1] ??
+        decodeHtml(href);
+
+      return {
+        applyUrl: new URL(decodeHtml(href), publicBase).toString(),
+        category: htmlToText(decodeHtml(category ?? "")).trim(),
+        location: htmlToText(decodeHtml(location ?? "")).trim(),
+        sourceId,
+        title: htmlToText(decodeHtml(title)).trim(),
+      };
+    })
+    .filter((job): job is AppcastSearchJob => Boolean(job?.title));
+}
+
+async function fetchAppcastJobs(
+  source: JobSource,
+  context?: {
+    signal?: AbortSignal;
+  },
+): Promise<ImportedJob[]> {
+  const recruiterId = process.env.SYSTEM_RECRUITER_ID;
+
+  if (!recruiterId) {
+    throw new Error("Missing SYSTEM_RECRUITER_ID");
+  }
+
+  const publicBase =
+    metadataString(source, "publicBase") ??
+    source.sourceUrl ??
+    "https://careers.expediagroup.com";
+  const maxPages = Math.max(
+    metadataNumber(source, "maxPages") ?? APPCAST_DEFAULT_MAX_PAGES,
+    1,
+  );
+  const category = metadataString(source, "category") ?? "Technology";
+  const companyWebsite =
+    metadataString(source, "companyWebsite") ??
+    (source.companyDomain ? `https://${source.companyDomain}` : null);
+  const jobs: ImportedJob[] = [];
+  const seenSourceIds = new Set<string>();
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const response = await fetch(appcastPageUrl(source, page), {
+      headers: {
+        Accept: "text/html",
+        "User-Agent": "HireGeneralJobBoard/1.0",
+      },
+      cache: "no-store",
+      signal: context?.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Appcast fetch failed: ${response.status}`);
+    }
+
+    const pageJobs = appcastResults(await response.text(), publicBase);
+    if (pageJobs.length === 0) break;
+
+    for (const job of pageJobs) {
+      const sourceId = `${source.sourceSlug}:${job.sourceId}`;
+      if (seenSourceIds.has(sourceId)) continue;
+      seenSourceIds.add(sourceId);
+
+      const searchText = `${job.title} ${job.category} ${job.location}`;
+      if (!isUsText(job.location)) continue;
+      if (!isEngineeringText(searchText)) continue;
+      if (isInternshipText(searchText)) continue;
+
+      const description = safeDescription({
+        title: job.title,
+        companyName: source.companyName,
+        description: `${job.title} role at ${source.companyName}. Visit the company careers site for the complete description and application details.`,
+      });
+
+      jobs.push({
+        recruiterId,
+        companyId: null,
+        companyName: source.companyName,
+        companyLogoUrl: source.companyLogoUrl ?? null,
+
+        title: job.title,
+        description,
+        location: job.location || "United States",
+
+        latitude: null,
+        longitude: null,
+
+        employmentType: normalizeEmploymentType(null),
+        workMode: detectWorkMode(job.title, job.location),
+
+        salaryMin: null,
+        salaryMax: null,
+        salaryCurrency: "USD",
+
+        skills: [],
+        responsibilities: [],
+        requirements: [],
+        benefits: [],
+
+        status: "published",
+
+        postedAt: new Date().toISOString(),
+        expiresAt: defaultExpiryDate(30),
+
+        sourceName: "scraper",
+        sourceId,
+        applyUrl: job.applyUrl,
+
+        experienceLevel: null,
+        category: job.category || category,
+
+        companyTagline: null,
+        companySize: null,
+        companyWebsite,
+      });
+    }
+  }
+
+  return jobs;
+}
+
+function foxJobsListUrl(source: JobSource, page: number) {
+  const apiUrl = metadataString(source, "apiUrl") ?? FOX_DEFAULT_API_URL;
+  const params = {
+    page: String(page),
+    jobFunction:
+      metadataString(source, "jobFunction") ??
+      "Information Technology_Technology",
+    brand: metadataString(source, "brand") ?? "",
+    subBrand: metadataString(source, "subBrand") ?? "",
+    brandCategory: metadataString(source, "brandCategory") ?? "",
+    country: metadataString(source, "country") ?? "United States of America",
+    location: metadataString(source, "location") ?? "",
+    locationType: metadataString(source, "locationType") ?? "",
+    experienceLevel: metadataString(source, "experienceLevel") ?? "",
+    city: metadataString(source, "city") ?? "",
+    latitude: metadataString(source, "latitude") ?? "0",
+    longitude: metadataString(source, "longitude") ?? "0",
+    keyword: metadataString(source, "keyword") ?? "",
+    language: metadataString(source, "language") ?? "undefined",
+  };
+  const query = Object.entries(params)
+    .map(
+      ([key, value]) =>
+        `${encodeURIComponent(key)}=${encodeURIComponent(value)}`,
+    )
+    .join("&");
+
+  return `${apiUrl}?${query}`;
+}
+
+function foxPostedAt(value: string) {
+  const dateText = value.replace(/^Job Posting Date:\s*/i, "").trim();
+  const parsed = new Date(dateText);
+
+  return Number.isNaN(parsed.getTime())
+    ? new Date().toISOString()
+    : parsed.toISOString();
+}
+
+function foxResults(html: string, publicBase: string) {
+  return [
+    ...html.matchAll(
+      /<div\b[^>]*class=["'][^"']*\bjobListing\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi,
+    ),
+  ]
+    .map((match) => {
+      const item = match[1];
+      const link = item.match(
+        /<a\b[^>]*class=["'][^"']*\bsearchResultTitle\b[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i,
+      );
+
+      if (!link) return null;
+
+      const [, href, titleHtml] = link;
+      const title = htmlToText(
+        decodeHtml(titleHtml.replace(/<span\b[\s\S]*?<\/span>/gi, "")),
+      )
+        .replace(/\s+/g, " ")
+        .trim();
+      const brand = item.match(
+        /<p\b[^>]*class=["'][^"']*\bsearchResultBrand\b[^"']*["'][^>]*>([\s\S]*?)<\/p>/i,
+      )?.[1];
+      const detailMatches = [
+        ...item.matchAll(
+          /<p\b[^>]*class=["'][^"']*\bsearchResultDetail\b[^"']*["'][^>]*>([\s\S]*?)<\/p>/gi,
+        ),
+      ].map((detail) => htmlToText(decodeHtml(detail[1])).trim());
+      const location =
+        detailMatches.find((detail) => !/^Job Posting Date:/i.test(detail)) ??
+        "";
+      const dateText =
+        detailMatches.find((detail) => /^Job Posting Date:/i.test(detail)) ??
+        "";
+      const sourceId =
+        decodeHtml(href).match(/\/Search\/JobDetail\/([^/]+)/)?.[1] ??
+        decodeHtml(href);
+
+      return {
+        applyUrl: new URL(decodeHtml(href), publicBase).toString(),
+        brand: htmlToText(decodeHtml(brand ?? "")).trim(),
+        dateText,
+        location: location.replace(/;$/, "").trim(),
+        sourceId,
+        title,
+      };
+    })
+    .filter((job): job is FoxSearchJob => Boolean(job?.title));
+}
+
+async function fetchFoxJobs(
+  source: JobSource,
+  context?: {
+    signal?: AbortSignal;
+  },
+): Promise<ImportedJob[]> {
+  const recruiterId = process.env.SYSTEM_RECRUITER_ID;
+
+  if (!recruiterId) {
+    throw new Error("Missing SYSTEM_RECRUITER_ID");
+  }
+
+  const publicBase =
+    metadataString(source, "publicBase") ?? "https://www.foxcareers.com";
+  const maxPages = Math.max(
+    metadataNumber(source, "maxPages") ?? FOX_DEFAULT_MAX_PAGES,
+    1,
+  );
+  const category = metadataString(source, "category") ?? "Technology";
+  const companyWebsite =
+    metadataString(source, "companyWebsite") ??
+    (source.companyDomain ? `https://${source.companyDomain}` : null);
+  const jobs: ImportedJob[] = [];
+  const seenSourceIds = new Set<string>();
+
+  for (let page = 0; page < maxPages; page += 1) {
+    const response = await fetch(foxJobsListUrl(source, page), {
+      headers: {
+        Accept: "text/html",
+        "Accept-Language": "en-US,en;q=0.9",
+        "User-Agent": "HireGeneralJobBoard/1.0",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      cache: "no-store",
+      signal: context?.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Fox careers fetch failed: ${response.status}`);
+    }
+
+    const pageJobs = foxResults(await response.text(), publicBase);
+    if (pageJobs.length === 0) break;
+
+    for (const job of pageJobs) {
+      const sourceId = `${source.sourceSlug}:${job.sourceId}`;
+      if (seenSourceIds.has(sourceId)) continue;
+      seenSourceIds.add(sourceId);
+
+      const searchText = `${job.title} ${job.brand} ${job.location}`;
+      if (!isUsText(job.location)) continue;
+      if (!isEngineeringText(searchText)) continue;
+      if (isInternshipText(searchText)) continue;
+
+      const description = safeDescription({
+        title: job.title,
+        companyName: source.companyName,
+        description: `${job.title} role at ${source.companyName}. Visit the company careers site for the complete description and application details.`,
+      });
+
+      jobs.push({
+        recruiterId,
+        companyId: null,
+        companyName: source.companyName,
+        companyLogoUrl: source.companyLogoUrl ?? null,
+
+        title: job.title,
+        description,
+        location: job.location || "United States",
+
+        latitude: null,
+        longitude: null,
+
+        employmentType: normalizeEmploymentType(null),
+        workMode: detectWorkMode(job.title, job.location),
+
+        salaryMin: null,
+        salaryMax: null,
+        salaryCurrency: "USD",
+
+        skills: [],
+        responsibilities: [],
+        requirements: [],
+        benefits: [],
+
+        status: "published",
+
+        postedAt: foxPostedAt(job.dateText),
+        expiresAt: defaultExpiryDate(30),
+
+        sourceName: "scraper",
+        sourceId,
+        applyUrl: job.applyUrl,
+
+        experienceLevel: null,
+        category,
+
+        companyTagline: null,
+        companySize: null,
+        companyWebsite,
+      });
+    }
+  }
+
+  return jobs;
+}
+
+function attraxTileBlocks(html: string) {
+  const starts = [
+    ...html.matchAll(/<div\b[^>]*class=["'][^"']*\battrax-vacancy-tile\b/gi),
+  ].map((match) => match.index ?? 0);
+
+  return starts.map((start, index) =>
+    html.slice(start, starts[index + 1] ?? html.length),
+  );
+}
+
+function attraxValue(block: string, className: string) {
+  const classPattern = className.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const section = block.match(
+    new RegExp(
+      `<[^>]*class=["'][^"']*\\b${classPattern}\\b[^"']*["'][^>]*>([\\s\\S]*?)(?=<div\\b[^>]*class=["'][^"']*\\battrax-vacancy-tile__|<a\\b[^>]*class=["'][^"']*\\battrax-vacancy-tile__|$)`,
+      "i",
+    ),
+  )?.[1];
+
+  if (!section) return "";
+
+  const value =
+    section.match(
+      /<p\b[^>]*class=["'][^"']*\battrax-vacancy-tile__item-value\b[^"']*["'][^>]*>([\s\S]*?)<\/p>/i,
+    )?.[1] ?? section;
+
+  return htmlToText(decodeHtml(value)).replace(/\s+/g, " ").trim();
+}
+
+function attraxPageUrl(source: JobSource, page: number) {
+  const url = new URL(source.sourceUrl ?? "https://jobs.experian.com/jobs");
+  url.searchParams.set("page", String(page));
+
+  return url;
+}
+
+async function fetchAttraxJobs(
+  source: JobSource,
+  context?: {
+    signal?: AbortSignal;
+  },
+): Promise<ImportedJob[]> {
+  const recruiterId = process.env.SYSTEM_RECRUITER_ID;
+
+  if (!recruiterId) {
+    throw new Error("Missing SYSTEM_RECRUITER_ID");
+  }
+
+  const publicBase =
+    metadataString(source, "publicBase") ??
+    source.sourceUrl ??
+    "https://jobs.experian.com";
+  const maxPages = Math.max(
+    metadataNumber(source, "maxPages") ?? ATTRAX_DEFAULT_MAX_PAGES,
+    1,
+  );
+  const category = metadataString(source, "category") ?? "Technology";
+  const companyWebsite =
+    metadataString(source, "companyWebsite") ??
+    (source.companyDomain ? `https://${source.companyDomain}` : null);
+  const jobs: ImportedJob[] = [];
+  const seenSourceIds = new Set<string>();
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const response = await fetch(attraxPageUrl(source, page), {
+      headers: {
+        Accept: "text/html",
+        "User-Agent": "HireGeneralJobBoard/1.0",
+      },
+      cache: "no-store",
+      signal: context?.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Attrax fetch failed: ${response.status}`);
+    }
+
+    const blocks = attraxTileBlocks(await response.text());
+    if (blocks.length === 0) break;
+
+    for (const block of blocks) {
+      const titleLink = block.match(
+        /<a\b[^>]*class=["'][^"']*\battrax-vacancy-tile__title\b[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i,
+      );
+      if (!titleLink) continue;
+
+      const sourceId =
+        htmlAttribute(block, "data-jobid") || decodeHtml(titleLink[1]);
+      const fullSourceId = `${source.sourceSlug}:${sourceId}`;
+      if (seenSourceIds.has(fullSourceId)) continue;
+      seenSourceIds.add(fullSourceId);
+
+      const title = htmlToText(decodeHtml(titleLink[2]))
+        .replace(/\s+/g, " ")
+        .trim();
+      const location =
+        attraxValue(block, "attrax-vacancy-tile__location-freetext") ||
+        attraxValue(block, "attrax-vacancy-tile__option-location") ||
+        "United States";
+      const roleType = attraxValue(
+        block,
+        "attrax-vacancy-tile__option-role-type",
+      );
+      const schedule = attraxValue(
+        block,
+        "attrax-vacancy-tile__option-schedule",
+      );
+      const salaryText = attraxValue(
+        block,
+        "attrax-vacancy-tile__option-salary-range",
+      );
+      const department = attraxValue(
+        block,
+        "attrax-vacancy-tile__option-department",
+      );
+      const description = safeDescription({
+        description:
+          attraxValue(block, "attrax-vacancy-tile__description") ||
+          `${title} role at ${source.companyName}. Visit the company careers site for the full description and application details.`,
+        title,
+        companyName: source.companyName,
+      });
+      const searchText = `${title} ${department} ${description} ${category}`;
+
+      if (!isUsText(location)) continue;
+      if (!isEngineeringText(searchText)) continue;
+      if (isInternshipText(searchText)) continue;
+
+      const salary = numberRangeFromText(salaryText);
+
+      jobs.push({
+        recruiterId,
+        companyId: null,
+        companyName: source.companyName,
+        companyLogoUrl: source.companyLogoUrl ?? null,
+
+        title,
+        description,
+        location,
+
+        latitude: null,
+        longitude: null,
+
+        employmentType: normalizeEmploymentType(schedule),
+        workMode: detectWorkMode(`${title} ${roleType}`, location),
+
+        salaryMin: salary.min,
+        salaryMax: salary.max,
+        salaryCurrency: "USD",
+
+        skills: [],
+        responsibilities: [],
+        requirements: [],
+        benefits: [],
+
+        status: "published",
+
+        postedAt: new Date().toISOString(),
+        expiresAt:
+          isoDateFromText(attraxValue(block, "attrax-vacancy-tile__expiry")) ??
+          defaultExpiryDate(30),
+
+        sourceName: "scraper",
+        sourceId: fullSourceId,
+        applyUrl: new URL(decodeHtml(titleLink[1]), publicBase).toString(),
+
+        experienceLevel:
+          attraxValue(block, "attrax-vacancy-tile__option-experience-level") ||
+          null,
+        category: department || category,
+
+        companyTagline: null,
+        companySize: null,
+        companyWebsite,
+      });
+    }
+  }
+
+  return jobs;
+}
+
+function fedexPreloadState(html: string) {
+  const match = html.match(
+    /window\.__PRELOAD_STATE__\s*=\s*({[\s\S]*?});\s*<\/script>/i,
+  );
+
+  if (!match) return [];
+
+  try {
+    const data = JSON.parse(match[1]) as {
+      jobSearch?: {
+        jobs?: FedExPreloadJob[];
+      };
+    };
+
+    return Array.isArray(data.jobSearch?.jobs) ? data.jobSearch.jobs : [];
+  } catch {
+    return [];
+  }
+}
+
+function fedexLocation(job: FedExPreloadJob) {
+  const locations = job.locations ?? [];
+  const usLocations = locations.filter(
+    (location) =>
+      location.countryAbbr === "US" ||
+      /^United States/i.test(location.country ?? ""),
+  );
+  const selected = usLocations.length > 0 ? usLocations : locations;
+  const labels = selected
+    .map((location) => {
+      const city = location.city?.trim();
+      const state = (location.stateAbbr ?? location.state)?.trim();
+      const country = location.country?.trim();
+
+      return [city, state, country].filter(Boolean).join(", ");
+    })
+    .filter(Boolean);
+
+  return uniqueItems(labels).slice(0, 4).join(", ") || "United States";
+}
+
+async function fetchFedExPreloadJobs(
+  source: JobSource,
+  context?: {
+    signal?: AbortSignal;
+  },
+): Promise<ImportedJob[]> {
+  const recruiterId = process.env.SYSTEM_RECRUITER_ID;
+
+  if (!recruiterId) {
+    throw new Error("Missing SYSTEM_RECRUITER_ID");
+  }
+
+  const response = await fetch(
+    source.sourceUrl ??
+      "https://careers.fedex.com/career-areas/professional/jobs",
+    {
+      headers: {
+        Accept: "text/html",
+        "User-Agent": "HireGeneralJobBoard/1.0",
+      },
+      cache: "no-store",
+      signal: context?.signal,
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`FedEx careers fetch failed: ${response.status}`);
+  }
+
+  const category = metadataString(source, "category") ?? "Technology";
+  const companyWebsite =
+    metadataString(source, "companyWebsite") ??
+    (source.companyDomain ? `https://${source.companyDomain}` : null);
+  const jobs: ImportedJob[] = [];
+  const seenSourceIds = new Set<string>();
+
+  for (const job of fedexPreloadState(await response.text())) {
+    const title = job.title?.trim();
+    const applyUrl = job.applyURL?.trim();
+    if (!title || !applyUrl) continue;
+
+    const sourceId = `${source.sourceSlug}:${
+      job.requisitionID ?? job.reference ?? job.uniqueID ?? applyUrl
+    }`;
+    if (seenSourceIds.has(sourceId)) continue;
+    seenSourceIds.add(sourceId);
+
+    const location = fedexLocation(job);
+    const fields = (job.customFields ?? [])
+      .map((field) => field.value)
+      .join(" ");
+    const searchText = `${title} ${location} ${fields} ${category}`;
+
+    if (!isUsText(location)) continue;
+    if (!isEngineeringText(searchText)) continue;
+    if (isInternshipText(searchText)) continue;
+
+    const description = safeDescription({
+      title,
+      companyName: source.companyName,
+      description: `${title} role at ${source.companyName}. Visit the company careers site for the complete description and application details.`,
+    });
+
+    jobs.push({
+      recruiterId,
+      companyId: null,
+      companyName: source.companyName,
+      companyLogoUrl: source.companyLogoUrl ?? null,
+
+      title,
+      description,
+      location,
+
+      latitude: null,
+      longitude: null,
+
+      employmentType: normalizeEmploymentType(job.employmentType?.join(" ")),
+      workMode: detectWorkMode(title, `${location} ${String(job.isRemote)}`),
+
+      salaryMin: null,
+      salaryMax: null,
+      salaryCurrency: "USD",
+
+      skills: [],
+      responsibilities: [],
+      requirements: [],
+      benefits: [],
+
+      status: "published",
+
+      postedAt: new Date().toISOString(),
+      expiresAt: defaultExpiryDate(30),
+
+      sourceName: "scraper",
+      sourceId,
+      applyUrl,
+
+      experienceLevel: null,
+      category,
+
+      companyTagline: null,
+      companySize: null,
+      companyWebsite,
+    });
+  }
+
+  return jobs;
 }
 
 async function fetchTalentBrewJobs(
@@ -2657,6 +3521,453 @@ async function fetchTalentBrewJobs(
   return jobs;
 }
 
+function jibeJobsUrl(source: JobSource, page: number) {
+  const apiUrl =
+    metadataString(source, "apiUrl") ??
+    new URL(
+      "/api/jobs",
+      source.sourceUrl ?? "https://careers.ice.com",
+    ).toString();
+  const url = new URL(apiUrl);
+  const query =
+    source.metadata.query && typeof source.metadata.query === "object"
+      ? (source.metadata.query as Record<string, unknown>)
+      : {};
+
+  for (const [key, value] of Object.entries(query)) {
+    if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    ) {
+      url.searchParams.set(key, String(value));
+    }
+  }
+
+  url.searchParams.set("page", String(page));
+  return url;
+}
+
+function jibeTags(value: JibeJobData["tags2"]) {
+  if (Array.isArray(value)) {
+    return value
+      .map((tag) => tag.name ?? "")
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  return value ?? "";
+}
+
+function jibeCategory(value: JibeJobData["category"], fallback: string) {
+  if (Array.isArray(value)) {
+    return value.find((item) => item.trim())?.trim() ?? fallback;
+  }
+
+  return value?.trim() || fallback;
+}
+
+function jibeLocation(job: JibeJobData) {
+  if (job.location?.trim()) return job.location.trim();
+
+  return (
+    [job.city, job.state, job.country].filter(Boolean).join(", ") ||
+    "United States"
+  );
+}
+
+function jibePostedAt(job: JibeJobData) {
+  return (
+    isoDateFromText(job.posted_date) ??
+    isoDateFromText(job.postedDate) ??
+    isoDateFromText(job.updated_at) ??
+    isoDateFromText(job.updated) ??
+    new Date().toISOString()
+  );
+}
+
+function jibeApplyUrl(source: JobSource, job: JibeJobData) {
+  const publicBase =
+    metadataString(source, "publicBase") ??
+    source.sourceUrl ??
+    "https://careers.ice.com";
+
+  if (job.slug) {
+    return new URL(`/jobs/${job.slug}`, publicBase).toString();
+  }
+
+  return source.sourceUrl ?? publicBase;
+}
+
+async function fetchJibeJobs(
+  source: JobSource,
+  context?: {
+    signal?: AbortSignal;
+  },
+): Promise<ImportedJob[]> {
+  const recruiterId = process.env.SYSTEM_RECRUITER_ID;
+
+  if (!recruiterId) {
+    throw new Error("Missing SYSTEM_RECRUITER_ID");
+  }
+
+  const maxPages = Math.max(
+    metadataNumber(source, "maxPages") ?? JIBE_DEFAULT_MAX_PAGES,
+    1,
+  );
+  const category = metadataString(source, "category") ?? "Technology";
+  const companyWebsite =
+    metadataString(source, "companyWebsite") ??
+    (source.companyDomain ? `https://${source.companyDomain}` : null);
+  const jobs: ImportedJob[] = [];
+  const seenSourceIds = new Set<string>();
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const response = await fetch(jibeJobsUrl(source, page), {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "HireGeneralJobBoard/1.0",
+      },
+      cache: "no-store",
+      signal: context?.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Jibe careers fetch failed: ${response.status}`);
+    }
+
+    const data = (await response.json()) as JibeSearchResponse;
+    const pageJobs = Array.isArray(data.jobs) ? data.jobs : [];
+    if (pageJobs.length === 0) break;
+
+    for (const item of pageJobs) {
+      const job = item.data;
+      if (!job?.title?.trim()) continue;
+
+      const sourceId = `${source.sourceSlug}:${
+        job.req_id ?? job.slug ?? job.title
+      }`;
+      if (seenSourceIds.has(sourceId)) continue;
+      seenSourceIds.add(sourceId);
+
+      const title = job.title.trim();
+      const location = jibeLocation(job);
+      const jobCategory = jibeCategory(job.category, category);
+      const description = safeDescription({
+        description: htmlToText(job.description),
+        title,
+        companyName: source.companyName,
+      });
+      const searchText = [
+        title,
+        description,
+        jobCategory,
+        jibeTags(job.tags2),
+        category,
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      if (
+        !isUsText(`${location} ${job.country_code ?? ""} ${job.country ?? ""}`)
+      )
+        continue;
+      if (!isEngineeringText(searchText)) continue;
+      if (isInternshipText(searchText)) continue;
+
+      jobs.push({
+        recruiterId,
+        companyId: null,
+        companyName: source.companyName,
+        companyLogoUrl: source.companyLogoUrl ?? null,
+
+        title,
+        description,
+        location,
+
+        latitude: null,
+        longitude: null,
+
+        employmentType: normalizeEmploymentType(job.employment_type),
+        workMode: detectWorkMode(
+          title,
+          `${location} ${String(job.remote_eligible ?? "")}`,
+        ),
+
+        salaryMin: null,
+        salaryMax: null,
+        salaryCurrency: "USD",
+
+        skills: [],
+        responsibilities: splitListItems(description, 12),
+        requirements: splitListItems(description, 14),
+        benefits: [],
+
+        status: "published",
+
+        postedAt: jibePostedAt(job),
+        expiresAt: defaultExpiryDate(30),
+
+        sourceName: "scraper",
+        sourceId,
+        applyUrl: jibeApplyUrl(source, job),
+
+        experienceLevel: null,
+        category: jobCategory,
+
+        companyTagline: null,
+        companySize: null,
+        companyWebsite,
+      });
+    }
+
+    if (
+      pageJobs.length < (data.count ?? pageJobs.length) ||
+      (data.totalCount && jobs.length >= data.totalCount)
+    ) {
+      break;
+    }
+  }
+
+  return jobs;
+}
+
+function balancedJsonObjects(value: string, marker: string) {
+  const objects: string[] = [];
+  let searchIndex = 0;
+
+  while (searchIndex < value.length) {
+    const start = value.indexOf(marker, searchIndex);
+    if (start < 0) break;
+
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let index = start; index < value.length; index += 1) {
+      const char = value[index];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === "\\") {
+        escaped = true;
+        continue;
+      }
+
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (inString) continue;
+
+      if (char === "{") depth += 1;
+      if (char === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          objects.push(value.slice(start, index + 1));
+          searchIndex = index + 1;
+          break;
+        }
+      }
+    }
+
+    if (searchIndex <= start) searchIndex = start + marker.length;
+  }
+
+  return objects;
+}
+
+function kulaJobsFromHtml(html: string) {
+  const normalized = decodeHtml(html)
+    .replace(/\\u0026/g, "&")
+    .replace(/\\"/g, '"');
+
+  return uniqueItems(balancedJsonObjects(normalized, '{"id":'))
+    .map((raw) => {
+      try {
+        return JSON.parse(raw) as KulaJob;
+      } catch {
+        return null;
+      }
+    })
+    .filter((job): job is KulaJob =>
+      Boolean(job?.title && job.ats_job && job.listed !== false),
+    );
+}
+
+function kulaLocation(job: KulaJob) {
+  const locations = uniqueItems(
+    (job.ats_job?.offices ?? [])
+      .map(
+        (office) =>
+          office.location ||
+          [office.city, office.state, office.country]
+            .filter(Boolean)
+            .join(", "),
+      )
+      .filter(Boolean),
+  );
+
+  if (locations.length === 0) return "United States";
+  if (locations.length === 1) return locations[0];
+
+  return `${locations[0]}, ${locations.length - 1} locations`;
+}
+
+function kulaLocationSearchText(job: KulaJob) {
+  return (job.ats_job?.offices ?? [])
+    .map((office) =>
+      [
+        office.name,
+        office.location,
+        office.city,
+        office.state,
+        office.country,
+        String(office.remote ?? ""),
+      ]
+        .filter(Boolean)
+        .join(" "),
+    )
+    .join(" ");
+}
+
+function kulaApplyUrl(source: JobSource, job: KulaJob) {
+  const accountName =
+    metadataString(source, "accountName") ?? source.sourceSlug;
+  const publicBase =
+    metadataString(source, "publicBase") ?? "https://careers.kula.ai";
+
+  if (job.id) {
+    return new URL(
+      `/${accountName}/${encodeURIComponent(String(job.id))}`,
+      publicBase,
+    ).toString();
+  }
+
+  return source.sourceUrl ?? new URL(`/${accountName}`, publicBase).toString();
+}
+
+async function fetchKulaJobs(
+  source: JobSource,
+  context?: {
+    signal?: AbortSignal;
+  },
+): Promise<ImportedJob[]> {
+  const recruiterId = process.env.SYSTEM_RECRUITER_ID;
+
+  if (!recruiterId) {
+    throw new Error("Missing SYSTEM_RECRUITER_ID");
+  }
+
+  const response = await fetch(
+    source.sourceUrl ?? "https://careers.kula.ai/varo-money",
+    {
+      headers: {
+        Accept: "text/html",
+        "User-Agent": "HireGeneralJobBoard/1.0",
+      },
+      cache: "no-store",
+      signal: context?.signal,
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Kula careers fetch failed: ${response.status}`);
+  }
+
+  const category = metadataString(source, "category") ?? "Technology";
+  const companyWebsite =
+    metadataString(source, "companyWebsite") ??
+    (source.companyDomain ? `https://${source.companyDomain}` : null);
+  const jobs: ImportedJob[] = [];
+  const seenSourceIds = new Set<string>();
+
+  for (const job of kulaJobsFromHtml(await response.text())) {
+    const title = job.title?.trim();
+    if (!title) continue;
+
+    const sourceId = `${source.sourceSlug}:${job.id ?? title}`;
+    if (seenSourceIds.has(sourceId)) continue;
+    seenSourceIds.add(sourceId);
+
+    const department = job.ats_job?.ats_department?.name ?? category;
+    const location = kulaLocation(job);
+    const searchText = [
+      title,
+      department,
+      job.ats_job?.employment_type,
+      job.ats_job?.workplace,
+      kulaLocationSearchText(job),
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    if (!isUsText(`${location} ${kulaLocationSearchText(job)}`)) continue;
+    if (!isEngineeringText(searchText)) continue;
+    if (isInternshipText(searchText)) continue;
+
+    const salary = job.ats_job?.compensation?.base_salary;
+    const minSalary = salary ? recordNumber(salary, ["min_amount"]) : null;
+    const maxSalary = salary ? recordNumber(salary, ["max_amount"]) : null;
+    const description = safeDescription({
+      title,
+      companyName: source.companyName,
+      description: `${title} role on ${source.companyName}'s ${department} team. Visit the company careers site for the complete description and application details.`,
+    });
+
+    jobs.push({
+      recruiterId,
+      companyId: null,
+      companyName: source.companyName,
+      companyLogoUrl: source.companyLogoUrl ?? null,
+
+      title,
+      description,
+      location,
+
+      latitude: null,
+      longitude: null,
+
+      employmentType: normalizeEmploymentType(job.ats_job?.employment_type),
+      workMode: detectWorkMode(
+        title,
+        `${location} ${job.ats_job?.workplace ?? ""}`,
+      ),
+
+      salaryMin: minSalary,
+      salaryMax: maxSalary,
+      salaryCurrency: salary?.currency ?? "USD",
+
+      skills: [],
+      responsibilities: [],
+      requirements: [],
+      benefits: [],
+
+      status: "published",
+
+      postedAt: new Date().toISOString(),
+      expiresAt: defaultExpiryDate(30),
+
+      sourceName: "scraper",
+      sourceId,
+      applyUrl: kulaApplyUrl(source, job),
+
+      experienceLevel: null,
+      category: department,
+
+      companyTagline: null,
+      companySize: null,
+      companyWebsite,
+    });
+  }
+
+  return jobs;
+}
+
 export const scraperAdapter: JobSourceAdapter = {
   type: "scraper",
   fetchJobs: (source, context) => {
@@ -2697,6 +4008,30 @@ export const scraperAdapter: JobSourceAdapter = {
 
     if (adapter === "talentbrew") {
       return fetchTalentBrewJobs(source, context);
+    }
+
+    if (adapter === "appcast") {
+      return fetchAppcastJobs(source, context);
+    }
+
+    if (adapter === "fox") {
+      return fetchFoxJobs(source, context);
+    }
+
+    if (adapter === "attrax") {
+      return fetchAttraxJobs(source, context);
+    }
+
+    if (adapter === "fedex-preload") {
+      return fetchFedExPreloadJobs(source, context);
+    }
+
+    if (adapter === "jibe") {
+      return fetchJibeJobs(source, context);
+    }
+
+    if (adapter === "kula") {
+      return fetchKulaJobs(source, context);
     }
 
     throw new Error(

@@ -427,7 +427,7 @@ export default function WhyUsPage() {
       </section>
 
       <section className="mx-auto max-w-7xl px-8 pb-32 pt-12">
-        <div className="relative overflow-hidden rounded-4xl bg-linear-to-br from-teal-500 via-emerald-600 to-teal-800 p-12 text-white md:p-20">
+        <div className="relative overflow-hidden bg-linear-to-br from-teal-500 via-emerald-600 to-teal-800 p-12 text-white md:p-20 rounded-[10px]">
           <div
             aria-hidden
             className="pointer-events-none absolute -right-40 -top-40 h-125 w-125 rounded-full bg-orange-400/30 blur-3xl"
