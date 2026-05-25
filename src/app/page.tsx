@@ -3,6 +3,7 @@ import { getIndexPageData } from "@/home/index-data";
 import { getIndexPageSchema, indexPageMetadata } from "@/home/index-metadata";
 
 export const metadata = indexPageMetadata;
+export const revalidate = 3600;
 
 export default async function HomePage() {
   const { highlightedJobs, salaryBands, marketCategories } =

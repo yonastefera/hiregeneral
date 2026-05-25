@@ -31,41 +31,53 @@ export default function HomeMarketCategories({
       </div>
 
       <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {categories.map((category) => {
-          const style = categoryStyles[category.icon];
-          const CategoryIcon = style.icon;
+        {categories.length === 0 ? (
+          <div className="col-span-full rounded-3xl border border-dashed border-neutral-200 bg-white px-6 py-10 text-center shadow-sm">
+            <p className="text-sm font-medium text-neutral-900">
+              Market categories are updating.
+            </p>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-neutral-500">
+              This section appears once live roles are indexed and grouped by
+              craft.
+            </p>
+          </div>
+        ) : (
+          categories.map((category) => {
+            const style = categoryStyles[category.icon];
+            const CategoryIcon = style.icon;
 
-          return (
-            <Link
-              key={category.name}
-              href={`/jobs?q=${encodeURIComponent(category.query)}`}
-              className={`group flex items-center justify-between rounded-2xl bg-gradient-to-br ${style.accent} p-5 transition hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2`}
-            >
-              <span className="flex items-center gap-4">
-                <span
-                  className={`grid h-12 w-12 place-items-center rounded-xl bg-white/70 ${style.iconColor} ring-1 ring-black/5`}
+            return (
+              <Link
+                key={category.name}
+                href={`/jobs?q=${encodeURIComponent(category.query)}`}
+                className={`group flex items-center justify-between rounded-2xl bg-gradient-to-br ${style.accent} p-5 transition hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2`}
+              >
+                <span className="flex items-center gap-4">
+                  <span
+                    className={`grid h-12 w-12 place-items-center rounded-xl bg-white/70 ${style.iconColor} ring-1 ring-black/5`}
+                    aria-hidden="true"
+                  >
+                    <CategoryIcon className="h-5 w-5" />
+                  </span>
+
+                  <span>
+                    <span className="block font-semibold tracking-tight">
+                      {category.name}
+                    </span>
+                    <span className="block text-[12px] text-neutral-700/80">
+                      {category.count}
+                    </span>
+                  </span>
+                </span>
+
+                <ChevronRight
+                  className="h-5 w-5 text-neutral-700 transition group-hover:translate-x-1"
                   aria-hidden="true"
-                >
-                  <CategoryIcon className="h-5 w-5" />
-                </span>
-
-                <span>
-                  <span className="block font-semibold tracking-tight">
-                    {category.name}
-                  </span>
-                  <span className="block text-[12px] text-neutral-700/80">
-                    {category.count}
-                  </span>
-                </span>
-              </span>
-
-              <ChevronRight
-                className="h-5 w-5 text-neutral-700 transition group-hover:translate-x-1"
-                aria-hidden="true"
-              />
-            </Link>
-          );
-        })}
+                />
+              </Link>
+            );
+          })
+        )}
       </div>
     </section>
   );

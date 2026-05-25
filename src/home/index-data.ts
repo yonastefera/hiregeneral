@@ -1,6 +1,10 @@
 import type { Job } from "@/lib/db/types";
 import { toJobCardShape, type JobCardJob } from "@/lib/jobs/card-shape";
-import type { HomeMarketCategory, HomeSalaryBand } from "./home-insights";
+import {
+  loadHomeInsights,
+  type HomeMarketCategory,
+  type HomeSalaryBand,
+} from "./home-insights";
 
 const HIGHLIGHTED_JOBS_PAGE = "1";
 const HIGHLIGHTED_JOBS_PAGE_SIZE = "4";
@@ -17,6 +21,11 @@ export async function getIndexPageData(): Promise<{
   salaryBands: HomeSalaryBand[];
   marketCategories: HomeMarketCategory[];
 }> {
+  const fallbackInsights = {
+    salaryBands: [],
+    marketCategories: [],
+  };
+
   try {
     const seed = `home:${new Date().toISOString().slice(0, 13)}`;
     const params = new URLSearchParams({
@@ -26,34 +35,21 @@ export async function getIndexPageData(): Promise<{
       seed,
     });
 
-    const [jobsResponse, insightsResponse] = await Promise.all([
+    const [jobsResult, insights] = await Promise.all([
       fetch(`${SITE_URL}/api/jobs?${params.toString()}`, {
         next: {
           revalidate: 3600,
         },
-      }),
-      fetch(`${SITE_URL}/api/home/insights`, {
-        next: {
-          revalidate: 3600,
-        },
+      }).catch(() => null),
+      loadHomeInsights().catch((error) => {
+        console.error("[getIndexPageData:insights]", error);
+        return fallbackInsights;
       }),
     ]);
 
-    if (!jobsResponse.ok) {
-      return {
-        highlightedJobs: [],
-        salaryBands: [],
-        marketCategories: [],
-      };
-    }
-
-    const jobsBody = (await jobsResponse.json()) as { data?: unknown };
-    const insightsBody = insightsResponse.ok
-      ? ((await insightsResponse.json()) as {
-          salaryBands?: unknown;
-          marketCategories?: unknown;
-        })
-      : {};
+    const jobsBody = jobsResult?.ok
+      ? ((await jobsResult.json()) as { data?: unknown })
+      : { data: [] };
 
     const jobs: Job[] = Array.isArray(jobsBody.data)
       ? (jobsBody.data as Job[])
@@ -63,18 +59,15 @@ export async function getIndexPageData(): Promise<{
       highlightedJobs: jobs
         .slice(0, Number(HIGHLIGHTED_JOBS_PAGE_SIZE))
         .map(toJobCardShape),
-      salaryBands: Array.isArray(insightsBody.salaryBands)
-        ? (insightsBody.salaryBands as HomeSalaryBand[])
-        : [],
-      marketCategories: Array.isArray(insightsBody.marketCategories)
-        ? (insightsBody.marketCategories as HomeMarketCategory[])
-        : [],
+      salaryBands: insights.salaryBands,
+      marketCategories: insights.marketCategories,
     };
-  } catch {
+  } catch (error) {
+    console.error("[getIndexPageData]", error);
+
     return {
       highlightedJobs: [],
-      salaryBands: [],
-      marketCategories: [],
+      ...fallbackInsights,
     };
   }
 }

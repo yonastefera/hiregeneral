@@ -50,56 +50,65 @@ export default function HomeSalaryIntelligence({
 
           <div className="lg:col-span-7">
             <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/2 backdrop-blur">
-              {salaryBands.map((salaryBand, index) => {
-                const max = Math.max(...salaryBand.spark);
+              {salaryBands.length === 0 ? (
+                <div className="px-6 py-12">
+                  <p className="max-w-md text-sm leading-relaxed text-neutral-400">
+                    Salary intelligence is updating as verified salary ranges
+                    and benchmark data are added.
+                  </p>
+                </div>
+              ) : (
+                salaryBands.map((salaryBand, index) => {
+                  const max = Math.max(...salaryBand.spark);
 
-                return (
-                  <article
-                    key={salaryBand.role}
-                    className={`grid grid-cols-12 items-center gap-4 px-6 py-5 ${
-                      index < salaryBands.length - 1
-                        ? "border-b border-white/5"
-                        : ""
-                    }`}
-                  >
-                    <div className="col-span-12 sm:col-span-5">
-                      <h3 className="text-sm font-semibold text-white">
-                        {salaryBand.role}
-                      </h3>
-                      <p className="text-[12px] text-neutral-400">
-                        Median 90-day range
-                      </p>
-                    </div>
-
-                    <div className="col-span-6 sm:col-span-3">
-                      <p className="text-[15px] font-semibold tracking-tight text-white">
-                        {salaryBand.range}
-                      </p>
-                    </div>
-
-                    <div className="col-span-3 sm:col-span-2">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-400 ring-1 ring-emerald-400/20">
-                        <TrendingUp className="h-3 w-3" aria-hidden="true" />
-                        {salaryBand.trend}
-                      </span>
-                    </div>
-
-                    <div
-                      className="col-span-3 flex h-8 items-end justify-end gap-0.5 sm:col-span-2"
-                      aria-label={`${salaryBand.role} salary trend`}
+                  return (
+                    <article
+                      key={salaryBand.role}
+                      className={`grid grid-cols-12 items-center gap-4 px-6 py-5 ${
+                        index < salaryBands.length - 1
+                          ? "border-b border-white/5"
+                          : ""
+                      }`}
                     >
-                      {salaryBand.spark.map((value, sparkIndex) => (
-                        <span
-                          key={sparkIndex}
-                          className="w-1.5 rounded-sm bg-linear-to-t from-teal-500 to-teal-300"
-                          style={{ height: `${(value / max) * 100}%` }}
-                          aria-hidden="true"
-                        />
-                      ))}
-                    </div>
-                  </article>
-                );
-              })}
+                      <div className="col-span-12 sm:col-span-5">
+                        <h3 className="text-sm font-semibold text-white">
+                          {salaryBand.role}
+                        </h3>
+                        <p className="text-[12px] text-neutral-400">
+                          Median 90-day range
+                        </p>
+                      </div>
+
+                      <div className="col-span-6 sm:col-span-3">
+                        <p className="text-[15px] font-semibold tracking-tight text-white">
+                          {salaryBand.range}
+                        </p>
+                      </div>
+
+                      <div className="col-span-3 sm:col-span-2">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-400 ring-1 ring-emerald-400/20">
+                          <TrendingUp className="h-3 w-3" aria-hidden="true" />
+                          {salaryBand.trend}
+                        </span>
+                      </div>
+
+                      <div
+                        className="col-span-3 flex h-8 items-end justify-end gap-0.5 sm:col-span-2"
+                        aria-label={`${salaryBand.role} salary trend`}
+                      >
+                        {salaryBand.spark.map((value, sparkIndex) => (
+                          <span
+                            key={sparkIndex}
+                            className="w-1.5 rounded-sm bg-linear-to-t from-teal-500 to-teal-300"
+                            style={{ height: `${(value / max) * 100}%` }}
+                            aria-hidden="true"
+                          />
+                        ))}
+                      </div>
+                    </article>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>

@@ -30,9 +30,26 @@ type InsightJobRow = {
   posted_at: string;
 };
 
+type BenchmarkSalaryRow = {
+  release_year: number;
+  occupation_code: string;
+  occupation_name: string;
+  area_type: string;
+  annual_p10: number | null;
+  annual_p25: number | null;
+  annual_median: number | null;
+  annual_p75: number | null;
+  annual_p90: number | null;
+};
+
 type SalaryBucket = {
   role: string;
   terms: string[];
+};
+
+type BenchmarkSalaryBucket = {
+  role: string;
+  codes: string[];
 };
 
 type CategoryBucket = {
@@ -44,6 +61,8 @@ type CategoryBucket = {
 
 const INSIGHT_LIMIT = 3000;
 const HOURS_PER_YEAR = 2080;
+
+const BENCHMARK_TABLES = ["salary_benchmarks", "salary_bls_oews"];
 
 const salaryBuckets: SalaryBucket[] = [
   {
@@ -94,6 +113,25 @@ const salaryBuckets: SalaryBucket[] = [
       "sre",
       "platform engineer",
     ],
+  },
+];
+
+const benchmarkSalaryBuckets: BenchmarkSalaryBucket[] = [
+  {
+    role: "Software Engineer",
+    codes: ["151252"],
+  },
+  {
+    role: "Data Engineer",
+    codes: ["152051", "151243", "151299"],
+  },
+  {
+    role: "Security Engineer",
+    codes: ["151212"],
+  },
+  {
+    role: "Cloud Engineer",
+    codes: ["151241", "151244", "151253"],
   },
 ];
 
@@ -164,72 +202,6 @@ const categoryBuckets: CategoryBucket[] = [
     query: "marketing technology",
     icon: "marketing",
     terms: ["marketing", "growth", "crm", "campaign", "seo", "content"],
-  },
-];
-
-const fallbackSalaryBands: HomeSalaryBand[] = [
-  {
-    role: "Software Engineer",
-    range: "$90k - $180k",
-    trend: "Market sample",
-    spark: [20, 28, 24, 36, 32, 44, 48],
-  },
-  {
-    role: "Data Engineer",
-    range: "$95k - $170k",
-    trend: "Market sample",
-    spark: [18, 22, 28, 26, 34, 38, 46],
-  },
-  {
-    role: "Product Designer",
-    range: "$85k - $155k",
-    trend: "Market sample",
-    spark: [22, 26, 24, 30, 28, 32, 36],
-  },
-  {
-    role: "Security Engineer",
-    range: "$100k - $190k",
-    trend: "Market sample",
-    spark: [16, 24, 22, 30, 36, 32, 42],
-  },
-];
-
-const fallbackMarketCategories: HomeMarketCategory[] = [
-  {
-    name: "Engineering",
-    count: "Browse roles",
-    query: "software engineering",
-    icon: "engineering",
-  },
-  {
-    name: "Data & AI",
-    count: "Browse roles",
-    query: "data ai",
-    icon: "data",
-  },
-  {
-    name: "Design",
-    count: "Browse roles",
-    query: "product design",
-    icon: "design",
-  },
-  {
-    name: "Product",
-    count: "Browse roles",
-    query: "product manager",
-    icon: "operations",
-  },
-  {
-    name: "Healthcare Tech",
-    count: "Browse roles",
-    query: "healthcare technology",
-    icon: "healthcare",
-  },
-  {
-    name: "Marketing Tech",
-    count: "Browse roles",
-    query: "marketing technology",
-    icon: "marketing",
   },
 ];
 
@@ -331,6 +303,53 @@ function buildSparkline(values: number[]) {
   );
 }
 
+function compactCode(value: string) {
+  return value.replace(/\D/g, "");
+}
+
+function benchmarkSparkline(row: BenchmarkSalaryRow) {
+  const values = [
+    row.annual_p10,
+    row.annual_p25,
+    row.annual_median,
+    row.annual_p75,
+    row.annual_p90,
+  ].filter((value): value is number => typeof value === "number" && value > 0);
+
+  return buildSparkline(values);
+}
+
+function benchmarkRange(row: BenchmarkSalaryRow) {
+  const median = row.annual_median;
+  const low = row.annual_p25 ?? (median ? Math.round(median * 0.85) : null);
+  const high = row.annual_p75 ?? (median ? Math.round(median * 1.15) : null);
+
+  if (!low || !high) return null;
+
+  return `${formatCompactCurrency(low)} - ${formatCompactCurrency(high)}`;
+}
+
+function buildBenchmarkSalaryBands(rows: BenchmarkSalaryRow[]) {
+  return benchmarkSalaryBuckets
+    .map((bucket) => {
+      const row = rows.find((candidate) =>
+        bucket.codes.includes(compactCode(candidate.occupation_code)),
+      );
+      const range = row ? benchmarkRange(row) : null;
+
+      if (!row || !range) return null;
+
+      return {
+        role: bucket.role,
+        range,
+        trend: `BLS ${row.release_year}`,
+        spark: benchmarkSparkline(row),
+      };
+    })
+    .filter((band): band is HomeSalaryBand => Boolean(band))
+    .slice(0, 4);
+}
+
 function buildSalaryBands(jobs: InsightJobRow[]) {
   const bands = salaryBuckets
     .map((bucket) => {
@@ -339,7 +358,7 @@ function buildSalaryBands(jobs: InsightJobRow[]) {
         .map(salaryRange)
         .filter((range): range is NonNullable<typeof range> => Boolean(range));
 
-      if (ranges.length < 2) return null;
+      if (ranges.length < 1) return null;
 
       const low = percentile(
         ranges.map((range) => range.low),
@@ -376,7 +395,7 @@ function buildSalaryBands(jobs: InsightJobRow[]) {
       spark: band.spark,
     }));
 
-  return bands.length > 0 ? bands : fallbackSalaryBands;
+  return bands;
 }
 
 function buildMarketCategories(jobs: InsightJobRow[]) {
@@ -404,7 +423,89 @@ function buildMarketCategories(jobs: InsightJobRow[]) {
       icon: category.icon,
     }));
 
-  return categories.length > 0 ? categories : fallbackMarketCategories;
+  if (categories.length > 0) return categories;
+
+  const counts = jobs.reduce((acc, job) => {
+    const category = job.category?.trim();
+    if (!category) return acc;
+
+    acc.set(category, (acc.get(category) ?? 0) + 1);
+    return acc;
+  }, new Map<string, number>());
+
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([name, count]) => ({
+      name,
+      count: formatRoleCount(count),
+      query: name,
+      icon: "operations" as const,
+    }));
+}
+
+async function latestBenchmarkYear(
+  supabaseAdmin: NonNullable<ReturnType<typeof getSupabaseAdmin>>,
+  tableName: string,
+) {
+  const { data, error } = await supabaseAdmin
+    .from(tableName)
+    .select("release_year")
+    .not("annual_median", "is", null)
+    .order("release_year", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === "42P01") return null;
+    throw new Error(error.message);
+  }
+
+  return data?.release_year ?? null;
+}
+
+async function loadBenchmarkSalaryBands(
+  supabaseAdmin: NonNullable<ReturnType<typeof getSupabaseAdmin>>,
+) {
+  const codes = benchmarkSalaryBuckets.flatMap((bucket) => bucket.codes);
+  const queryCodes = codes.flatMap((code) => [
+    code,
+    `${code.slice(0, 2)}-${code.slice(2)}`,
+  ]);
+
+  for (const tableName of BENCHMARK_TABLES) {
+    try {
+      const latestYear = await latestBenchmarkYear(supabaseAdmin, tableName);
+      if (!latestYear) continue;
+
+      const { data, error } = await supabaseAdmin
+        .from(tableName)
+        .select(
+          "release_year, occupation_code, occupation_name, area_type, annual_p10, annual_p25, annual_median, annual_p75, annual_p90",
+        )
+        .eq("release_year", latestYear)
+        .eq("area_type", "N")
+        .in("occupation_code", queryCodes)
+        .not("annual_median", "is", null);
+
+      if (error) {
+        if (error.code === "42P01") continue;
+        throw new Error(error.message);
+      }
+
+      const rows = ((data ?? []) as BenchmarkSalaryRow[]).map((row) => ({
+        ...row,
+        occupation_code: compactCode(row.occupation_code),
+      }));
+      const bands = buildBenchmarkSalaryBands(rows);
+
+      if (bands.length > 0) return bands;
+    } catch (error) {
+      console.error(`[loadBenchmarkSalaryBands:${tableName}]`, error);
+    }
+  }
+
+  return [];
 }
 
 export async function loadHomeInsights(): Promise<{
@@ -415,8 +516,8 @@ export async function loadHomeInsights(): Promise<{
 
   if (!supabaseAdmin) {
     return {
-      salaryBands: fallbackSalaryBands,
-      marketCategories: fallbackMarketCategories,
+      salaryBands: [],
+      marketCategories: [],
     };
   }
 
@@ -429,13 +530,22 @@ export async function loadHomeInsights(): Promise<{
     .limit(INSIGHT_LIMIT);
 
   if (error) {
-    throw new Error(error.message);
+    console.error("[loadHomeInsights]", error.message);
+
+    return {
+      salaryBands: await loadBenchmarkSalaryBands(supabaseAdmin),
+      marketCategories: [],
+    };
   }
 
   const jobs = (data ?? []) as InsightJobRow[];
+  const jobSalaryBands = buildSalaryBands(jobs);
 
   return {
-    salaryBands: buildSalaryBands(jobs),
+    salaryBands:
+      jobSalaryBands.length > 0
+        ? jobSalaryBands
+        : await loadBenchmarkSalaryBands(supabaseAdmin),
     marketCategories: buildMarketCategories(jobs),
   };
 }
