@@ -122,6 +122,52 @@ function SectionCard({
   );
 }
 
+function CompanyRailCard({
+  job,
+  displayLocation,
+}: {
+  job: Job;
+  displayLocation: string;
+}) {
+  return (
+    <section
+      aria-labelledby="job-company-heading"
+      className="rounded-3xl border border-black/5 bg-gradient-to-br from-neutral-950 to-neutral-800 p-5 text-white shadow-[0_30px_80px_-40px_rgba(15,23,42,0.7)]"
+    >
+      <h2
+        id="job-company-heading"
+        className="text-[10px] uppercase tracking-[0.18em] text-neutral-500"
+      >
+        Company
+      </h2>
+      <div className="mt-3 flex items-center gap-3">
+        <LogoMark job={job} size="md" dark />
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold">
+            {job.company_name}
+          </div>
+          <div className="line-clamp-2 text-[12px] leading-5 text-neutral-400">
+            {displayLocation}
+            {job.company_size ? ` / ${job.company_size}` : ""}
+          </div>
+        </div>
+      </div>
+
+      {job.company_website && (
+        <a
+          href={job.company_website}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 inline-flex items-center gap-1 text-[13px] font-medium text-teal-300 hover:text-teal-200"
+        >
+          <Globe aria-hidden="true" className="size-3.5" />
+          Visit careers site
+        </a>
+      )}
+    </section>
+  );
+}
+
 export default async function JobDetailsPage({ jobId }: JobDetailsPageProps) {
   const { job, related } = await getJobDetailsPageData(jobId);
 
@@ -261,7 +307,7 @@ export default async function JobDetailsPage({ jobId }: JobDetailsPageProps) {
               </div>
             </div>
 
-            <div className="space-y-4 lg:col-span-4">
+            <div className="lg:col-span-4">
               <div className="relative overflow-hidden rounded-3xl border border-teal-900/10 bg-white p-5 shadow-[0_30px_80px_-30px_rgba(13,148,136,0.35)]">
                 <div
                   aria-hidden="true"
@@ -320,36 +366,6 @@ export default async function JobDetailsPage({ jobId }: JobDetailsPageProps) {
                     ))}
                   </div>
                 </div>
-              </div>
-
-              <div className="rounded-3xl border border-black/5 bg-gradient-to-br from-neutral-950 to-neutral-800 p-5 text-white shadow-[0_30px_80px_-40px_rgba(15,23,42,0.7)]">
-                <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-500">
-                  Company
-                </div>
-                <div className="mt-3 flex items-center gap-3">
-                  <LogoMark job={job} size="md" dark />
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold">
-                      {job.company_name}
-                    </div>
-                    <div className="text-[12px] text-neutral-400">
-                      {heroLocation}
-                      {job.company_size ? ` / ${job.company_size}` : ""}
-                    </div>
-                  </div>
-                </div>
-
-                {job.company_website && (
-                  <a
-                    href={job.company_website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-4 inline-flex items-center gap-1 text-[13px] font-medium text-teal-300 hover:text-teal-200"
-                  >
-                    <Globe aria-hidden="true" className="size-3.5" />
-                    Visit careers site
-                  </a>
-                )}
               </div>
             </div>
           </div>
@@ -498,6 +514,7 @@ export default async function JobDetailsPage({ jobId }: JobDetailsPageProps) {
 
           <aside className="min-w-0">
             <div className="sticky top-24 space-y-4">
+              <CompanyRailCard job={job} displayLocation={heroLocation} />
               <SimilarRoles jobs={related} />
             </div>
           </aside>
