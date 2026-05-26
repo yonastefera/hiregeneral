@@ -1536,7 +1536,10 @@ async function eightfoldSessionHeaders(
   if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
   if (cookie) headers.Cookie = cookie;
 
-  return headers;
+  return {
+    headers,
+    html,
+  };
 }
 
 function eightfoldJobsFromResponse(data: EightfoldResponse) {
@@ -1552,6 +1555,82 @@ function eightfoldJobsFromResponse(data: EightfoldResponse) {
     return (
       [nested.positions, nested.jobs, nested.results].find(Array.isArray) ?? []
     );
+  }
+
+  return [];
+}
+
+function jsonArrayAt(text: string, startIndex: number) {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = startIndex; index < text.length; index += 1) {
+    const character = text[index];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (character === "\\") {
+        escaped = true;
+      } else if (character === '"') {
+        inString = false;
+      }
+
+      continue;
+    }
+
+    if (character === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (character === "[") {
+      depth += 1;
+    } else if (character === "]") {
+      depth -= 1;
+
+      if (depth === 0) {
+        return text.slice(startIndex, index + 1);
+      }
+    }
+  }
+
+  return "";
+}
+
+function eightfoldJobsFromHtml(html: string) {
+  const candidates = [html, decodeHtml(html)];
+
+  for (const candidate of candidates) {
+    for (const key of ["positions", "jobs", "results"]) {
+      const keyMatcher = new RegExp(`"${key}"\\s*:\\s*\\[`, "g");
+      let match: RegExpExecArray | null;
+
+      while ((match = keyMatcher.exec(candidate))) {
+        const arrayStart = candidate.indexOf("[", match.index);
+        if (arrayStart === -1) continue;
+
+        const arrayJson = jsonArrayAt(candidate, arrayStart);
+        if (!arrayJson) continue;
+
+        try {
+          const parsed = JSON.parse(arrayJson) as unknown;
+
+          if (
+            Array.isArray(parsed) &&
+            parsed.some((item) => item && typeof item === "object")
+          ) {
+            return parsed.filter(
+              (item): item is EightfoldJob =>
+                Boolean(item) && typeof item === "object",
+            );
+          }
+        } catch {
+          continue;
+        }
+      }
+    }
   }
 
   return [];
@@ -1841,17 +1920,109 @@ async function fetchEightfoldJobs(
     (source.companyDomain ? `https://${source.companyDomain}` : null);
   const jobs: ImportedJob[] = [];
   const seenSourceIds = new Set<string>();
-  const sessionHeaders = await eightfoldSessionHeaders(source, context);
+  const session = await eightfoldSessionHeaders(source, context);
 
   for (let page = 0; page < maxPages; page += 1) {
     const start = page * pageSize;
     const response = await fetch(eightfoldJobsUrl(source, start), {
-      headers: sessionHeaders,
+      headers: session.headers,
       cache: "no-store",
       signal: context?.signal,
     });
 
     if (!response.ok) {
+      if (page === 0) {
+        const fallbackJobs = eightfoldJobsFromHtml(session.html);
+
+        if (fallbackJobs.length > 0) {
+          for (const job of fallbackJobs) {
+            const title = recordString(job, ["title", "name", "position_name"]);
+            if (!title) continue;
+
+            const sourceId = eightfoldSourceId(source, job);
+            if (seenSourceIds.has(sourceId)) continue;
+            seenSourceIds.add(sourceId);
+
+            const location = eightfoldLocation(job);
+            const description = safeDescription({
+              description: eightfoldDescription(job),
+              title,
+              companyName: source.companyName,
+            });
+            const searchText = [
+              title,
+              description,
+              category,
+              recordString(job, [
+                "department",
+                "team",
+                "job_category",
+                "job_function",
+                "businessarea",
+              ]),
+            ]
+              .filter(Boolean)
+              .join(" ");
+
+            if (!isUsText(eightfoldLocationSearchText(job))) continue;
+            if (!isEngineeringText(searchText)) continue;
+            if (isInternshipText(searchText)) continue;
+
+            jobs.push({
+              recruiterId,
+              companyId: null,
+              companyName: source.companyName,
+              companyLogoUrl: source.companyLogoUrl ?? null,
+
+              title,
+              description,
+              location,
+
+              latitude: null,
+              longitude: null,
+
+              employmentType: normalizeEmploymentType(
+                recordString(job, [
+                  "employment_type",
+                  "employmentType",
+                  "job_type",
+                  "efcustom_text_text_time_type",
+                  "efcustomTextTextTimeType",
+                ]),
+              ),
+              workMode: detectWorkMode(title, location),
+
+              salaryMin: null,
+              salaryMax: null,
+              salaryCurrency: "USD",
+
+              skills: [],
+              responsibilities: splitListItems(description, 12),
+              requirements: splitListItems(description, 14),
+              benefits: [],
+
+              status: "published",
+
+              postedAt: eightfoldPostedAt(job),
+              expiresAt: defaultExpiryDate(30),
+
+              sourceName: "scraper",
+              sourceId,
+              applyUrl: eightfoldApplyUrl(source, job),
+
+              experienceLevel: null,
+              category,
+
+              companyTagline: null,
+              companySize: null,
+              companyWebsite,
+            });
+          }
+
+          return jobs;
+        }
+      }
+
       throw new Error(`Eightfold fetch failed: ${response.status}`);
     }
 
@@ -1897,7 +2068,7 @@ async function fetchEightfoldJobs(
       const detailedJob = await fetchEightfoldJobDetails(
         source,
         job,
-        sessionHeaders,
+        session.headers,
         context,
       );
       const detailedDescription = safeDescription({

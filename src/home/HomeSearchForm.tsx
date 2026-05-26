@@ -72,9 +72,9 @@ export default function HomeSearchForm({
         event.preventDefault();
         onSubmit();
       }}
-      className="relative z-30 mt-8 max-w-2xl overflow-visible"
+      className="relative z-30 mt-8 w-full max-w-2xl min-w-0 overflow-visible"
     >
-      <div className="relative z-30 grid max-w-2xl grid-cols-1 gap-2 overflow-visible rounded-2xl border border-black/5 bg-white/80 p-2 shadow-sm backdrop-blur sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+      <div className="relative z-30 grid w-full max-w-2xl min-w-0 grid-cols-1 gap-2 overflow-visible rounded-2xl border border-black/5 bg-white/80 p-2 shadow-sm backdrop-blur sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
         <div className="relative z-30 min-w-0 overflow-visible rounded-xl transition focus-within:bg-white/70">
           <Search
             className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-neutral-400"

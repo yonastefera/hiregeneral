@@ -258,9 +258,10 @@ async function fetchSearchPage(params: {
   config: PhenomConfig;
   from: number;
   keyword: string;
+  selectedFields?: Record<string, string[]>;
   signal?: AbortSignal;
 }) {
-  const { config, from, keyword, signal } = params;
+  const { config, from, keyword, selectedFields, signal } = params;
 
   const response = await fetch(config.widgetApiEndpoint, {
     method: "POST",
@@ -292,7 +293,7 @@ async function fetchSearchPage(params: {
       siteType: config.siteType,
       keywords: keyword,
       global: true,
-      selected_fields: config.selectedFields,
+      selected_fields: selectedFields ?? config.selectedFields,
       lang: config.locale,
       deviceType: "desktop",
       country: config.country,
@@ -319,6 +320,10 @@ async function fetchSearchPage(params: {
   };
 }
 
+function hasSelectedFields(fields: Record<string, string[]>) {
+  return Object.values(fields).some((values) => values.length > 0);
+}
+
 export async function fetchPhenomJobs(
   source: JobSource,
   context?: {
@@ -343,14 +348,24 @@ export async function fetchPhenomJobs(
         keyword,
         signal: context?.signal,
       });
+      const activeResult =
+        result.jobs.length === 0 && hasSelectedFields(config.selectedFields)
+          ? await fetchSearchPage({
+              config,
+              from,
+              keyword,
+              selectedFields: {},
+              signal: context?.signal,
+            })
+          : result;
 
-      result.jobs.forEach((job) => {
+      activeResult.jobs.forEach((job) => {
         jobsById.set(sourceId(source.sourceSlug, job), job);
       });
 
       if (
-        result.jobs.length < config.pageSize ||
-        from + config.pageSize >= result.totalHits
+        activeResult.jobs.length < config.pageSize ||
+        from + config.pageSize >= activeResult.totalHits
       ) {
         break;
       }

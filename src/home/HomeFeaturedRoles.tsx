@@ -20,8 +20,11 @@ type HomeFeaturedRolesProps = {
 
 export default function HomeFeaturedRoles({ jobs }: HomeFeaturedRolesProps) {
   return (
-    <aside className="lg:col-span-5" aria-labelledby="home-featured-heading">
-      <div className="rounded-3xl border border-black/5 bg-white p-5 shadow-[0_30px_80px_-30px_rgba(20,30,50,0.25)]">
+    <aside
+      className="min-w-0 lg:col-span-5"
+      aria-labelledby="home-featured-heading"
+    >
+      <div className="min-w-0 rounded-3xl border border-black/5 bg-white p-5 shadow-[0_30px_80px_-30px_rgba(20,30,50,0.25)]">
         <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-neutral-500">
           <span>Live market pulse</span>
 
@@ -50,7 +53,7 @@ export default function HomeFeaturedRoles({ jobs }: HomeFeaturedRolesProps) {
               return (
                 <article
                   key={job.id}
-                  className="group relative block rounded-2xl border border-black/5 p-3 transition hover:bg-neutral-50"
+                  className="group relative block min-w-0 rounded-2xl border border-black/5 p-3 transition hover:bg-neutral-50"
                 >
                   <Link
                     href={getJobHref(job)}
