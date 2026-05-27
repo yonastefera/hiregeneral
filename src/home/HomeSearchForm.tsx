@@ -1,6 +1,6 @@
 "use client";
 
-import { Crosshair, MapPin, Search } from "lucide-react";
+import { Crosshair, Loader2, MapPin, Search } from "lucide-react";
 
 import LocationAutocomplete from "@/components/location/LocationAutocomplete";
 import type { LocationSuggestion } from "@/components/location/location-types";
@@ -24,6 +24,7 @@ type HomeSearchFormProps = {
   query: string;
   locationQuery: string;
   locationError: string | null;
+  isLocating?: boolean;
   onQueryChange: (value: string) => void;
   onKeywordSelect: (keyword: SelectedKeyword | null) => void;
   onLocationQueryChange: (value: string) => void;
@@ -57,6 +58,7 @@ export default function HomeSearchForm({
   query,
   locationQuery,
   locationError,
+  isLocating = false,
   onKeywordSelect,
   onLocationQueryChange,
   onLocationSelect,
@@ -142,11 +144,21 @@ export default function HomeSearchForm({
 
           <button
             type="button"
-            aria-label="Use my current location"
+            aria-label={
+              isLocating
+                ? "Finding your current location"
+                : "Use my current location"
+            }
+            aria-busy={isLocating}
             onClick={onUseMyLocation}
-            className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-teal-600 transition hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+            disabled={isLocating}
+            className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-teal-600 transition hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
           >
-            <Crosshair className="h-4 w-4" aria-hidden="true" />
+            {isLocating ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Crosshair className="h-4 w-4" aria-hidden="true" />
+            )}
           </button>
         </div>
 

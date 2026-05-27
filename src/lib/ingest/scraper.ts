@@ -193,7 +193,16 @@ type YahooCareerSearchResponse =
 
 type TalentBrewSearchJob = {
   applyUrl: string;
+  category?: string;
   dateText: string;
+  location: string;
+  sourceId: string;
+  title: string;
+};
+
+type StgHavasSearchJob = {
+  applyUrl: string;
+  category: string;
   location: string;
   sourceId: string;
   title: string;
@@ -322,6 +331,7 @@ const YAHOO_DEFAULT_PAGE_SIZE = 20;
 const YAHOO_DEFAULT_MAX_PAGES = 5;
 const TALENTBREW_DEFAULT_ORG_ID = "185";
 const TALENTBREW_DEFAULT_MAX_PAGES = 6;
+const STG_HAVAS_DEFAULT_MAX_PAGES = 4;
 const APPCAST_DEFAULT_MAX_PAGES = 1;
 const FOX_DEFAULT_API_URL = "https://www.foxcareers.com/Search/JobsList/";
 const FOX_DEFAULT_MAX_PAGES = 4;
@@ -2826,7 +2836,7 @@ function talentBrewCitiResults(html: string, publicBase: string) {
       /<li\b[^>]*class=["'][^"']*\bsr-job-item\b[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi,
     ),
   ]
-    .map((match) => {
+    .map((match): TalentBrewSearchJob | null => {
       const item = match[1];
       const link = item.match(
         /<a\b[^>]*class=["'][^"']*\bsr-job-item__link\b[^"']*["'][^>]*href=["']([^"']+)["'][^>]*data-job-id=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i,
@@ -2850,7 +2860,82 @@ function talentBrewCitiResults(html: string, publicBase: string) {
         title: htmlToText(decodeHtml(titleHtml)).trim(),
       };
     })
+    .filter((job): job is TalentBrewSearchJob => job !== null);
+}
+
+function talentBrewSearchResultsList(html: string, publicBase: string) {
+  const starts = [
+    ...html.matchAll(
+      /<li\b[^>]*class=["'][^"']*\bsearch-results-list__item\b/gi,
+    ),
+  ].map((match) => match.index ?? 0);
+
+  return starts
+    .map((start, index) => html.slice(start, starts[index + 1] ?? html.length))
+    .map((match) => {
+      const item = match;
+      const link = item.match(
+        /<a\b[^>]*class=["'][^"']*\bsearch-results-list__job-link\b[^"']*["'][^>]*href=["']([^"']+)["'][^>]*data-job-id=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i,
+      );
+
+      if (!link) return null;
+
+      const [, href, sourceId, titleHtml] = link;
+      const location = item.match(
+        /<li\b[^>]*class=["'][^"']*\bjob-location\b[^"']*["'][^>]*>([\s\S]*?)<\/li>/i,
+      )?.[1];
+
+      return {
+        applyUrl: new URL(decodeHtml(href), publicBase).toString(),
+        dateText: "",
+        location: htmlToText(decodeHtml(location ?? "")).trim(),
+        sourceId,
+        title: htmlToText(decodeHtml(titleHtml)).trim(),
+      };
+    })
     .filter((job): job is TalentBrewSearchJob => Boolean(job?.title));
+}
+
+function talentBrewPlainResults(html: string, publicBase: string) {
+  const section =
+    html.match(
+      /<section\b[^>]*id=["']search-results-list["'][^>]*>([\s\S]*?)<\/section>/i,
+    )?.[1] ?? "";
+
+  return [...section.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)]
+    .map((match): TalentBrewSearchJob | null => {
+      const item = match[1];
+      const link = item.match(
+        /<a\b[^>]*href=["']([^"']+)["'][^>]*data-job-id=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i,
+      );
+
+      if (!link) return null;
+
+      const [, href, sourceId, body] = link;
+      const title = body.match(
+        /<h2\b[^>]*class=["']title["'][^>]*>([\s\S]*?)<\/h2>/i,
+      )?.[1];
+      const location = body.match(
+        /<span\b[^>]*class=["']location["'][^>]*>([\s\S]*?)<\/span>/i,
+      )?.[1];
+      const category = body.match(
+        /<span\b[^>]*class=["']category["'][^>]*>([\s\S]*?)<\/span>/i,
+      )?.[1];
+
+      if (!title) return null;
+
+      return {
+        applyUrl: new URL(decodeHtml(href), publicBase).toString(),
+        category: htmlToText(decodeHtml(category ?? ""))
+          .replace(/^Category:\s*/i, "")
+          .trim(),
+        dateText: "",
+        location: htmlToText(decodeHtml(location ?? "")).trim(),
+        sourceId,
+        title: htmlToText(decodeHtml(title)).trim(),
+      };
+    })
+    .filter((job): job is TalentBrewSearchJob => job !== null);
 }
 
 function talentBrewResults(html: string, publicBase: string) {
@@ -2885,7 +2970,12 @@ function talentBrewResults(html: string, publicBase: string) {
     })
     .filter((job): job is TalentBrewSearchJob => Boolean(job?.title));
 
-  return [...defaultJobs, ...talentBrewCitiResults(html, publicBase)];
+  return [
+    ...defaultJobs,
+    ...talentBrewCitiResults(html, publicBase),
+    ...talentBrewSearchResultsList(html, publicBase),
+    ...talentBrewPlainResults(html, publicBase),
+  ];
 }
 
 function appcastPageUrl(source: JobSource, page: number) {
@@ -3631,7 +3721,7 @@ async function fetchTalentBrewJobs(
         if (seenSourceIds.has(sourceId)) continue;
         seenSourceIds.add(sourceId);
 
-        const searchText = `${job.title} ${job.location} ${searchTerm}`;
+        const searchText = `${job.title} ${job.category ?? ""} ${job.location} ${searchTerm}`;
         if (!isUsText(job.location)) continue;
         if (!isEngineeringText(searchText)) continue;
         if (isInternshipText(searchText)) continue;
@@ -3677,7 +3767,7 @@ async function fetchTalentBrewJobs(
           applyUrl: job.applyUrl,
 
           experienceLevel: null,
-          category,
+          category: job.category || category,
 
           companyTagline: null,
           companySize: null,
@@ -3686,6 +3776,181 @@ async function fetchTalentBrewJobs(
       }
 
       if (pageJobs.length < 15) break;
+    }
+  }
+
+  return jobs;
+}
+
+function stgHavasPageUrl(source: JobSource, page: number) {
+  const url = new URL(
+    source.sourceUrl ??
+      "https://search-ihgcareers.stghavaspeople.com/en/search-and-apply/",
+  );
+
+  if (page > 1) {
+    url.searchParams.set("page", String(page));
+  }
+
+  return url;
+}
+
+function stgHavasResultBlocks(html: string) {
+  const starts = [
+    ...html.matchAll(/<div\b[^>]*class=["'][^"']*\bitem\b/gi),
+  ].map((match) => match.index ?? 0);
+
+  return starts.map((start, index) =>
+    html.slice(start, starts[index + 1] ?? html.length),
+  );
+}
+
+function stgHavasResults(html: string, publicBase: string) {
+  return stgHavasResultBlocks(html)
+    .map((block) => {
+      const jobSection = block.match(
+        /<div\b[^>]*class=["'][^"']*\blatest-jobs-section-jobs_department\b[^"']*["'][^>]*>([\s\S]*?)<\/div>\s*<div\b[^>]*class=["'][^"']*\blatest-jobs-section-jobs_location\b/i,
+      )?.[1];
+      const locationSection = block.match(
+        /<div\b[^>]*class=["'][^"']*\blatest-jobs-section-jobs_location\b[^"']*["'][^>]*>([\s\S]*?)<\/div>\s*<div\b[^>]*class=["'][^"']*\blatest-jobs-section-jobs_link\b/i,
+      )?.[1];
+
+      if (!jobSection || !locationSection) return null;
+
+      const href = jobSection.match(/<a\b[^>]*href=["']([^"']+)["']/i)?.[1];
+      const title = jobSection.match(/<h3\b[^>]*>([\s\S]*?)<\/h3>/i)?.[1];
+      const category = [...jobSection.matchAll(/<h5\b[^>]*>([\s\S]*?)<\/h5>/gi)]
+        .map((match) => htmlToText(decodeHtml(match[1])).trim())
+        .filter(Boolean)
+        .join(" ");
+      const location = [
+        locationSection.match(/<h3\b[^>]*>([\s\S]*?)<\/h3>/i)?.[1],
+        locationSection.match(/<h4\b[^>]*>([\s\S]*?)<\/h4>/i)?.[1],
+      ]
+        .map((value) => htmlToText(decodeHtml(value ?? "")).trim())
+        .filter(Boolean)
+        .join(", ");
+
+      if (!href || !title) return null;
+
+      const decodedHref = decodeHtml(href);
+      const sourceId =
+        decodedHref.match(/[?&]jobref=([^&#]+)/)?.[1] ??
+        htmlAttribute(block, "data-anchor") ??
+        decodedHref;
+
+      return {
+        applyUrl: new URL(decodedHref, publicBase).toString(),
+        category,
+        location,
+        sourceId,
+        title: htmlToText(decodeHtml(title)).trim(),
+      };
+    })
+    .filter((job): job is StgHavasSearchJob => Boolean(job?.title));
+}
+
+async function fetchStgHavasJobs(
+  source: JobSource,
+  context?: {
+    signal?: AbortSignal;
+  },
+): Promise<ImportedJob[]> {
+  const recruiterId = process.env.SYSTEM_RECRUITER_ID;
+
+  if (!recruiterId) {
+    throw new Error("Missing SYSTEM_RECRUITER_ID");
+  }
+
+  const publicBase =
+    metadataString(source, "publicBase") ??
+    source.sourceUrl ??
+    "https://search-ihgcareers.stghavaspeople.com";
+  const maxPages = Math.max(
+    metadataNumber(source, "maxPages") ?? STG_HAVAS_DEFAULT_MAX_PAGES,
+    1,
+  );
+  const category = metadataString(source, "category") ?? "Technology";
+  const companyWebsite =
+    metadataString(source, "companyWebsite") ??
+    (source.companyDomain ? `https://${source.companyDomain}` : null);
+  const jobs: ImportedJob[] = [];
+  const seenSourceIds = new Set<string>();
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const response = await fetch(stgHavasPageUrl(source, page), {
+      headers: {
+        Accept: "text/html",
+        "User-Agent": "HireGeneralJobBoard/1.0",
+      },
+      cache: "no-store",
+      signal: context?.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`STG Havas careers fetch failed: ${response.status}`);
+    }
+
+    const pageJobs = stgHavasResults(await response.text(), publicBase);
+    if (pageJobs.length === 0) break;
+
+    for (const job of pageJobs) {
+      const sourceId = `${source.sourceSlug}:${job.sourceId}`;
+      if (seenSourceIds.has(sourceId)) continue;
+      seenSourceIds.add(sourceId);
+
+      const searchText = `${job.title} ${job.category} ${job.location}`;
+      if (!isUsText(job.location)) continue;
+      if (!isEngineeringText(searchText)) continue;
+      if (isInternshipText(searchText)) continue;
+
+      const description = safeDescription({
+        title: job.title,
+        companyName: source.companyName,
+        description: `${job.title} role at ${source.companyName}. Visit the company careers site for the complete description and application details.`,
+      });
+
+      jobs.push({
+        recruiterId,
+        companyId: null,
+        companyName: source.companyName,
+        companyLogoUrl: source.companyLogoUrl ?? null,
+
+        title: job.title,
+        description,
+        location: job.location || "United States",
+
+        latitude: null,
+        longitude: null,
+
+        employmentType: normalizeEmploymentType(null),
+        workMode: detectWorkMode(`${job.title} ${job.category}`, job.location),
+
+        salaryMin: null,
+        salaryMax: null,
+        salaryCurrency: "USD",
+
+        skills: [],
+        responsibilities: [],
+        requirements: [],
+        benefits: [],
+
+        status: "published",
+
+        postedAt: new Date().toISOString(),
+        expiresAt: defaultExpiryDate(30),
+
+        sourceName: "scraper",
+        sourceId,
+        applyUrl: job.applyUrl,
+
+        experienceLevel: null,
+        category: job.category || category,
+
+        companyTagline: null,
+        companySize: null,
+        companyWebsite,
+      });
     }
   }
 
@@ -4179,6 +4444,10 @@ export const scraperAdapter: JobSourceAdapter = {
 
     if (adapter === "talentbrew") {
       return fetchTalentBrewJobs(source, context);
+    }
+
+    if (adapter === "stg-havas") {
+      return fetchStgHavasJobs(source, context);
     }
 
     if (adapter === "appcast") {

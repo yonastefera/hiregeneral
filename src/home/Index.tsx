@@ -13,12 +13,18 @@ import HomeSearchForm, {
   type SelectedLocation,
 } from "./HomeSearchForm";
 import type { HomeMarketCategory, HomeSalaryBand } from "./home-insights";
+import { buildJobsSearchParams } from "./home-search-params";
 
 interface IndexProps {
   initialHighlightedJobs: JobCardJob[];
   initialSalaryBands: HomeSalaryBand[];
   initialMarketCategories: HomeMarketCategory[];
 }
+
+type ReverseLocationResponse = {
+  location?: SelectedLocation;
+  error?: string;
+};
 
 const Index = ({
   initialHighlightedJobs,
@@ -30,11 +36,66 @@ const Index = ({
   const [query, setQuery] = useState("");
   const [selectedKeyword, setSelectedKeyword] =
     useState<SelectedKeyword | null>(null);
+
   const [locationQuery, setLocationQuery] = useState("");
   const [selectedLocation, setSelectedLocation] =
     useState<SelectedLocation | null>(null);
-  const [locationError, setLocationError] = useState<string | null>(null);
 
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
+
+  const handleQueryChange = (value: string) => {
+    setQuery(value);
+    setSelectedKeyword(null);
+  };
+
+  const handleKeywordSelect = (keyword: SelectedKeyword | null) => {
+    setSelectedKeyword(keyword);
+
+    if (keyword) {
+      setQuery(keyword.term);
+    }
+  };
+
+  const handleLocationQueryChange = (value: string) => {
+    setLocationQuery(value);
+    setLocationError(null);
+    setSelectedLocation(null);
+  };
+
+  const handleLocationSelect = (location: SelectedLocation | null) => {
+    setSelectedLocation(location);
+    setLocationError(null);
+
+    if (location) {
+      setLocationQuery(`${location.city}, ${location.state}`);
+    }
+  };
+
+  const reverseGeocodeCurrentPosition = async (
+    position: GeolocationPosition,
+  ) => {
+    const params = new URLSearchParams({
+      lat: String(position.coords.latitude),
+      lng: String(position.coords.longitude),
+    });
+
+    const response = await fetch(`/api/locations/reverse?${params.toString()}`);
+    const body = (await response.json()) as ReverseLocationResponse;
+
+    if (!response.ok || !body.location) {
+      throw new Error(body.error ?? "Could not resolve your location.");
+    }
+
+    return body.location;
+  };
+
+  /*
+    IMPORTANT:
+    This function is only called by the crosshair icon button inside
+    HomeSearchForm.tsx. There is no useEffect, no mount-time call, and no
+    automatic page-load permission request.
+  */
   const useMyLocation = () => {
     setLocationError(null);
 
@@ -43,45 +104,51 @@ const Index = ({
       return;
     }
 
+    setIsLocating(true);
+
     navigator.geolocation.getCurrentPosition(
-      () => {
-        setLocationQuery("Current location");
-        setSelectedLocation(null);
+      async (position) => {
+        try {
+          const location = await reverseGeocodeCurrentPosition(position);
+
+          setSelectedLocation(location);
+          setLocationQuery(`${location.city}, ${location.state}`);
+          setLocationError(null);
+        } catch (error) {
+          console.error("[useMyLocation:reverseGeocode]", error);
+
+          setSelectedLocation(null);
+          setLocationQuery("");
+          setLocationError(
+            "We found your coordinates but could not convert them into a city and state.",
+          );
+        } finally {
+          setIsLocating(false);
+        }
       },
       () => {
+        setIsLocating(false);
+        setSelectedLocation(null);
         setLocationError("Could not access your location.");
+      },
+      {
+        enableHighAccuracy: false,
+        maximumAge: 60_000,
+        timeout: 10_000,
       },
     );
   };
 
   const searchJobs = () => {
-    const params = new URLSearchParams();
-    const trimmedQuery = query.trim();
-    const trimmedLocation = locationQuery.trim();
-
-    if (selectedKeyword) {
-      params.set("q", selectedKeyword.term);
-    } else if (trimmedQuery) {
-      params.set("q", trimmedQuery);
-    }
-
-    if (selectedLocation) {
-      params.set("city", selectedLocation.city);
-      params.set("state", selectedLocation.state);
-
-      if (selectedLocation.zip_code) {
-        params.set("zip", selectedLocation.zip_code);
-      }
-
-      params.set(
-        "location",
-        `${selectedLocation.city}, ${selectedLocation.state}`,
-      );
-    } else if (trimmedLocation) {
-      params.set("location", trimmedLocation);
-    }
+    const params = buildJobsSearchParams({
+      query,
+      selectedKeyword,
+      locationQuery,
+      selectedLocation,
+    });
 
     const queryString = params.toString();
+
     router.push(queryString ? `/jobs?${queryString}` : "/jobs");
   };
 
@@ -117,25 +184,19 @@ const Index = ({
             </h1>
 
             <p className="mt-6 max-w-xl text-[17px] leading-relaxed text-neutral-600">
-              A minimal job board for candidates and recruiters with public job
-              search, secure saved listings, recruiter posting, and rich
-              profiles.
+              Find better-fit roles, save opportunities, and connect with
+              recruiters through focused job search and rich profiles.
             </p>
 
             <HomeSearchForm
               query={query}
               locationQuery={locationQuery}
               locationError={locationError}
-              onQueryChange={setQuery}
-              onKeywordSelect={setSelectedKeyword}
-              onLocationQueryChange={(value) => {
-                setLocationQuery(value);
-                setLocationError(null);
-              }}
-              onLocationSelect={(location) => {
-                setSelectedLocation(location);
-                setLocationError(null);
-              }}
+              isLocating={isLocating}
+              onQueryChange={handleQueryChange}
+              onKeywordSelect={handleKeywordSelect}
+              onLocationQueryChange={handleLocationQueryChange}
+              onLocationSelect={handleLocationSelect}
               onUseMyLocation={useMyLocation}
               onSubmit={searchJobs}
             />
