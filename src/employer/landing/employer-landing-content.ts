@@ -106,7 +106,7 @@ export const marketplaceFilters = [
 ];
 
 export const hiringMetrics = [
-  "2.4M candidates",
+  "Experienced candidates",
   "14-day avg time-to-hire",
   "No sourcing fees",
 ];

@@ -72,6 +72,38 @@ type MCloudResponse = {
   queryResult?: MCloudJob[];
 };
 
+type GoldmanHigherRole = {
+  roleId?: string;
+  corporateTitle?: string | null;
+  division?: string | null;
+  jobTitle?: string;
+  jobFunction?: string | null;
+  locations?: Array<{
+    primary?: boolean;
+    state?: string | null;
+    country?: string | null;
+    city?: string | null;
+  }>;
+  status?: string;
+  skills?: string[];
+  jobType?: {
+    code?: string | null;
+    description?: string | null;
+  } | null;
+  externalSource?: {
+    sourceId?: string | null;
+  } | null;
+};
+
+type GoldmanHigherResponse = {
+  data?: {
+    roleSearch?: {
+      totalCount?: number;
+      items?: GoldmanHigherRole[];
+    };
+  };
+};
+
 type EightfoldJob = Record<string, unknown>;
 
 type EightfoldResponse =
@@ -315,6 +347,10 @@ const AVATURE_DEFAULT_MAX_PAGES = 4;
 const MCLOUD_DEFAULT_API_BASE = "https://jobsapi-internal.m-cloud.io/api";
 const MCLOUD_DEFAULT_PAGE_SIZE = 50;
 const MCLOUD_DEFAULT_MAX_PAGES = 4;
+const GOLDMAN_HIGHER_DEFAULT_API_URL =
+  "https://api-higher.gs.com/gateway/api/v1/graphql";
+const GOLDMAN_HIGHER_DEFAULT_PAGE_SIZE = 20;
+const GOLDMAN_HIGHER_DEFAULT_MAX_PAGES = 4;
 const ACTIVATE_DEFAULT_PAGE_SIZE = 12;
 const ACTIVATE_DEFAULT_MAX_PAGES = 5;
 const EIGHTFOLD_DEFAULT_PAGE_SIZE = 10;
@@ -696,9 +732,13 @@ function avaturePageUrl(source: JobSource, pageSize: number, offset: number) {
 }
 
 function parseAvatureArticle(source: JobSource, article: string) {
-  const linkMatch = article.match(
-    /<a\b(?=[^>]*class=["'][^"']*\blink\b)(?=[^>]*href=["']([^"']+)["'])[^>]*>([\s\S]*?)<\/a>/i,
-  );
+  const linkMatch =
+    article.match(
+      /<a\b(?=[^>]*class=["'][^"']*\blink\b)(?=[^>]*href=["']([^"']+)["'])[^>]*>([\s\S]*?)<\/a>/i,
+    ) ??
+    article.match(
+      /<h3\b[^>]*class=["'][^"']*\barticle__header__text__title\b[\s\S]*?<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i,
+    );
 
   if (!linkMatch) return null;
 
@@ -706,13 +746,29 @@ function parseAvatureArticle(source: JobSource, article: string) {
   const title = htmlToText(decodeHtml(titleHtml)).replace(/\s+/g, " ").trim();
   const sourceUrl = source.sourceUrl ?? "https://smurfitwestrockta.avature.net";
   const applyUrl = new URL(decodeHtml(href), sourceUrl).toString();
-  const location = avatureClassText(article, "list-item-location");
+  const subtitle = article.match(
+    /<div\b[^>]*class=["'][^"']*\barticle__header__text__subtitle\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
+  )?.[1];
+  const subtitleText = htmlToText(decodeHtml(subtitle ?? ""))
+    .replace(/\s+/g, " ")
+    .trim();
+  const location =
+    avatureClassText(article, "list-item-location") ||
+    subtitleText
+      .replace(/\s*,?\s*Ref\s*#.*$/i, "")
+      .replace(/\s*,?\s*Posted\s+.*$/i, "")
+      .replace(/\s+,/g, ",")
+      .trim();
   const employmentType = avatureClassText(article, "list-item-type");
-  const postedText = avatureClassText(article, "list-item-posted");
-  const jobId = avatureClassText(article, "list-item-ref").replace(
-    /^Job ID:\s*/i,
-    "",
-  );
+  const postedText =
+    avatureClassText(article, "list-item-posted") ||
+    subtitleText.match(/\bPosted\s+([A-Za-z]{3}-\d{2}-\d{4})/i)?.[1] ||
+    "";
+  const jobId =
+    avatureClassText(article, "list-item-ref").replace(/^Job ID:\s*/i, "") ||
+    subtitleText.match(/\bRef\s*#\s*([A-Za-z0-9-]+)/i)?.[1] ||
+    href.match(/\/(\d+)(?:[/?#]|$)/)?.[1] ||
+    "";
 
   if (!title) return null;
 
@@ -770,6 +826,7 @@ async function fetchAvatureJobs(
     metadataNumber(source, "maxPages") ?? AVATURE_DEFAULT_MAX_PAGES;
   const category = metadataString(source, "category") ?? "Technology";
   const country = metadataString(source, "country");
+  const requiredTerms = metadataStringArray(source, "requiredTerms") ?? [];
   const jobs: ImportedJob[] = [];
   const seenSourceIds = new Set<string>();
 
@@ -800,7 +857,14 @@ async function fetchAvatureJobs(
 
       const locationText = [job.location, country].filter(Boolean).join(", ");
       const searchText = `${job.title} ${locationText} ${category}`;
+      const sourceSearchText = `${job.title} ${job.location} ${job.employmentType}`;
+      if (isNonJobTitle(job.title)) continue;
       if (!isUsText(locationText)) continue;
+      if (
+        requiredTerms.length > 0 &&
+        !includesAnyTerm(sourceSearchText, requiredTerms)
+      )
+        continue;
       if (!isEngineeringText(searchText)) continue;
       if (isInternshipText(searchText)) continue;
 
@@ -962,6 +1026,18 @@ function mcloudSalary(value: string | null | undefined) {
   return { min, max: max === min ? null : max };
 }
 
+function includesAnyTerm(value: string, terms: string[]) {
+  const lowerValue = value.toLowerCase();
+
+  return terms.some((term) => lowerValue.includes(term.toLowerCase()));
+}
+
+function isNonJobTitle(value: string) {
+  return /\b(cookie|disclosure|privacy|terms(?:\s+of\s+use)?|accessibility|equal opportunity)\b/i.test(
+    value,
+  );
+}
+
 function mcloudSourceId(source: JobSource, job: MCloudJob) {
   return `${source.sourceSlug}:${job.ref ?? job.clientid ?? job.id ?? job.url}`;
 }
@@ -991,6 +1067,7 @@ async function fetchMCloudJobs(
     1,
   );
   const category = metadataString(source, "category") ?? "Technology";
+  const requiredTerms = metadataStringArray(source, "requiredTerms") ?? [];
   const companyWebsite =
     metadataString(source, "companyWebsite") ??
     (source.companyDomain ? `https://${source.companyDomain}` : null);
@@ -1049,8 +1126,21 @@ async function fetchMCloudJobs(
       ]
         .filter(Boolean)
         .join(" ");
+      const sourceSearchText = [
+        title,
+        job.primary_category,
+        job.parent_category,
+        job.function,
+      ]
+        .filter(Boolean)
+        .join(" ");
 
       if (!isUsText(mcloudLocationSearchText(job))) continue;
+      if (
+        requiredTerms.length > 0 &&
+        !includesAnyTerm(sourceSearchText, requiredTerms)
+      )
+        continue;
       if (!isEngineeringText(searchText)) continue;
       if (isInternshipText(searchText)) continue;
 
@@ -1106,6 +1196,231 @@ async function fetchMCloudJobs(
 
     if (pageJobs.length < pageSize || jobs.length >= (data.totalHits ?? 0)) {
       break;
+    }
+  }
+
+  return jobs;
+}
+
+function goldmanHigherLocation(job: GoldmanHigherRole) {
+  const location =
+    job.locations?.find((item) => item.primary) ?? job.locations?.[0];
+
+  return [location?.city, location?.state, location?.country]
+    .filter(Boolean)
+    .join(", ");
+}
+
+function goldmanHigherLocationSearchText(job: GoldmanHigherRole) {
+  return (job.locations ?? [])
+    .map((location) =>
+      [location.city, location.state, location.country]
+        .filter(Boolean)
+        .join(", "),
+    )
+    .join(" ");
+}
+
+function goldmanHigherApplyUrl(source: JobSource, role: GoldmanHigherRole) {
+  const publicBase =
+    metadataString(source, "publicBase") ??
+    source.sourceUrl ??
+    "https://higher.gs.com";
+  const sourceId = role.externalSource?.sourceId ?? role.roleId;
+
+  return sourceId
+    ? new URL(`/roles/${sourceId}`, publicBase).toString()
+    : publicBase;
+}
+
+async function fetchGoldmanHigherJobs(
+  source: JobSource,
+  context?: {
+    signal?: AbortSignal;
+  },
+): Promise<ImportedJob[]> {
+  const recruiterId = process.env.SYSTEM_RECRUITER_ID;
+
+  if (!recruiterId) {
+    throw new Error("Missing SYSTEM_RECRUITER_ID");
+  }
+
+  const apiUrl =
+    metadataString(source, "apiUrl") ?? GOLDMAN_HIGHER_DEFAULT_API_URL;
+  const pageSize = Math.max(
+    metadataNumber(source, "pageSize") ?? GOLDMAN_HIGHER_DEFAULT_PAGE_SIZE,
+    1,
+  );
+  const maxPages = Math.max(
+    metadataNumber(source, "maxPages") ?? GOLDMAN_HIGHER_DEFAULT_MAX_PAGES,
+    1,
+  );
+  const searchTerms = metadataStringArray(source, "searchTerms") ?? [
+    "software",
+    "technology",
+    "engineering",
+    "data",
+    "security",
+  ];
+  const category = metadataString(source, "category") ?? "Technology";
+  const companyWebsite =
+    metadataString(source, "companyWebsite") ??
+    (source.companyDomain ? `https://${source.companyDomain}` : null);
+  const jobs: ImportedJob[] = [];
+  const seenSourceIds = new Set<string>();
+  const query = `
+    query GetRoles($searchQueryInput: RoleSearchQueryInput!) {
+      roleSearch(searchQueryInput: $searchQueryInput) {
+        totalCount
+        items {
+          roleId
+          corporateTitle
+          jobTitle
+          jobFunction
+          locations {
+            primary
+            state
+            country
+            city
+          }
+          status
+          division
+          skills
+          jobType {
+            code
+            description
+          }
+          externalSource {
+            sourceId
+          }
+        }
+      }
+    }
+  `;
+
+  for (const searchTerm of searchTerms) {
+    for (let page = 0; page < maxPages; page += 1) {
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "User-Agent": "HireGeneralJobBoard/1.0",
+          "x-higher-session-id": `hiregeneral-${source.sourceSlug}`,
+        },
+        body: JSON.stringify({
+          query,
+          variables: {
+            searchQueryInput: {
+              page: {
+                pageSize,
+                pageNumber: page,
+              },
+              filters: [],
+              experiences: ["PROFESSIONAL", "EARLY_CAREER"],
+              searchTerm,
+            },
+          },
+        }),
+        cache: "no-store",
+        signal: context?.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Goldman Higher fetch failed: ${response.status}`);
+      }
+
+      const data = (await response.json()) as GoldmanHigherResponse;
+      const pageJobs = data.data?.roleSearch?.items ?? [];
+
+      if (pageJobs.length === 0) break;
+
+      for (const job of pageJobs) {
+        if (job.status && job.status !== "POSTED") continue;
+
+        const title = job.jobTitle?.trim();
+        if (!title) continue;
+
+        const externalSourceId = job.externalSource?.sourceId ?? job.roleId;
+        const sourceId = `${source.sourceSlug}:${externalSourceId ?? title}`;
+        if (seenSourceIds.has(sourceId)) continue;
+        seenSourceIds.add(sourceId);
+
+        const location = goldmanHigherLocation(job);
+        const locationSearchText = goldmanHigherLocationSearchText(job);
+        const searchText = [
+          title,
+          job.jobFunction,
+          job.division,
+          job.corporateTitle,
+          ...(job.skills ?? []),
+          category,
+        ]
+          .filter(Boolean)
+          .join(" ");
+
+        if (!isUsText(locationSearchText || location)) continue;
+        if (!isEngineeringText(searchText)) continue;
+        if (isInternshipText(searchText)) continue;
+
+        const description = safeDescription({
+          description: [
+            title,
+            job.jobFunction,
+            job.division,
+            job.corporateTitle,
+            ...(job.skills ?? []),
+          ]
+            .filter(Boolean)
+            .join(". "),
+          title,
+          companyName: source.companyName,
+        });
+
+        jobs.push({
+          recruiterId,
+          companyId: null,
+          companyName: source.companyName,
+          companyLogoUrl: source.companyLogoUrl ?? null,
+
+          title,
+          description,
+          location: location || "United States",
+
+          latitude: null,
+          longitude: null,
+
+          employmentType: normalizeEmploymentType(job.jobType?.description),
+          workMode: detectWorkMode(title, location),
+
+          salaryMin: null,
+          salaryMax: null,
+          salaryCurrency: "USD",
+
+          skills: job.skills ?? [],
+          responsibilities: [],
+          requirements: [],
+          benefits: [],
+
+          status: "published",
+
+          postedAt: new Date().toISOString(),
+          expiresAt: defaultExpiryDate(30),
+
+          sourceName: "scraper",
+          sourceId,
+          applyUrl: goldmanHigherApplyUrl(source, job),
+
+          experienceLevel: null,
+          category: job.jobFunction ?? category,
+
+          companyTagline: null,
+          companySize: null,
+          companyWebsite,
+        });
+      }
+
+      if (pageJobs.length < pageSize) break;
     }
   }
 
@@ -2912,17 +3227,23 @@ function talentBrewPlainResults(html: string, publicBase: string) {
       if (!link) return null;
 
       const [, href, sourceId, body] = link;
-      const title = body.match(
-        /<h2\b[^>]*class=["']title["'][^>]*>([\s\S]*?)<\/h2>/i,
-      )?.[1];
-      const location = body.match(
-        /<span\b[^>]*class=["']location["'][^>]*>([\s\S]*?)<\/span>/i,
-      )?.[1];
+      const title =
+        body.match(
+          /<h2\b[^>]*class=["']title["'][^>]*>([\s\S]*?)<\/h2>/i,
+        )?.[1] ?? body.match(/<h2\b[^>]*>([\s\S]*?)<\/h2>/i)?.[1];
+      const heading = title ?? body.match(/<h3\b[^>]*>([\s\S]*?)<\/h3>/i)?.[1];
+      const location =
+        body.match(
+          /<span\b[^>]*class=["']location["'][^>]*>([\s\S]*?)<\/span>/i,
+        )?.[1] ??
+        body.match(
+          /<span\b[^>]*class=["'][^"']*\bjob-location\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i,
+        )?.[1];
       const category = body.match(
         /<span\b[^>]*class=["']category["'][^>]*>([\s\S]*?)<\/span>/i,
       )?.[1];
 
-      if (!title) return null;
+      if (!heading) return null;
 
       return {
         applyUrl: new URL(decodeHtml(href), publicBase).toString(),
@@ -2932,7 +3253,7 @@ function talentBrewPlainResults(html: string, publicBase: string) {
         dateText: "",
         location: htmlToText(decodeHtml(location ?? "")).trim(),
         sourceId,
-        title: htmlToText(decodeHtml(title)).trim(),
+        title: htmlToText(decodeHtml(heading)).trim(),
       };
     })
     .filter((job): job is TalentBrewSearchJob => job !== null);
@@ -3689,6 +4010,7 @@ async function fetchTalentBrewJobs(
     1,
   );
   const category = metadataString(source, "category") ?? "Technology";
+  const requiredTerms = metadataStringArray(source, "requiredTerms") ?? [];
   const companyWebsite =
     metadataString(source, "companyWebsite") ??
     (source.companyDomain ? `https://${source.companyDomain}` : null);
@@ -3722,7 +4044,14 @@ async function fetchTalentBrewJobs(
         seenSourceIds.add(sourceId);
 
         const searchText = `${job.title} ${job.category ?? ""} ${job.location} ${searchTerm}`;
+        const sourceSearchText = `${job.title} ${job.category ?? ""} ${job.location}`;
+        if (isNonJobTitle(job.title)) continue;
         if (!isUsText(job.location)) continue;
+        if (
+          requiredTerms.length > 0 &&
+          !includesAnyTerm(sourceSearchText, requiredTerms)
+        )
+          continue;
         if (!isEngineeringText(searchText)) continue;
         if (isInternshipText(searchText)) continue;
 
@@ -4420,6 +4749,10 @@ export const scraperAdapter: JobSourceAdapter = {
 
     if (adapter === "mcloud") {
       return fetchMCloudJobs(source, context);
+    }
+
+    if (adapter === "goldman-higher") {
+      return fetchGoldmanHigherJobs(source, context);
     }
 
     if (adapter === "activate") {

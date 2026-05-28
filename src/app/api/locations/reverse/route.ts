@@ -1,58 +1,52 @@
 import { NextResponse } from "next/server";
 
-type MapboxFeature = {
-  properties?: {
-    name?: string;
-    full_address?: string;
-    place_formatted?: string;
-    context?: {
-      place?: {
-        name?: string;
-      };
-      locality?: {
-        name?: string;
-      };
-      region?: {
-        name?: string;
-        region_code?: string;
-      };
-      postcode?: {
-        name?: string;
-      };
-    };
-  };
+type GoogleAddressComponent = {
+  long_name: string;
+  short_name: string;
+  types: string[];
 };
 
-type MapboxReverseResponse = {
-  features?: MapboxFeature[];
+type GoogleGeocodeResult = {
+  address_components: GoogleAddressComponent[];
+  formatted_address: string;
+  place_id: string;
+  types: string[];
 };
 
-function normalizeRegionCode(value: string | undefined) {
-  if (!value) return null;
+type GoogleReverseGeocodeResponse = {
+  results?: GoogleGeocodeResult[];
+  status: string;
+  error_message?: string;
+};
 
-  /*
-    Mapbox often returns US state codes as "US-NY".
-    Your app's SelectedLocation shape expects just "NY".
-  */
-  const parts = value.split("-");
-  return parts[parts.length - 1] || value;
+function getComponent(
+  components: GoogleAddressComponent[],
+  type: string,
+  name: "long_name" | "short_name" = "long_name",
+) {
+  return components.find((component) => component.types.includes(type))?.[name];
 }
 
-function pickLocationFromMapboxFeature(feature: MapboxFeature) {
-  const context = feature.properties?.context;
+function pickCity(components: GoogleAddressComponent[]) {
+  return (
+    getComponent(components, "locality") ??
+    getComponent(components, "postal_town") ??
+    getComponent(components, "sublocality") ??
+    getComponent(components, "administrative_area_level_3") ??
+    getComponent(components, "administrative_area_level_2")
+  );
+}
 
-  const city =
-    context?.place?.name ??
-    context?.locality?.name ??
-    feature.properties?.name ??
+function pickLocationFromGoogleResult(result: GoogleGeocodeResult) {
+  const city = pickCity(result.address_components);
+  const state = getComponent(
+    result.address_components,
+    "administrative_area_level_1",
+    "short_name",
+  );
+  const zip_code =
+    getComponent(result.address_components, "postal_code", "short_name") ??
     null;
-
-  const state =
-    normalizeRegionCode(context?.region?.region_code) ??
-    context?.region?.name ??
-    null;
-
-  const zip_code = context?.postcode?.name ?? null;
 
   if (!city || !state) {
     return null;
@@ -83,12 +77,12 @@ export async function GET(request: Request) {
     );
   }
 
-  const accessToken = process.env.MAPBOX_ACCESS_TOKEN;
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
 
-  if (!accessToken) {
+  if (!apiKey) {
     return NextResponse.json(
       {
-        error: "Missing MAPBOX_ACCESS_TOKEN.",
+        error: "Missing GOOGLE_MAPS_API_KEY.",
       },
       {
         status: 500,
@@ -96,15 +90,16 @@ export async function GET(request: Request) {
     );
   }
 
-  const mapboxUrl = new URL("https://api.mapbox.com/search/geocode/v6/reverse");
+  const googleUrl = new URL(
+    "https://maps.googleapis.com/maps/api/geocode/json",
+  );
 
-  mapboxUrl.searchParams.set("latitude", String(lat));
-  mapboxUrl.searchParams.set("longitude", String(lng));
-  mapboxUrl.searchParams.set("access_token", accessToken);
-  mapboxUrl.searchParams.set("limit", "1");
-  mapboxUrl.searchParams.set("language", "en");
+  googleUrl.searchParams.set("latlng", `${lat},${lng}`);
+  googleUrl.searchParams.set("key", apiKey);
+  googleUrl.searchParams.set("result_type", "locality|postal_code");
+  googleUrl.searchParams.set("language", "en");
 
-  const response = await fetch(mapboxUrl.toString(), {
+  const response = await fetch(googleUrl.toString(), {
     next: {
       revalidate: 60 * 60 * 24,
     },
@@ -113,7 +108,7 @@ export async function GET(request: Request) {
   if (!response.ok) {
     return NextResponse.json(
       {
-        error: "Reverse geocoding failed.",
+        error: "Reverse geocoding request failed.",
       },
       {
         status: 502,
@@ -121,21 +116,25 @@ export async function GET(request: Request) {
     );
   }
 
-  const body = (await response.json()) as MapboxReverseResponse;
-  const feature = body.features?.[0];
+  const body = (await response.json()) as GoogleReverseGeocodeResponse;
 
-  if (!feature) {
+  if (body.status !== "OK") {
     return NextResponse.json(
       {
-        error: "No location found for those coordinates.",
+        error:
+          body.error_message ??
+          `Google reverse geocoding failed with status: ${body.status}`,
       },
       {
-        status: 404,
+        status: 502,
       },
     );
   }
 
-  const location = pickLocationFromMapboxFeature(feature);
+  const location =
+    body.results
+      ?.map(pickLocationFromGoogleResult)
+      .find((candidate) => candidate !== null) ?? null;
 
   if (!location) {
     return NextResponse.json(
