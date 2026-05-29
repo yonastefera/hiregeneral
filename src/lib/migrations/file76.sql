@@ -57,7 +57,7 @@ VALUES
       "site":"capitalgroupcareers",
       "apiBase":"https://capgroup.wd1.myworkdayjobs.com/wday/cxs/capgroup/capitalgroupcareers",
       "publicBase":"https://capgroup.wd1.myworkdayjobs.com/capitalgroupcareers",
-      "searchTexts":["software","developer","engineer","technology","data","cloud","security"],
+      "searchTexts":["software","developer","engineer","technology","data","analytics","data science","data engineering","data governance","cloud","security"],
       "pageSize":20,
       "maxPages":8
     }'::jsonb,
@@ -75,7 +75,7 @@ VALUES
       "site":"pimco-careers",
       "apiBase":"https://pimco.wd1.myworkdayjobs.com/wday/cxs/pimco/pimco-careers",
       "publicBase":"https://pimco.wd1.myworkdayjobs.com/pimco-careers",
-      "searchTexts":["software","developer","engineer","technology","data","cloud","security"],
+      "searchTexts":["software","developer","engineer","technology","data","analytics","data science","data engineering","data governance","cloud","security"],
       "pageSize":20,
       "maxPages":8
     }'::jsonb,
@@ -93,7 +93,7 @@ VALUES
       "site":"Primary-External-1",
       "apiBase":"https://franklintempleton.wd5.myworkdayjobs.com/wday/cxs/franklintempleton/Primary-External-1",
       "publicBase":"https://franklintempleton.wd5.myworkdayjobs.com/Primary-External-1",
-      "searchTexts":["software","developer","engineer","technology","data","cloud","security"],
+      "searchTexts":["software","developer","engineer","technology","data","analytics","data science","data engineering","data governance","cloud","security"],
       "pageSize":20,
       "maxPages":8
     }'::jsonb,
@@ -111,7 +111,7 @@ VALUES
       "site":"External",
       "apiBase":"https://wellington.wd5.myworkdayjobs.com/wday/cxs/wellington/External",
       "publicBase":"https://wellington.wd5.myworkdayjobs.com/External",
-      "searchTexts":["software","developer","engineer","technology","data","cloud","security"],
+      "searchTexts":["software","developer","engineer","technology","data","analytics","data science","data engineering","data governance","cloud","security"],
       "appliedFacets":{
         "locations":["26304b0c664210569c10f1c972eeb793","26304b0c664210569c10fb1c8899b7ae","7a16f0a283870154e35984593945f6f6","8f5223e050820100c051f8972d960000","26304b0c664210569c110178aa15b7c0","26304b0c664210569c10ee1b0c8cb78a"],
         "jobFamilyGroup":["5443731c44d3101790b8e1764986760a","53c84c2b57e31008d7c2504002b6a745"]
@@ -133,7 +133,7 @@ VALUES
       "site":"TRowePrice",
       "apiBase":"https://troweprice.wd5.myworkdayjobs.com/wday/cxs/troweprice/TRowePrice",
       "publicBase":"https://troweprice.wd5.myworkdayjobs.com/TRowePrice",
-      "searchTexts":["software","developer","engineer","technology","data","cloud","security"],
+      "searchTexts":["software","developer","engineer","technology","data","analytics","data science","data engineering","data governance","cloud","security"],
       "appliedFacets":{
         "jobFamilyGroup":["d3372256bd6c016f4b5e1ba3b1009735","5136e4a0469101596cfe3a9ab100d237","5136e4a0469101ad90f24399b100bc37","d3372256bd6c01a0a63affa2b1009335"]
       },
@@ -157,7 +157,7 @@ VALUES
       "country":"us",
       "pageName":"search-results",
       "siteType":"external",
-      "searchTerms":["software","developer","engineer","technology","data","cloud","security","cyber"],
+      "searchTerms":["software","developer","engineer","technology","data","analytics","data science","data engineering","data governance","cloud","security","cyber"],
       "selectedFields":{
         "country":["United States of America"]
       },
@@ -182,7 +182,7 @@ VALUES
       "country":"us",
       "pageName":"search-results",
       "siteType":"external",
-      "searchTerms":["software","developer","engineer","technology","data","cloud","security","digital"],
+      "searchTerms":["software","developer","engineer","technology","data","analytics","data science","data engineering","data governance","cloud","security","digital"],
       "selectedFields":{
         "country":["United States of America","United States"]
       },

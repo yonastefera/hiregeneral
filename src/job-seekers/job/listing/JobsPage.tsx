@@ -280,7 +280,7 @@ export default function JobsPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const initialQuery = searchParams.get("q") ?? "";
+  const initialQuery = searchParams.get("query") ?? searchParams.get("q") ?? "";
   const initialLocation = searchParams.get("location") ?? "";
 
   const [query, setQuery] = useState(initialQuery);
@@ -290,7 +290,6 @@ export default function JobsPage() {
   const [submittedLocation, setSubmittedLocation] = useState(initialLocation);
 
   const [, setSelectedKeyword] = useState<SelectedKeyword | null>(null);
-
   const [, setSelectedLocation] = useState<SelectedLocation | null>(null);
 
   const [dateFilter, setDateFilter] = useState(
@@ -338,7 +337,7 @@ export default function JobsPage() {
     const next = new URLSearchParams();
 
     if (submittedQuery.trim()) {
-      next.set("q", submittedQuery.trim());
+      next.set("query", submittedQuery.trim());
     }
 
     if (submittedLocation.trim()) {
@@ -526,6 +525,18 @@ export default function JobsPage() {
   const getPageHref = (targetPage: number) => {
     const nextPage = Math.min(Math.max(1, targetPage), totalPages);
     const params = new URLSearchParams(searchParams.toString());
+
+    /*
+      Normalize pagination links too. If the current URL still has old "q",
+      convert it to "query" before building the page href.
+    */
+    const legacyQuery = params.get("q");
+
+    if (!params.get("query") && legacyQuery) {
+      params.set("query", legacyQuery);
+    }
+
+    params.delete("q");
 
     if (nextPage <= 1) {
       params.delete("page");

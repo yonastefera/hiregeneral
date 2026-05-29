@@ -49,6 +49,7 @@ const JOB_CANDIDATE_SELECT = `
   expires_at,
   created_at,
   updated_at,
+  description,
   job_applicant_counts ( applicant_count )
 `;
 
@@ -101,7 +102,7 @@ type JobRow = {
 
 type JobCandidateRow = Omit<
   JobRow,
-  "description" | "responsibilities" | "requirements" | "benefits"
+  "responsibilities" | "requirements" | "benefits"
 >;
 
 type JobDetailRow = Pick<
@@ -292,6 +293,36 @@ function getSearchTokens(query: string) {
     .slice(0, 6);
 }
 
+function expandedSearchTerms(query: string) {
+  const normalized = normalizeSearchTerm(query);
+  if (!normalized) return [];
+
+  const terms = new Set([normalized, ...getSearchTokens(normalized)]);
+
+  if (/\bdata\s+engineer\b/.test(normalized)) {
+    terms.add("data engineering");
+    terms.add("data platform");
+    terms.add("etl");
+  }
+
+  if (/\bdata\s+science\b|\bdata\s+scientist\b/.test(normalized)) {
+    terms.add("machine learning");
+    terms.add("analytics");
+  }
+
+  if (/\bdata\s+analytics?\b|\banalytics?\b/.test(normalized)) {
+    terms.add("business intelligence");
+    terms.add("data analyst");
+  }
+
+  if (/\bdata\s+governance\b/.test(normalized)) {
+    terms.add("data management");
+    terms.add("data quality");
+  }
+
+  return Array.from(terms).slice(0, 12);
+}
+
 async function getKeywordCategories(query: string) {
   const normalized = normalizeSearchTerm(query);
 
@@ -339,13 +370,21 @@ function buildJobSearchFilter(query: string, categories: string[]) {
 
   if (!normalized) return null;
 
-  const tokens = getSearchTokens(normalized);
+  const terms = expandedSearchTerms(normalized);
   const filters: string[] = [];
+  const searchableColumns = [
+    "title",
+    "company_name",
+    "category",
+    "location",
+    "description",
+  ];
 
-  filters.push(`search_text.ilike.%${escapeIlikeValue(normalized)}%`);
-
-  for (const token of tokens) {
-    filters.push(`search_text.ilike.%${escapeIlikeValue(token)}%`);
+  for (const term of terms) {
+    const escaped = escapeIlikeValue(term);
+    for (const column of searchableColumns) {
+      filters.push(`${column}.ilike.%${escaped}%`);
+    }
   }
 
   for (const category of categories.slice(0, 3)) {
@@ -358,6 +397,7 @@ function buildJobSearchFilter(query: string, categories: string[]) {
 function expandedSearchRank<
   T extends {
     company_name: string;
+    location: string;
     title: string;
     category: string | null;
     posted_at: string;
@@ -406,9 +446,66 @@ function expandedSearchRank<
   return 100;
 }
 
+function jobSearchableText<
+  T extends {
+    company_name: string;
+    location: string;
+    title: string;
+    category: string | null;
+    description?: string | null;
+    skills?: string[] | null;
+  },
+>(job: T) {
+  return normalizeSearchTerm(
+    [
+      job.title,
+      job.company_name,
+      job.category,
+      job.location,
+      job.description,
+      ...(Array.isArray(job.skills) ? job.skills : []),
+    ]
+      .filter(Boolean)
+      .join(" "),
+  );
+}
+
+function jobMatchesExpandedSearch<
+  T extends {
+    company_name: string;
+    location: string;
+    title: string;
+    category: string | null;
+    description?: string | null;
+    skills?: string[] | null;
+  },
+>(job: T, query: string, categories: string[]) {
+  const normalizedQuery = normalizeSearchTerm(query);
+  if (!normalizedQuery) return true;
+
+  const text = jobSearchableText(job);
+  const tokens = getSearchTokens(normalizedQuery);
+  const terms = expandedSearchTerms(normalizedQuery);
+
+  if (text.includes(normalizedQuery)) return true;
+
+  if (tokens.length > 0 && tokens.every((token) => text.includes(token))) {
+    return true;
+  }
+
+  if (terms.some((term) => term.includes(" ") && text.includes(term))) {
+    return true;
+  }
+
+  return categories.some((category) =>
+    text.includes(normalizeSearchTerm(category)),
+  );
+}
+
 function rankExpandedSearchResults<
   T extends {
     company_name: string;
+    location: string;
     title: string;
     category: string | null;
     posted_at: string;
@@ -464,7 +561,7 @@ async function hydrateJobDetails(candidates: JobCandidateRow[]) {
 
     return {
       ...job,
-      description: stripHtml(details?.description),
+      description: stripHtml(details?.description ?? job.description),
       responsibilities: details?.responsibilities ?? [],
       requirements: details?.requirements ?? [],
       benefits: details?.benefits ?? [],
@@ -505,7 +602,7 @@ export async function GET(req: NextRequest) {
     const from = (page - 1) * pageSize;
     const to = from + pageSize;
     const shouldUseDatabasePage =
-      loadMode === "page" && !shouldBalanceByCompany;
+      loadMode === "page" && !shouldBalanceByCompany && !query.trim();
     const candidateLimit = candidateLimitForRequest({
       page,
       pageSize,
@@ -580,16 +677,30 @@ export async function GET(req: NextRequest) {
     }
 
     const candidateJobs = (data ?? []) as JobCandidateRow[];
-
-    const broadBrowseCandidates = shouldBalanceByCompany
-      ? rotateBroadBrowseJobs(candidateJobs, seed)
+    const filteredCandidateJobs = query.trim()
+      ? candidateJobs.filter((job) =>
+          jobMatchesExpandedSearch(job, query, keywordCategories),
+        )
       : candidateJobs;
 
+    const broadBrowseCandidates = shouldBalanceByCompany
+      ? rotateBroadBrowseJobs(filteredCandidateJobs, seed)
+      : filteredCandidateJobs;
+
+    const rankedCandidates = rankExpandedSearchResults(
+      filteredCandidateJobs,
+      query,
+      keywordCategories,
+    );
     const displayCandidates = shouldBalanceByCompany
       ? balanceJobsByCompany(broadBrowseCandidates)
-      : rankExpandedSearchResults(candidateJobs, query, keywordCategories);
+      : query.trim()
+        ? balanceJobsByCompany(rankedCandidates)
+        : rankedCandidates;
 
-    const total = count ?? displayCandidates.length;
+    const total = query.trim()
+      ? displayCandidates.length
+      : (count ?? displayCandidates.length);
     let newJobs = displayCandidates.filter((job) => {
       const postedTime = new Date(job.posted_at).getTime();
 

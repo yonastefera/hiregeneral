@@ -70,8 +70,8 @@ VALUES
       "publicBase":"https://jobs.chipotle.com",
       "orgId":"282",
       "category":"Information Technology",
-      "searchTerms":["software","developer","engineer","data","security"],
-      "requiredTerms":["software","developer","engineer","data","security","technology","architect","cloud"],
+      "searchTerms":["software","developer","engineer","data","analytics","data science","data engineering","data governance","security"],
+      "requiredTerms":["software","developer","engineer","data","analytics","data science","data engineering","data governance","security","technology","architect","cloud"],
       "maxPages":3,
       "companyWebsite":"https://jobs.chipotle.com/search-jobs"
     }'::jsonb,
@@ -88,7 +88,7 @@ VALUES
       "apiBase":"https://fa-essf-saasfaprod1.fa.ocs.oraclecloud.com/hcmRestApi/resources/11.13.18.05",
       "publicBase":"https://fa-essf-saasfaprod1.fa.ocs.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/jobs",
       "siteNumber":"CX_1",
-      "searchTexts":["software","developer","engineer","technology","data","cloud","security"],
+      "searchTexts":["software","developer","engineer","technology","data","analytics","data science","data engineering","data governance","cloud","security"],
       "countryCode":"US",
       "pageSize":50,
       "maxPages":8
@@ -109,7 +109,7 @@ VALUES
       "offsetParam":"jobOffset",
       "category":"Data and Technology",
       "country":"United States",
-      "requiredTerms":["data","software","developer","engineer","technology","analytics","security","cloud"],
+      "requiredTerms":["data","analytics","data science","data engineering","data governance","software","developer","engineer","technology","security","cloud"],
       "maxPages":8,
       "companyWebsite":"https://ally.avature.net/careers"
     }'::jsonb,
@@ -127,7 +127,7 @@ VALUES
       "site":"External",
       "apiBase":"https://geico.wd1.myworkdayjobs.com/wday/cxs/geico/External",
       "publicBase":"https://geico.wd1.myworkdayjobs.com/External",
-      "searchTexts":["software","developer","engineer","technology","data","cloud","security"],
+      "searchTexts":["software","developer","engineer","technology","data","analytics","data science","data engineering","data governance","cloud","security"],
       "appliedFacets":{
         "jobFamilyGroup":["da128ce5a1dc103e7c09aaa3fe312266"]
       },
@@ -152,6 +152,13 @@ VALUES
         "keywords":"Software Engineer",
         "sortBy":"relevance"
       },
+      "searchQueries":[
+        {"keywords":"Software Engineer","sortBy":"relevance"},
+        {"keywords":"Data Engineer","sortBy":"relevance"},
+        {"keywords":"Data Analytics","sortBy":"relevance"},
+        {"keywords":"Data Science","sortBy":"relevance"},
+        {"keywords":"Data Governance","sortBy":"relevance"}
+      ],
       "maxPages":4,
       "companyWebsite":"https://jobs.statefarm.com/main/jobs"
     }'::jsonb,
@@ -193,8 +200,8 @@ VALUES
       "publicBase":"https://careers.cargill.com/en",
       "orgId":"23251",
       "category":"Technology",
-      "searchTerms":["software","developer","engineer","data","security"],
-      "requiredTerms":["software","developer","engineer","data","security","technology","architect","cloud","analytics"],
+      "searchTerms":["software","developer","engineer","data","analytics","data science","data engineering","data governance","security"],
+      "requiredTerms":["software","developer","engineer","data","analytics","data science","data engineering","data governance","security","technology","architect","cloud"],
       "maxPages":4,
       "companyWebsite":"https://careers.cargill.com/en/search-jobs"
     }'::jsonb,
@@ -212,6 +219,7 @@ VALUES
       "apiBase":"https://searchjobs.libertymutualgroup.com",
       "domain":"libertymutual.com",
       "searchText":"technology",
+      "searchTexts":["technology","data","analytics","data science","data engineering","data governance"],
       "location":"United States",
       "sortBy":"relevance",
       "pageSize":10,
@@ -248,7 +256,7 @@ VALUES
       "site":"Nationwide_Career",
       "apiBase":"https://nationwide.wd1.myworkdayjobs.com/wday/cxs/nationwide/Nationwide_Career",
       "publicBase":"https://nationwide.wd1.myworkdayjobs.com/Nationwide_Career",
-      "searchTexts":["software","developer","engineer","technology","data","cloud","security"],
+      "searchTexts":["software","developer","engineer","technology","data","analytics","data science","data engineering","data governance","cloud","security"],
       "pageSize":20,
       "maxPages":8
     }'::jsonb,
@@ -282,6 +290,7 @@ VALUES
       "apiBase":"https://careers.newyorklife.com",
       "domain":"newyorklife.com",
       "searchText":"technology",
+      "searchTexts":["technology","data","analytics","data science","data engineering","data governance"],
       "location":"United States",
       "sortBy":"relevance",
       "pageSize":10,
@@ -302,8 +311,8 @@ VALUES
       "publicBase":"https://careers.massmutual.com",
       "orgId":"7243",
       "category":"Technology",
-      "searchTerms":["software","developer","engineer","data","security"],
-      "requiredTerms":["software","developer","engineer","data","security","technology","architect","cloud","analytics"],
+      "searchTerms":["software","developer","engineer","data","analytics","data science","data engineering","data governance","security"],
+      "requiredTerms":["software","developer","engineer","data","analytics","data science","data engineering","data governance","security","technology","architect","cloud"],
       "maxPages":4,
       "companyWebsite":"https://careers.massmutual.com/technology-jobs"
     }'::jsonb,
@@ -321,7 +330,7 @@ VALUES
       "site":"CorebridgeFinancial",
       "apiBase":"https://corebridgefinancial.wd1.myworkdayjobs.com/wday/cxs/corebridgefinancial/CorebridgeFinancial",
       "publicBase":"https://corebridgefinancial.wd1.myworkdayjobs.com/CorebridgeFinancial",
-      "searchTexts":["software","developer","engineer","technology","data","cloud","security"],
+      "searchTexts":["software","developer","engineer","technology","data","analytics","data science","data engineering","data governance","cloud","security"],
       "appliedFacets":{
         "jobFamilyGroup":["e4908cb6c4854e3a9f3654dbc2e7087c"]
       },

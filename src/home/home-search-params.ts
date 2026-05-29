@@ -7,6 +7,13 @@ interface BuildJobsSearchParamsInput {
   selectedLocation: SelectedLocation | null;
 }
 
+function setKeywordSearchParam(params: URLSearchParams, value: string) {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) return;
+  params.set("query", trimmedValue);
+}
+
 export function buildJobsSearchParams({
   query,
   selectedKeyword,
@@ -18,10 +25,10 @@ export function buildJobsSearchParams({
   const trimmedQuery = query.trim();
   const trimmedLocation = locationQuery.trim();
 
-  if (selectedKeyword) {
-    params.set("q", selectedKeyword.term);
-  } else if (trimmedQuery) {
-    params.set("q", trimmedQuery);
+  if (selectedKeyword?.term) {
+    setKeywordSearchParam(params, selectedKeyword.term);
+  } else {
+    setKeywordSearchParam(params, trimmedQuery);
   }
 
   if (selectedLocation) {

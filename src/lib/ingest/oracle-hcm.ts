@@ -107,6 +107,11 @@ function oracleHcmConfig(source: JobSource): OracleHcmConfig {
     siteNumber,
     searchTexts: metadataStringArray(source, "searchTexts") ?? [
       metadataString(source, "searchText") ?? "technology",
+      "data",
+      "analytics",
+      "data science",
+      "data engineering",
+      "data governance",
     ],
     selectedCategoriesFacet: metadataString(source, "selectedCategoriesFacet"),
     selectedLocationsFacet: metadataString(source, "selectedLocationsFacet"),

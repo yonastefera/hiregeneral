@@ -1744,7 +1744,7 @@ async function fetchActivateJobs(
   return jobs;
 }
 
-function eightfoldJobsUrl(source: JobSource, start: number) {
+function eightfoldJobsUrl(source: JobSource, start: number, query?: string) {
   const apiBase =
     metadataString(source, "apiBase") ??
     source.sourceUrl ??
@@ -1753,7 +1753,8 @@ function eightfoldJobsUrl(source: JobSource, start: number) {
     metadataString(source, "domain") ??
     source.companyDomain ??
     new URL(apiBase).hostname;
-  const searchText = metadataString(source, "searchText") ?? "technology";
+  const searchText =
+    query ?? metadataString(source, "searchText") ?? "technology";
   const location = metadataString(source, "location") ?? "United States";
   const sortBy = metadataString(source, "sortBy");
   const url = new URL("/api/pcsx/search", apiBase);
@@ -1959,23 +1960,6 @@ function eightfoldJobsFromHtml(html: string) {
   }
 
   return [];
-}
-
-function eightfoldTotalFromResponse(data: EightfoldResponse) {
-  if (Array.isArray(data)) return null;
-
-  const direct = data.total ?? data.total_count ?? data.count;
-  if (typeof direct === "number" && Number.isFinite(direct)) return direct;
-
-  const nested = data.data;
-  if (!nested || Array.isArray(nested) || typeof nested !== "object") {
-    return null;
-  }
-
-  const nestedTotal = nested.total ?? nested.total_count ?? nested.count;
-  return typeof nestedTotal === "number" && Number.isFinite(nestedTotal)
-    ? nestedTotal
-    : null;
 }
 
 function eightfoldLocation(job: EightfoldJob) {
@@ -2240,6 +2224,12 @@ async function fetchEightfoldJobs(
     1,
   );
   const category = metadataString(source, "category") ?? "Technology";
+  const searchTexts = uniqueItems(
+    [
+      ...(metadataStringArray(source, "searchTexts") ?? []),
+      metadataString(source, "searchText") ?? "technology",
+    ].filter(Boolean),
+  );
   const companyWebsite =
     metadataString(source, "companyWebsite") ??
     (source.companyDomain ? `https://${source.companyDomain}` : null);
@@ -2247,217 +2237,217 @@ async function fetchEightfoldJobs(
   const seenSourceIds = new Set<string>();
   const session = await eightfoldSessionHeaders(source, context);
 
-  for (let page = 0; page < maxPages; page += 1) {
-    const start = page * pageSize;
-    const response = await fetch(eightfoldJobsUrl(source, start), {
-      headers: session.headers,
-      cache: "no-store",
-      signal: context?.signal,
-    });
+  for (const query of searchTexts) {
+    for (let page = 0; page < maxPages; page += 1) {
+      const start = page * pageSize;
+      const response = await fetch(eightfoldJobsUrl(source, start, query), {
+        headers: session.headers,
+        cache: "no-store",
+        signal: context?.signal,
+      });
 
-    if (!response.ok) {
-      if (page === 0) {
-        const fallbackJobs = eightfoldJobsFromHtml(session.html);
+      if (!response.ok) {
+        if (page === 0 && jobs.length === 0) {
+          const fallbackJobs = eightfoldJobsFromHtml(session.html);
 
-        if (fallbackJobs.length > 0) {
-          for (const job of fallbackJobs) {
-            const title = recordString(job, ["title", "name", "position_name"]);
-            if (!title) continue;
+          if (fallbackJobs.length > 0) {
+            for (const job of fallbackJobs) {
+              const title = recordString(job, [
+                "title",
+                "name",
+                "position_name",
+              ]);
+              if (!title) continue;
 
-            const sourceId = eightfoldSourceId(source, job);
-            if (seenSourceIds.has(sourceId)) continue;
-            seenSourceIds.add(sourceId);
+              const sourceId = eightfoldSourceId(source, job);
+              if (seenSourceIds.has(sourceId)) continue;
+              seenSourceIds.add(sourceId);
 
-            const location = eightfoldLocation(job);
-            const description = safeDescription({
-              description: eightfoldDescription(job),
-              title,
-              companyName: source.companyName,
-            });
-            const searchText = [
-              title,
-              description,
-              category,
-              recordString(job, [
-                "department",
-                "team",
-                "job_category",
-                "job_function",
-                "businessarea",
-              ]),
-            ]
-              .filter(Boolean)
-              .join(" ");
-
-            if (!isUsText(eightfoldLocationSearchText(job))) continue;
-            if (!isEngineeringText(searchText)) continue;
-            if (isInternshipText(searchText)) continue;
-
-            jobs.push({
-              recruiterId,
-              companyId: null,
-              companyName: source.companyName,
-              companyLogoUrl: source.companyLogoUrl ?? null,
-
-              title,
-              description,
-              location,
-
-              latitude: null,
-              longitude: null,
-
-              employmentType: normalizeEmploymentType(
+              const location = eightfoldLocation(job);
+              const description = safeDescription({
+                description: eightfoldDescription(job),
+                title,
+                companyName: source.companyName,
+              });
+              const searchText = [
+                title,
+                description,
+                category,
                 recordString(job, [
-                  "employment_type",
-                  "employmentType",
-                  "job_type",
-                  "efcustom_text_text_time_type",
-                  "efcustomTextTextTimeType",
+                  "department",
+                  "team",
+                  "job_category",
+                  "job_function",
+                  "businessarea",
                 ]),
-              ),
-              workMode: detectWorkMode(title, location),
+              ]
+                .filter(Boolean)
+                .join(" ");
 
-              salaryMin: null,
-              salaryMax: null,
-              salaryCurrency: "USD",
+              if (!isUsText(eightfoldLocationSearchText(job))) continue;
+              if (!isEngineeringText(searchText)) continue;
+              if (isInternshipText(searchText)) continue;
 
-              skills: [],
-              responsibilities: splitListItems(description, 12),
-              requirements: splitListItems(description, 14),
-              benefits: [],
+              jobs.push({
+                recruiterId,
+                companyId: null,
+                companyName: source.companyName,
+                companyLogoUrl: source.companyLogoUrl ?? null,
 
-              status: "published",
+                title,
+                description,
+                location,
 
-              postedAt: eightfoldPostedAt(job),
-              expiresAt: defaultExpiryDate(30),
+                latitude: null,
+                longitude: null,
 
-              sourceName: "scraper",
-              sourceId,
-              applyUrl: eightfoldApplyUrl(source, job),
+                employmentType: normalizeEmploymentType(
+                  recordString(job, [
+                    "employment_type",
+                    "employmentType",
+                    "job_type",
+                    "efcustom_text_text_time_type",
+                    "efcustomTextTextTimeType",
+                  ]),
+                ),
+                workMode: detectWorkMode(title, location),
 
-              experienceLevel: null,
-              category,
+                salaryMin: null,
+                salaryMax: null,
+                salaryCurrency: "USD",
 
-              companyTagline: null,
-              companySize: null,
-              companyWebsite,
-            });
+                skills: [],
+                responsibilities: splitListItems(description, 12),
+                requirements: splitListItems(description, 14),
+                benefits: [],
+
+                status: "published",
+
+                postedAt: eightfoldPostedAt(job),
+                expiresAt: defaultExpiryDate(30),
+
+                sourceName: "scraper",
+                sourceId,
+                applyUrl: eightfoldApplyUrl(source, job),
+
+                experienceLevel: null,
+                category,
+
+                companyTagline: null,
+                companySize: null,
+                companyWebsite,
+              });
+            }
+
+            return jobs;
           }
-
-          return jobs;
         }
+
+        throw new Error(`Eightfold fetch failed: ${response.status}`);
       }
 
-      throw new Error(`Eightfold fetch failed: ${response.status}`);
-    }
+      const data = (await response.json()) as EightfoldResponse;
+      const pageJobs = eightfoldJobsFromResponse(data);
 
-    const data = (await response.json()) as EightfoldResponse;
-    const pageJobs = eightfoldJobsFromResponse(data);
-    const total = eightfoldTotalFromResponse(data);
+      if (pageJobs.length === 0) break;
 
-    if (pageJobs.length === 0) break;
+      for (const job of pageJobs) {
+        const title = recordString(job, ["title", "name", "position_name"]);
+        if (!title) continue;
 
-    for (const job of pageJobs) {
-      const title = recordString(job, ["title", "name", "position_name"]);
-      if (!title) continue;
+        const sourceId = eightfoldSourceId(source, job);
+        if (seenSourceIds.has(sourceId)) continue;
+        seenSourceIds.add(sourceId);
 
-      const sourceId = eightfoldSourceId(source, job);
-      if (seenSourceIds.has(sourceId)) continue;
-      seenSourceIds.add(sourceId);
-
-      const location = eightfoldLocation(job);
-      const description = safeDescription({
-        description: eightfoldDescription(job),
-        title,
-        companyName: source.companyName,
-      });
-      const searchText = [
-        title,
-        description,
-        category,
-        recordString(job, [
-          "department",
-          "team",
-          "job_category",
-          "job_function",
-          "businessarea",
-        ]),
-      ]
-        .filter(Boolean)
-        .join(" ");
-
-      if (!isUsText(eightfoldLocationSearchText(job))) continue;
-      if (!isEngineeringText(searchText)) continue;
-      if (isInternshipText(searchText)) continue;
-
-      const detailedJob = await fetchEightfoldJobDetails(
-        source,
-        job,
-        session.headers,
-        context,
-      );
-      const detailedDescription = safeDescription({
-        description: eightfoldDescription(detailedJob),
-        title,
-        companyName: source.companyName,
-      });
-
-      jobs.push({
-        recruiterId,
-        companyId: null,
-        companyName: source.companyName,
-        companyLogoUrl: source.companyLogoUrl ?? null,
-
-        title,
-        description: detailedDescription,
-        location,
-
-        latitude: null,
-        longitude: null,
-
-        employmentType: normalizeEmploymentType(
-          recordString(detailedJob, [
-            "employment_type",
-            "employmentType",
-            "job_type",
-            "efcustom_text_text_time_type",
-            "efcustomTextTextTimeType",
+        const location = eightfoldLocation(job);
+        const description = safeDescription({
+          description: eightfoldDescription(job),
+          title,
+          companyName: source.companyName,
+        });
+        const searchText = [
+          title,
+          description,
+          category,
+          recordString(job, [
+            "department",
+            "team",
+            "job_category",
+            "job_function",
+            "businessarea",
           ]),
-        ),
-        workMode: detectWorkMode(title, location),
+        ]
+          .filter(Boolean)
+          .join(" ");
 
-        salaryMin: null,
-        salaryMax: null,
-        salaryCurrency: "USD",
+        if (!isUsText(eightfoldLocationSearchText(job))) continue;
+        if (!isEngineeringText(searchText)) continue;
+        if (isInternshipText(searchText)) continue;
 
-        skills: [],
-        responsibilities: splitListItems(detailedDescription, 12),
-        requirements: splitListItems(detailedDescription, 14),
-        benefits: [],
+        const detailedJob = await fetchEightfoldJobDetails(
+          source,
+          job,
+          session.headers,
+          context,
+        );
+        const detailedDescription = safeDescription({
+          description: eightfoldDescription(detailedJob),
+          title,
+          companyName: source.companyName,
+        });
 
-        status: "published",
+        jobs.push({
+          recruiterId,
+          companyId: null,
+          companyName: source.companyName,
+          companyLogoUrl: source.companyLogoUrl ?? null,
 
-        postedAt: eightfoldPostedAt(job),
-        expiresAt: defaultExpiryDate(30),
+          title,
+          description: detailedDescription,
+          location,
 
-        sourceName: "scraper",
-        sourceId,
-        applyUrl: eightfoldApplyUrl(source, detailedJob),
+          latitude: null,
+          longitude: null,
 
-        experienceLevel: null,
-        category,
+          employmentType: normalizeEmploymentType(
+            recordString(detailedJob, [
+              "employment_type",
+              "employmentType",
+              "job_type",
+              "efcustom_text_text_time_type",
+              "efcustomTextTextTimeType",
+            ]),
+          ),
+          workMode: detectWorkMode(title, location),
 
-        companyTagline: null,
-        companySize: null,
-        companyWebsite,
-      });
-    }
+          salaryMin: null,
+          salaryMax: null,
+          salaryCurrency: "USD",
 
-    if (
-      pageJobs.length < pageSize ||
-      (total !== null && jobs.length >= total)
-    ) {
-      break;
+          skills: [],
+          responsibilities: splitListItems(detailedDescription, 12),
+          requirements: splitListItems(detailedDescription, 14),
+          benefits: [],
+
+          status: "published",
+
+          postedAt: eightfoldPostedAt(job),
+          expiresAt: defaultExpiryDate(30),
+
+          sourceName: "scraper",
+          sourceId,
+          applyUrl: eightfoldApplyUrl(source, detailedJob),
+
+          experienceLevel: null,
+          category,
+
+          companyTagline: null,
+          companySize: null,
+          companyWebsite,
+        });
+      }
+
+      if (pageJobs.length < pageSize) break;
     }
   }
 
@@ -4286,7 +4276,32 @@ async function fetchStgHavasJobs(
   return jobs;
 }
 
-function jibeJobsUrl(source: JobSource, page: number) {
+function jibeSearchQueries(source: JobSource) {
+  const value = source.metadata.searchQueries;
+
+  if (Array.isArray(value)) {
+    const queries = value
+      .filter(
+        (item): item is Record<string, unknown> =>
+          Boolean(item) && typeof item === "object" && !Array.isArray(item),
+      )
+      .filter((item) => Object.keys(item).length > 0);
+
+    if (queries.length > 0) return queries;
+  }
+
+  return [
+    source.metadata.query && typeof source.metadata.query === "object"
+      ? (source.metadata.query as Record<string, unknown>)
+      : {},
+  ];
+}
+
+function jibeJobsUrl(
+  source: JobSource,
+  page: number,
+  query: Record<string, unknown>,
+) {
   const apiUrl =
     metadataString(source, "apiUrl") ??
     new URL(
@@ -4294,10 +4309,6 @@ function jibeJobsUrl(source: JobSource, page: number) {
       source.sourceUrl ?? "https://careers.ice.com",
     ).toString();
   const url = new URL(apiUrl);
-  const query =
-    source.metadata.query && typeof source.metadata.query === "object"
-      ? (source.metadata.query as Record<string, unknown>)
-      : {};
 
   for (const [key, value] of Object.entries(query)) {
     if (
@@ -4386,111 +4397,116 @@ async function fetchJibeJobs(
     (source.companyDomain ? `https://${source.companyDomain}` : null);
   const jobs: ImportedJob[] = [];
   const seenSourceIds = new Set<string>();
+  const searchQueries = jibeSearchQueries(source);
 
-  for (let page = 1; page <= maxPages; page += 1) {
-    const response = await fetch(jibeJobsUrl(source, page), {
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "HireGeneralJobBoard/1.0",
-      },
-      cache: "no-store",
-      signal: context?.signal,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Jibe careers fetch failed: ${response.status}`);
-    }
-
-    const data = (await response.json()) as JibeSearchResponse;
-    const pageJobs = Array.isArray(data.jobs) ? data.jobs : [];
-    if (pageJobs.length === 0) break;
-
-    for (const item of pageJobs) {
-      const job = item.data;
-      if (!job?.title?.trim()) continue;
-
-      const sourceId = `${source.sourceSlug}:${
-        job.req_id ?? job.slug ?? job.title
-      }`;
-      if (seenSourceIds.has(sourceId)) continue;
-      seenSourceIds.add(sourceId);
-
-      const title = job.title.trim();
-      const location = jibeLocation(job);
-      const jobCategory = jibeCategory(job.category, category);
-      const description = safeDescription({
-        description: htmlToText(job.description),
-        title,
-        companyName: source.companyName,
+  for (const searchQuery of searchQueries) {
+    for (let page = 1; page <= maxPages; page += 1) {
+      const response = await fetch(jibeJobsUrl(source, page, searchQuery), {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "HireGeneralJobBoard/1.0",
+        },
+        cache: "no-store",
+        signal: context?.signal,
       });
-      const searchText = [
-        title,
-        description,
-        jobCategory,
-        jibeTags(job.tags2),
-        category,
-      ]
-        .filter(Boolean)
-        .join(" ");
+
+      if (!response.ok) {
+        throw new Error(`Jibe careers fetch failed: ${response.status}`);
+      }
+
+      const data = (await response.json()) as JibeSearchResponse;
+      const pageJobs = Array.isArray(data.jobs) ? data.jobs : [];
+      if (pageJobs.length === 0) break;
+
+      for (const item of pageJobs) {
+        const job = item.data;
+        if (!job?.title?.trim()) continue;
+
+        const sourceId = `${source.sourceSlug}:${
+          job.req_id ?? job.slug ?? job.title
+        }`;
+        if (seenSourceIds.has(sourceId)) continue;
+        seenSourceIds.add(sourceId);
+
+        const title = job.title.trim();
+        const location = jibeLocation(job);
+        const jobCategory = jibeCategory(job.category, category);
+        const description = safeDescription({
+          description: htmlToText(job.description),
+          title,
+          companyName: source.companyName,
+        });
+        const searchText = [
+          title,
+          description,
+          jobCategory,
+          jibeTags(job.tags2),
+          category,
+        ]
+          .filter(Boolean)
+          .join(" ");
+
+        if (
+          !isUsText(
+            `${location} ${job.country_code ?? ""} ${job.country ?? ""}`,
+          )
+        )
+          continue;
+        if (!isEngineeringText(searchText)) continue;
+        if (isInternshipText(searchText)) continue;
+
+        jobs.push({
+          recruiterId,
+          companyId: null,
+          companyName: source.companyName,
+          companyLogoUrl: source.companyLogoUrl ?? null,
+
+          title,
+          description,
+          location,
+
+          latitude: null,
+          longitude: null,
+
+          employmentType: normalizeEmploymentType(job.employment_type),
+          workMode: detectWorkMode(
+            title,
+            `${location} ${String(job.remote_eligible ?? "")}`,
+          ),
+
+          salaryMin: null,
+          salaryMax: null,
+          salaryCurrency: "USD",
+
+          skills: [],
+          responsibilities: splitListItems(description, 12),
+          requirements: splitListItems(description, 14),
+          benefits: [],
+
+          status: "published",
+
+          postedAt: jibePostedAt(job),
+          expiresAt: defaultExpiryDate(30),
+
+          sourceName: "scraper",
+          sourceId,
+          applyUrl: jibeApplyUrl(source, job),
+
+          experienceLevel: null,
+          category: jobCategory,
+
+          companyTagline: null,
+          companySize: null,
+          companyWebsite,
+        });
+      }
 
       if (
-        !isUsText(`${location} ${job.country_code ?? ""} ${job.country ?? ""}`)
-      )
-        continue;
-      if (!isEngineeringText(searchText)) continue;
-      if (isInternshipText(searchText)) continue;
-
-      jobs.push({
-        recruiterId,
-        companyId: null,
-        companyName: source.companyName,
-        companyLogoUrl: source.companyLogoUrl ?? null,
-
-        title,
-        description,
-        location,
-
-        latitude: null,
-        longitude: null,
-
-        employmentType: normalizeEmploymentType(job.employment_type),
-        workMode: detectWorkMode(
-          title,
-          `${location} ${String(job.remote_eligible ?? "")}`,
-        ),
-
-        salaryMin: null,
-        salaryMax: null,
-        salaryCurrency: "USD",
-
-        skills: [],
-        responsibilities: splitListItems(description, 12),
-        requirements: splitListItems(description, 14),
-        benefits: [],
-
-        status: "published",
-
-        postedAt: jibePostedAt(job),
-        expiresAt: defaultExpiryDate(30),
-
-        sourceName: "scraper",
-        sourceId,
-        applyUrl: jibeApplyUrl(source, job),
-
-        experienceLevel: null,
-        category: jobCategory,
-
-        companyTagline: null,
-        companySize: null,
-        companyWebsite,
-      });
-    }
-
-    if (
-      pageJobs.length < (data.count ?? pageJobs.length) ||
-      (data.totalCount && jobs.length >= data.totalCount)
-    ) {
-      break;
+        pageJobs.length < (data.count ?? pageJobs.length) ||
+        (data.totalCount && jobs.length >= data.totalCount)
+      ) {
+        break;
+      }
     }
   }
 

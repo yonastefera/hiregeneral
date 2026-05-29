@@ -74,6 +74,11 @@ const DEFAULT_SEARCH_TERMS = [
   "developer",
   "engineer",
   "technology",
+  "data",
+  "analytics",
+  "data science",
+  "data engineering",
+  "data governance",
 ];
 
 function metadataString(source: JobSource, key: string) {

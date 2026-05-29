@@ -62,11 +62,20 @@ export function getSearchParamValue(
   return value ?? fallback;
 }
 
+function getKeywordSearchParamValue(
+  searchParams: Record<string, string | string[] | undefined>,
+) {
+  return (
+    getSearchParamValue(searchParams.query) ||
+    getSearchParamValue(searchParams.q)
+  );
+}
+
 export function parseJobsSearchParams(
   searchParams: Record<string, string | string[] | undefined>,
 ): JobsSearchState {
   return {
-    query: getSearchParamValue(searchParams.q),
+    query: getKeywordSearchParamValue(searchParams),
     location: getSearchParamValue(searchParams.location),
     dateFilter: getSearchParamValue(searchParams.posted, DEFAULT_POSTED),
     distance: getSearchParamValue(searchParams.distance, DEFAULT_DISTANCE),
@@ -97,7 +106,7 @@ export function buildJobsUrlParams(state: JobsSearchState) {
   const params = new URLSearchParams();
 
   if (state.query.trim()) {
-    params.set("q", state.query.trim());
+    params.set("query", state.query.trim());
   }
 
   if (state.location.trim()) {

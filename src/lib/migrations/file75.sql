@@ -24,7 +24,7 @@ VALUES
       "publicBase":"https://www.schwabjobs.com",
       "companyWebsite":"https://www.schwabjobs.com/search-jobs",
       "orgId":"33727",
-      "searchTerms":["software","developer","engineer","technology","data","cloud","security","ai"],
+      "searchTerms":["software","developer","engineer","technology","data","analytics","data science","data engineering","data governance","cloud","security","ai"],
       "maxPages":8,
       "category":"Technology"
     }'::jsonb,
@@ -43,7 +43,7 @@ VALUES
       "organization":"1981",
       "facets":["ats_portalid:Workday"],
       "category":"Technology",
-      "requiredTerms":["software","developer","engineer","information technology","data","cloud","security","cyber","analytics"],
+      "requiredTerms":["software","developer","engineer","information technology","data","analytics","data science","data engineering","data governance","cloud","security","cyber"],
       "companyWebsite":"https://www.sentaracareers.com/job-search-results/?keyword=software",
       "pageSize":50,
       "maxPages":4
@@ -65,7 +65,7 @@ VALUES
       "country":"global",
       "pageName":"search-results",
       "siteType":"external",
-      "searchTerms":["software","developer","engineer","technology","data","cloud","security","digital"],
+      "searchTerms":["software","developer","engineer","technology","data","analytics","data science","data engineering","data governance","cloud","security","digital"],
       "selectedFields":{
         "country":["United States"]
       },
@@ -90,7 +90,7 @@ VALUES
       "country":"global",
       "pageName":"search-results",
       "siteType":"external",
-      "searchTerms":["software","developer","engineer","technology","data","cloud","security","digital"],
+      "searchTerms":["software","developer","engineer","technology","data","analytics","data science","data engineering","data governance","cloud","security","digital"],
       "selectedFields":{
         "country":["United States"]
       },
@@ -111,7 +111,7 @@ VALUES
       "apiBase":"https://eofe.fa.us2.oraclecloud.com/hcmRestApi/resources/11.13.18.05",
       "publicBase":"https://eofe.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/BNY-Careers/jobs",
       "siteNumber":"BNY-Careers",
-      "searchTexts":["software","developer","engineer","technology","data","cloud","security"],
+      "searchTexts":["software","developer","engineer","technology","data","analytics","data science","data engineering","data governance","cloud","security"],
       "selectedLocationsFacet":"300000000378743",
       "countryCode":"US",
       "pageSize":50,
@@ -131,7 +131,7 @@ VALUES
       "apiUrl":"https://api-higher.gs.com/gateway/api/v1/graphql",
       "publicBase":"https://higher.gs.com",
       "companyWebsite":"https://www.goldmansachs.com/careers",
-      "searchTerms":["software","developer","engineering","technology","data","cloud","security"],
+      "searchTerms":["software","developer","engineering","technology","data","analytics","data science","data engineering","data governance","cloud","security"],
       "category":"Engineering",
       "pageSize":20,
       "maxPages":5
@@ -173,7 +173,7 @@ VALUES
       "site":"MTB",
       "apiBase":"https://mtb.wd5.myworkdayjobs.com/wday/cxs/mtb/MTB",
       "publicBase":"https://mtb.wd5.myworkdayjobs.com/MTB",
-      "searchTexts":["software","developer","engineer","technology","data","cloud","security"],
+      "searchTexts":["software","developer","engineer","technology","data","analytics","data science","data engineering","data governance","cloud","security"],
       "pageSize":20,
       "maxPages":6
     }'::jsonb,
@@ -208,7 +208,7 @@ VALUES
       "site":"53careers",
       "apiBase":"https://fifththird.wd5.myworkdayjobs.com/wday/cxs/fifththird/53careers",
       "publicBase":"https://fifththird.wd5.myworkdayjobs.com/53careers",
-      "searchTexts":["software","developer","engineer","technology","data","cloud","security"],
+      "searchTexts":["software","developer","engineer","technology","data","analytics","data science","data engineering","data governance","cloud","security"],
       "appliedFacets":{
         "jobFamilyGroup":["5d81a4de586e014889e3ac247a0b18aa"]
       },
