@@ -512,40 +512,62 @@ export async function loadHomeInsights(): Promise<{
   salaryBands: HomeSalaryBand[];
   marketCategories: HomeMarketCategory[];
 }> {
+  const fallback = {
+    salaryBands: [],
+    marketCategories: [],
+  };
+
   const supabaseAdmin = getSupabaseAdmin();
 
   if (!supabaseAdmin) {
+    return fallback;
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("jobs")
+      .select("id, title, category, skills, salary_min, salary_max, posted_at")
+      .eq("status", "published")
+      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+      .order("posted_at", { ascending: false })
+      .limit(INSIGHT_LIMIT);
+
+    if (error) {
+      console.error("[loadHomeInsights:jobs]", error.message);
+
+      return {
+        salaryBands: await safeLoadBenchmarkSalaryBands(supabaseAdmin),
+        marketCategories: [],
+      };
+    }
+
+    const jobs = (data ?? []) as InsightJobRow[];
+    const jobSalaryBands = buildSalaryBands(jobs);
+
     return {
-      salaryBands: [],
+      salaryBands:
+        jobSalaryBands.length > 0
+          ? jobSalaryBands
+          : await safeLoadBenchmarkSalaryBands(supabaseAdmin),
+      marketCategories: buildMarketCategories(jobs),
+    };
+  } catch (error) {
+    console.error("[loadHomeInsights:fetch-failed]", error);
+
+    return {
+      salaryBands: await safeLoadBenchmarkSalaryBands(supabaseAdmin),
       marketCategories: [],
     };
   }
+}
 
-  const { data, error } = await supabaseAdmin
-    .from("jobs")
-    .select("id, title, category, skills, salary_min, salary_max, posted_at")
-    .eq("status", "published")
-    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
-    .order("posted_at", { ascending: false })
-    .limit(INSIGHT_LIMIT);
-
-  if (error) {
-    console.error("[loadHomeInsights]", error.message);
-
-    return {
-      salaryBands: await loadBenchmarkSalaryBands(supabaseAdmin),
-      marketCategories: [],
-    };
+async function safeLoadBenchmarkSalaryBands(
+  supabaseAdmin: NonNullable<ReturnType<typeof getSupabaseAdmin>>,
+) {
+  try {
+    return await loadBenchmarkSalaryBands(supabaseAdmin);
+  } catch (error) {
+    console.error("[safeLoadBenchmarkSalaryBands]", error);
+    return [];
   }
-
-  const jobs = (data ?? []) as InsightJobRow[];
-  const jobSalaryBands = buildSalaryBands(jobs);
-
-  return {
-    salaryBands:
-      jobSalaryBands.length > 0
-        ? jobSalaryBands
-        : await loadBenchmarkSalaryBands(supabaseAdmin),
-    marketCategories: buildMarketCategories(jobs),
-  };
 }

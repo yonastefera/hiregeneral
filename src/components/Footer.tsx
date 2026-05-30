@@ -1,6 +1,3 @@
-"use client";
-
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
 import { BrandLogo } from "@/components/BrandLogo";
@@ -9,7 +6,7 @@ import {
   legalLinks,
   type FooterLinkAudience,
 } from "@/data/footerNavigation";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/server";
 
 type UserType = "job_seeker" | "recruiter" | "admin" | string;
 
@@ -38,78 +35,42 @@ function canSeeLink(
   return false;
 }
 
-export const Footer = () => {
+async function getFooterUserType(): Promise<UserType | null> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user?.id) {
+    return null;
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("user_type")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  return profile?.user_type ?? null;
+}
+
+export const Footer = async () => {
   const year = new Date().getFullYear();
-  const [userType, setUserType] = useState<UserType | null>(null);
+  const userType = await getFooterUserType();
 
-  useEffect(() => {
-    let mounted = true;
+  const visibleFooterSections = footerSections
+    .map((section) => ({
+      ...section,
+      links: section.links.filter((link) =>
+        canSeeLink(link.audience, userType),
+      ),
+    }))
+    .filter((section) => section.links.length > 0);
 
-    const loadUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!mounted) return;
-
-      if (!user?.id) {
-        setUserType(null);
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("user_type")
-        .eq("user_id", user.id)
-        .single();
-
-      if (!mounted) return;
-
-      setUserType(profile?.user_type ?? null);
-    };
-
-    loadUser();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      const nextUserId = session?.user?.id ?? null;
-
-      if (!nextUserId) {
-        setUserType(null);
-      } else {
-        supabase
-          .from("profiles")
-          .select("user_type")
-          .eq("user_id", nextUserId)
-          .single()
-          .then(({ data: profile }) => {
-            if (!mounted) return;
-            setUserType(profile?.user_type ?? null);
-          });
-      }
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  const visibleFooterSections = useMemo(() => {
-    return footerSections
-      .map((section) => ({
-        ...section,
-        links: section.links.filter((link) =>
-          canSeeLink(link.audience, userType),
-        ),
-      }))
-      .filter((section) => section.links.length > 0);
-  }, [userType]);
-
-  const visibleLegalLinks = useMemo(() => {
-    return legalLinks.filter((link) => canSeeLink(link.audience, userType));
-  }, [userType]);
+  const visibleLegalLinks = legalLinks.filter((link) =>
+    canSeeLink(link.audience, userType),
+  );
 
   return (
     <footer className="bg-[hsl(220_25%_8%)] text-surface-strong-foreground">

@@ -3,22 +3,23 @@ import { NextResponse } from "next/server";
 import { loadHomeInsights } from "@/home/home-insights";
 
 export const runtime = "nodejs";
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
     const insights = await loadHomeInsights();
 
-    return NextResponse.json(insights);
-  } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Could not load homepage insights.",
+    return NextResponse.json(insights, {
+      headers: {
+        "Cache-Control": "s-maxage=3600, stale-while-revalidate=86400",
       },
-      { status: 500 },
-    );
+    });
+  } catch (error) {
+    console.error("[api/home/salary-insights]", error);
+
+    return NextResponse.json({
+      salaryBands: [],
+      marketCategories: [],
+    });
   }
 }

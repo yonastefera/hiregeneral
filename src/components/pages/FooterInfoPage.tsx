@@ -1,6 +1,3 @@
-"use client";
-
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -14,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/server";
 
 type FooterInfoPageProps = {
   type:
@@ -77,6 +74,26 @@ function canSeeAction(
   }
 
   return false;
+}
+
+async function getFooterInfoUserType(): Promise<UserType | null> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user?.id) {
+    return null;
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("user_type")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  return profile?.user_type ?? null;
 }
 
 const pageContent: Record<FooterInfoPageProps["type"], PageContent> = {
@@ -292,75 +309,11 @@ const pageContent: Record<FooterInfoPageProps["type"], PageContent> = {
   },
 };
 
-export default function FooterInfoPage({ type }: FooterInfoPageProps) {
+export default async function FooterInfoPage({ type }: FooterInfoPageProps) {
   const content = pageContent[type];
   const isContact = type === "contact";
-
-  const [userType, setUserType] = useState<UserType | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const loadUserType = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!mounted) return;
-
-      if (!user?.id) {
-        setUserType(null);
-        setAuthLoading(false);
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("user_type")
-        .eq("user_id", user.id)
-        .single();
-
-      if (!mounted) return;
-
-      setUserType(profile?.user_type ?? null);
-      setAuthLoading(false);
-    };
-
-    loadUserType();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      const userId = session?.user?.id;
-
-      if (!userId) {
-        setUserType(null);
-        setAuthLoading(false);
-        return;
-      }
-
-      supabase
-        .from("profiles")
-        .select("user_type")
-        .eq("user_id", userId)
-        .single()
-        .then(({ data: profile }) => {
-          if (!mounted) return;
-          setUserType(profile?.user_type ?? null);
-          setAuthLoading(false);
-        });
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  const showAction = useMemo(() => {
-    return canSeeAction(content.audience, userType);
-  }, [content.audience, userType]);
+  const userType = await getFooterInfoUserType();
+  const showAction = canSeeAction(content.audience, userType);
 
   return (
     <main className="min-h-screen bg-background">
@@ -374,7 +327,7 @@ export default function FooterInfoPage({ type }: FooterInfoPageProps) {
             {content.description}
           </p>
 
-          {!authLoading && showAction && (
+          {showAction && (
             <Button variant="hero" size="lg" className="mt-7" asChild>
               <Link href={content.to} prefetch={false}>
                 {content.action}
@@ -409,10 +362,7 @@ export default function FooterInfoPage({ type }: FooterInfoPageProps) {
         </div>
 
         {isContact ? (
-          <form
-            className="rounded-lg border border-border bg-surface p-6 shadow-soft"
-            onSubmit={(event) => event.preventDefault()}
-          >
+          <form className="rounded-lg border border-border bg-surface p-6 shadow-soft">
             <div className="flex items-center gap-3">
               <Mail className="size-6 text-primary" />
 
@@ -432,7 +382,7 @@ export default function FooterInfoPage({ type }: FooterInfoPageProps) {
               aria-label="Message"
             />
 
-            <Button variant="hero" className="mt-4">
+            <Button type="button" variant="hero" className="mt-4">
               Submit request
             </Button>
           </form>

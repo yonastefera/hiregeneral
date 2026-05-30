@@ -1,5 +1,3 @@
-"use client";
-
 import Link from "next/link";
 import {
   ArrowRight,
@@ -8,10 +6,8 @@ import {
   Clock,
   DollarSign,
   MapPin,
-  Star,
 } from "lucide-react";
 
-import { useSavedJobs } from "@/hooks/useSavedJobs";
 import type { JobCardJob } from "@/lib/jobs/card-shape";
 import {
   getCompanyInitials,
@@ -33,8 +29,6 @@ type HomeEditorsPicksProps = {
 };
 
 export default function HomeEditorsPicks({ jobs }: HomeEditorsPicksProps) {
-  const { isSaved, toggleSaved, pendingId } = useSavedJobs();
-
   return (
     <section className="w-full bg-white" aria-labelledby="home-editors-heading">
       <div className="mx-auto max-w-7xl px-6 py-20">
@@ -85,8 +79,6 @@ export default function HomeEditorsPicks({ jobs }: HomeEditorsPicksProps) {
               const salary = getJobSalary(job);
               const tags = getJobTags(job);
               const accent = jobAccents[index % jobAccents.length];
-              const saved = isSaved(job.id);
-              const saving = pendingId === job.id;
 
               return (
                 <article
@@ -107,24 +99,9 @@ export default function HomeEditorsPicks({ jobs }: HomeEditorsPicksProps) {
                       {getCompanyInitials(company)}
                     </Link>
 
-                    <button
-                      type="button"
-                      onClick={() => toggleSaved(job.id)}
-                      disabled={saving}
-                      aria-label={saved ? "Unsave job" : "Save job"}
-                      aria-pressed={saved}
-                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
-                        saved
-                          ? "bg-rose-50 text-rose-700"
-                          : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                      } disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2`}
-                    >
-                      <Star
-                        className={`h-3 w-3 ${saved ? "fill-current" : ""}`}
-                        aria-hidden="true"
-                      />
-                      {saved ? "Saved" : "Save"}
-                    </button>
+                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                      Featured
+                    </span>
                   </div>
 
                   <Link
