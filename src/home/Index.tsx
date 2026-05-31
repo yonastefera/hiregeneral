@@ -35,7 +35,7 @@ const Index = ({
           }}
         />
 
-        <div className="mx-auto grid w-full max-w-7xl min-w-0 items-center gap-12 px-4 pb-20 pt-24 sm:px-6 md:pt-28 lg:grid-cols-12 lg:pt-20">
+        <div className="mx-auto grid w-full max-w-7xl min-w-0 items-center gap-12 px-4 pb-20 pt-20 sm:px-6 md:pt-28 lg:grid-cols-12 lg:pt-32">
           <div className="min-w-0 lg:col-span-7">
             <h1
               id="home-hero-heading"

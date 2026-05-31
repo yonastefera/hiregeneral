@@ -21,7 +21,7 @@ type HomeFeaturedRolesProps = {
 export default function HomeFeaturedRoles({ jobs }: HomeFeaturedRolesProps) {
   return (
     <aside
-      className="min-w-0 lg:col-span-5"
+      className="min-w-0 lg:col-span-5 pt-14"
       aria-labelledby="home-featured-heading"
     >
       <div className="min-w-0 rounded-3xl border border-black/5 bg-white p-5 shadow-[0_30px_80px_-30px_rgba(20,30,50,0.25)]">

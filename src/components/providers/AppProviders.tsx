@@ -1,12 +1,10 @@
-"use client";
-
-import { Toaster as Sonner } from "@/components/ui/sonner";
+import { LazyToaster } from "@/components/providers/LazyToaster";
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <>
       {children}
-      <Sonner />
+      <LazyToaster />
     </>
   );
 }

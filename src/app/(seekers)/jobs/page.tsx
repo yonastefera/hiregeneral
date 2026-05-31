@@ -8,21 +8,25 @@ export const metadata: Metadata = {
   description:
     "Browse job listings by title, skill, company, keyword, location, posted date, and distance.",
   alternates: {
-    canonical: "/job",
+    canonical: "/jobs",
   },
   openGraph: {
     title: "Search Jobs | HireGeneral",
     description:
       "Browse job listings by title, skill, company, keyword, location, posted date, and distance.",
-    url: "/job",
+    url: "/jobs",
     type: "website",
   },
 };
 
-export default function Jobs() {
+type JobsRouteProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default function Jobs({ searchParams }: JobsRouteProps) {
   return (
     <Suspense fallback={null}>
-      <JobsPage />
+      <JobsPage searchParams={searchParams} />
     </Suspense>
   );
 }

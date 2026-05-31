@@ -1,19 +1,16 @@
-"use client";
-
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   ArrowRight,
-  Bookmark,
   BriefcaseBusiness,
   Clock3,
   ExternalLink,
-  Loader2,
   MapPin,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { SaveJobButton } from "@/components/jobs/SaveJobButton";
 import { listingLocation, listingTitle } from "@/lib/jobs/display";
 import { companyInitials, isSupportedLogoUrl } from "@/lib/logos";
 import { cn } from "@/lib/utils";
@@ -27,11 +24,13 @@ type JobCardProps = {
 };
 
 export function JobCard({ job, saved, saving = false, onSave }: JobCardProps) {
-  const router = useRouter();
-
   const isExternal = Boolean(job.applyUrl);
   const displayTitle = listingTitle(job.title);
   const displayLocation = listingLocation(job.location);
+
+  const detailsHref = `/jobs/${job.slug}`;
+  const applyHref =
+    isExternal && job.applyUrl ? job.applyUrl : `/jobs/${job.slug}/apply`;
 
   const logoUrl = isSupportedLogoUrl(job.logo) ? job.logo : null;
   const logoText = logoUrl
@@ -39,29 +38,6 @@ export function JobCard({ job, saved, saving = false, onSave }: JobCardProps) {
     : job.logo.startsWith("http")
       ? companyInitials(job.company)
       : job.logo;
-
-  const goToDetails = () => {
-    router.push(`/jobs/${job.slug}`);
-  };
-
-  const onApply = (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation();
-
-    if (isExternal && job.applyUrl) {
-      window.open(job.applyUrl, "_blank", "noopener,noreferrer");
-    } else {
-      router.push(`/jobs/${job.slug}/apply`);
-    }
-  };
-
-  const onSaveClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (saving) return;
-
-    onSave(job.id);
-  };
 
   return (
     <article className="group relative max-w-full overflow-hidden rounded-2xl border border-border/60 bg-card p-5 shadow-xs transition-shadow duration-200 hover:shadow-soft">
@@ -95,38 +71,21 @@ export function JobCard({ job, saved, saving = false, onSave }: JobCardProps) {
               </p>
 
               <h3 className="mt-1 text-base font-semibold tracking-tight text-foreground md:text-lg">
-                <button
-                  type="button"
-                  onClick={goToDetails}
+                <Link
+                  href={detailsHref}
                   className="text-left transition-colors hover:text-primary focus-visible:text-primary focus-visible:outline-none"
                 >
                   {displayTitle}
-                </button>
+                </Link>
               </h3>
             </div>
 
-            <button
-              type="button"
-              aria-label={saved ? "Remove saved job" : "Save job"}
-              aria-pressed={saved}
-              disabled={saving}
-              onClick={onSaveClick}
-              className={cn(
-                "relative z-10 grid size-10 shrink-0 place-items-center rounded-lg bg-transparent text-muted-foreground transition-colors",
-                "hover:bg-transparent hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2",
-                saved && "text-primary",
-                saving && "cursor-wait opacity-80",
-              )}
-            >
-              {saving ? (
-                <Loader2 className="size-5 animate-spin" />
-              ) : (
-                <Bookmark
-                  className={cn("size-5", saved && "fill-current")}
-                  strokeWidth={2}
-                />
-              )}
-            </button>
+            <SaveJobButton
+              jobId={job.id}
+              saved={saved}
+              saving={saving}
+              onSave={onSave}
+            />
           </div>
 
           <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -172,20 +131,28 @@ export function JobCard({ job, saved, saving = false, onSave }: JobCardProps) {
             </span>
 
             <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-              <Button variant="ghost" size="sm" onClick={goToDetails}>
-                Details <ArrowRight className="size-3.5" />
+              <Button variant="ghost" size="sm" asChild>
+                <Link href={detailsHref}>
+                  Details <ArrowRight className="size-3.5" />
+                </Link>
               </Button>
 
-              <Button size="sm" onClick={onApply}>
-                {isExternal ? (
-                  <>
-                    Apply <ExternalLink className="size-3.5" />
-                  </>
-                ) : (
-                  <>
-                    Apply now <ArrowRight className="size-3.5" />
-                  </>
-                )}
+              <Button size="sm" asChild>
+                <Link
+                  href={applyHref}
+                  target={isExternal ? "_blank" : undefined}
+                  rel={isExternal ? "noopener noreferrer" : undefined}
+                >
+                  {isExternal ? (
+                    <>
+                      Apply <ExternalLink className="size-3.5" />
+                    </>
+                  ) : (
+                    <>
+                      Apply now <ArrowRight className="size-3.5" />
+                    </>
+                  )}
+                </Link>
               </Button>
             </div>
           </div>

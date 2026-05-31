@@ -27,6 +27,10 @@ export default function RootLayout({
   const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
   const clarityProjectId = process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID;
 
+  const enableAnalytics =
+    process.env.NODE_ENV === "production" &&
+    process.env.NEXT_PUBLIC_ENABLE_ANALYTICS === "true";
+
   return (
     <html lang="en">
       <body>
@@ -44,11 +48,13 @@ export default function RootLayout({
 
         <WebVitals />
 
-        <Analytics />
+        {enableAnalytics && <Analytics />}
 
-        {clarityProjectId && <MicrosoftClarity projectId={clarityProjectId} />}
+        {enableAnalytics && clarityProjectId && (
+          <MicrosoftClarity projectId={clarityProjectId} />
+        )}
 
-        {gaId && <GoogleAnalytics gaId={gaId} />}
+        {enableAnalytics && gaId && <GoogleAnalytics gaId={gaId} />}
       </body>
     </html>
   );

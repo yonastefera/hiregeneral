@@ -1,37 +1,53 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
-import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
 export function HeaderSignOutButton() {
   const router = useRouter();
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const handleSignOut = async () => {
-    const response = await fetch("/api/auth/signout", {
-      method: "POST",
-      cache: "no-store",
-    });
+    if (isSigningOut) return;
 
-    if (!response.ok) {
-      toast.error("Unable to sign out. Please try again.");
-      return;
+    setIsSigningOut(true);
+
+    try {
+      const response = await fetch("/api/auth/signout", {
+        method: "POST",
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to sign out.");
+      }
+
+      void showSuccessToast("Signed out.");
+
+      router.push("/");
+      router.refresh();
+    } catch {
+      void showErrorToast("Unable to sign out. Please try again.");
+    } finally {
+      setIsSigningOut(false);
     }
-
-    toast.success("Signed out.");
-
-    router.replace("/jobs");
-    router.refresh();
   };
 
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="sm"
       onClick={handleSignOut}
-      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10"
+      disabled={isSigningOut}
+      className="justify-start gap-2"
     >
-      <LogOut className="size-4" />
-      Sign out
-    </button>
+      <LogOut aria-hidden="true" className="size-4" />
+      {isSigningOut ? "Signing out..." : "Sign out"}
+    </Button>
   );
 }

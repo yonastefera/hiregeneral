@@ -72,7 +72,7 @@ function getKeywordSearchParamValue(
 }
 
 export function parseJobsSearchParams(
-  searchParams: Record<string, string | string[] | undefined>,
+  searchParams: Record<string, string | string[] | undefined> = {},
 ): JobsSearchState {
   return {
     query: getKeywordSearchParamValue(searchParams),
