@@ -61,14 +61,16 @@ export default function LocationAutocomplete({
     latestQueryRef.current = cacheKey;
 
     if (query.length < minQueryLength) {
-      setSuggestions([]);
+      setSuggestions((current) => (current.length > 0 ? [] : current));
       return;
     }
 
     const cachedSuggestions = cacheRef.current[cacheKey];
 
     if (cachedSuggestions) {
-      setSuggestions(cachedSuggestions);
+      setSuggestions((current) =>
+        current === cachedSuggestions ? current : cachedSuggestions,
+      );
       return;
     }
 
@@ -96,7 +98,16 @@ export default function LocationAutocomplete({
         cacheRef.current[cacheKey] = nextSuggestions;
 
         if (latestQueryRef.current === cacheKey) {
-          setSuggestions(nextSuggestions);
+          setSuggestions((current) => {
+            const sameLength = current.length === nextSuggestions.length;
+            const sameItems =
+              sameLength &&
+              current.every(
+                (item, index) => item.id === nextSuggestions[index]?.id,
+              );
+
+            return sameItems ? current : nextSuggestions;
+          });
         }
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
@@ -151,7 +162,9 @@ export default function LocationAutocomplete({
         value={value}
         disabled={disabled}
         placeholder={placeholder}
-        onFocus={() => setShowSuggestions(true)}
+        onFocus={() => {
+          setShowSuggestions(true);
+        }}
         onBlur={() => {
           window.setTimeout(() => {
             setShowSuggestions(false);

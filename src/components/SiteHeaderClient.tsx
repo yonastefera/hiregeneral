@@ -82,19 +82,48 @@ export function SiteHeaderClient({
 }: SiteHeaderClientProps) {
   const pathname = usePathname();
 
-  const [scrolled, setScrolled] = useState(false);
+  const isTransparentHeaderRoute = pathname === "/";
+  const shouldTrackScroll = isTransparentHeaderRoute;
+
+  const [scrolled, setScrolled] = useState(pathname !== "/");
   const [open, setOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 4);
+    if (!shouldTrackScroll) {
+      setScrolled(true);
+      return;
+    }
 
-    onScroll();
+    let currentScrolled = window.scrollY > 4;
+    let ticking = false;
+
+    setScrolled(currentScrolled);
+
+    const updateScrolled = () => {
+      const nextScrolled = window.scrollY > 4;
+
+      if (nextScrolled !== currentScrolled) {
+        currentScrolled = nextScrolled;
+        setScrolled(nextScrolled);
+      }
+
+      ticking = false;
+    };
+
+    const onScroll = () => {
+      if (ticking) return;
+
+      ticking = true;
+      window.requestAnimationFrame(updateScrolled);
+    };
 
     window.addEventListener("scroll", onScroll, { passive: true });
 
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, [shouldTrackScroll]);
 
   useEffect(() => {
     setOpen(false);
@@ -124,8 +153,10 @@ export function SiteHeaderClient({
   const isRecruiter =
     profile?.user_type === "recruiter" || profile?.user_type === "admin";
 
+  const isAuthenticated = Boolean(user && profile);
+
   const navLinks = useMemo(() => {
-    if (!user || !profile) return publicNavLinks;
+    if (!isAuthenticated) return publicNavLinks;
 
     if (isJobSeeker) {
       return [...publicNavLinks, ...jobSeekerNavLinks];
@@ -136,9 +167,8 @@ export function SiteHeaderClient({
     }
 
     return publicNavLinks;
-  }, [user, profile, isJobSeeker, isRecruiter]);
+  }, [isAuthenticated, isJobSeeker, isRecruiter]);
 
-  const isTransparentHeaderRoute = pathname === "/";
   const elevated = !isTransparentHeaderRoute || scrolled;
 
   return (

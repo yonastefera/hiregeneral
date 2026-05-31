@@ -90,23 +90,32 @@ export default function KeywordAutocomplete({
     const cacheKey = query.toLowerCase();
 
     if (query.length < minQueryLength) {
-      setSuggestions([]);
-      setLoadingSuggestions(false);
+      setSuggestions((current) => (current.length > 0 ? [] : current));
+      setLoadingSuggestions((current) => (current ? false : current));
       return;
     }
 
     const cachedSuggestions = cacheRef.current[cacheKey];
 
     if (cachedSuggestions) {
-      setSuggestions(cachedSuggestions);
-      setLoadingSuggestions(false);
+      setSuggestions((current) =>
+        current === cachedSuggestions ? current : cachedSuggestions,
+      );
+      setLoadingSuggestions((current) => (current ? false : current));
       return;
     }
 
     const localMatches = getLocalKeywordMatches(query);
 
     if (localMatches.length > 0) {
-      setSuggestions(localMatches);
+      setSuggestions((current) => {
+        const sameLength = current.length === localMatches.length;
+        const sameItems =
+          sameLength &&
+          current.every((item, index) => item.id === localMatches[index]?.id);
+
+        return sameItems ? current : localMatches;
+      });
     }
 
     const controller = new AbortController();

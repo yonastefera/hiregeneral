@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -12,11 +13,19 @@ import {
   X,
 } from "lucide-react";
 
-import dynamic from "next/dynamic";
 import type { LocationSuggestion } from "@/components/location/location-types";
 import type { KeywordSuggestion } from "@/components/search/keyword-types";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+import {
+  buildJobsUrlParams,
+  DEFAULT_DISTANCE,
+  DEFAULT_POSTED,
+  distanceOptions,
+  postedOptions,
+  type JobsSearchState,
+} from "./search-options";
 
 const KeywordAutocomplete = dynamic(
   () => import("@/components/search/KeywordAutocomplete"),
@@ -46,48 +55,16 @@ const LocationAutocomplete = dynamic(
   },
 );
 
-import {
-  buildJobsUrlParams,
-  DEFAULT_DISTANCE,
-  DEFAULT_POSTED,
-  distanceOptions,
-  postedOptions,
-  type JobsSearchState,
-} from "./search-options";
-
 type JobsPageClientProps = {
   initialState: JobsSearchState;
   children: ReactNode;
 };
 
-type SelectedKeyword = {
-  term: string;
-  label: string;
-  category: string | null;
-};
-
-type SelectedLocation = {
-  city: string;
-  state: string;
-  zip_code: string | null;
-  label: string;
-};
-
-function toSelectedKeyword(suggestion: KeywordSuggestion): SelectedKeyword {
-  return {
-    term: suggestion.term,
-    label: suggestion.label,
-    category: suggestion.category,
-  };
-}
-
-function toSelectedLocation(location: LocationSuggestion): SelectedLocation {
-  return {
-    city: location.city,
-    state: location.state,
-    zip_code: location.zip_code,
-    label: location.label,
-  };
+function getLocationLabel(suggestion: LocationSuggestion) {
+  return (
+    suggestion.label ||
+    [suggestion.city, suggestion.state].filter(Boolean).join(", ")
+  ).trim();
 }
 
 export default function JobsPageClient({
@@ -106,16 +83,9 @@ export default function JobsPageClient({
     initialState.location,
   );
 
-  const [, setSelectedKeyword] = useState<SelectedKeyword | null>(null);
-  const [, setSelectedLocation] = useState<SelectedLocation | null>(null);
-
   const [dateFilter, setDateFilter] = useState(initialState.dateFilter);
   const [distance, setDistance] = useState(initialState.distance);
 
-  /**
-   * Keep the client form fields aligned with the URL/server state.
-   * This is important when users navigate with browser back/forward buttons.
-   */
   useEffect(() => {
     setQuery(initialState.query);
     setSubmittedQuery(initialState.query);
@@ -154,11 +124,9 @@ export default function JobsPageClient({
 
   const clearAll = () => {
     setQuery("");
-    setSelectedKeyword(null);
     setSubmittedQuery("");
 
     setLocation("");
-    setSelectedLocation(null);
     setSubmittedLocation("");
 
     setDateFilter(DEFAULT_POSTED);
@@ -276,21 +244,9 @@ export default function JobsPageClient({
                 placeholder="Job title, skill, company, or keyword"
                 showClearButton={false}
                 className="h-12 border-0 bg-transparent pl-9 pr-3 shadow-none focus-visible:ring-0"
-                onValueChange={(value) => {
-                  setQuery(value);
-
-                  if (!value.trim()) {
-                    setSelectedKeyword(null);
-                  }
-                }}
-                onKeywordSelect={(suggestion) => {
-                  const nextKeyword = toSelectedKeyword(suggestion);
-
-                  setSelectedKeyword(nextKeyword);
-                  setQuery(nextKeyword.term);
-                }}
-                onClear={() => {
-                  setSelectedKeyword(null);
+                onValueChange={setQuery}
+                onKeywordSelect={(suggestion: KeywordSuggestion) => {
+                  setQuery(suggestion.term);
                 }}
               />
             </div>
@@ -311,21 +267,9 @@ export default function JobsPageClient({
                 placeholder="City, state, or ZIP"
                 showClearButton={false}
                 className="h-12 border-0 bg-transparent pl-9 pr-3 shadow-none focus-visible:ring-0"
-                onValueChange={(value) => {
-                  setLocation(value);
-
-                  if (!value.trim()) {
-                    setSelectedLocation(null);
-                  }
-                }}
-                onLocationSelect={(suggestion) => {
-                  const nextLocation = toSelectedLocation(suggestion);
-
-                  setSelectedLocation(nextLocation);
-                  setLocation(nextLocation.label);
-                }}
-                onClear={() => {
-                  setSelectedLocation(null);
+                onValueChange={setLocation}
+                onLocationSelect={(suggestion: LocationSuggestion) => {
+                  setLocation(getLocationLabel(suggestion));
                 }}
               />
             </div>
