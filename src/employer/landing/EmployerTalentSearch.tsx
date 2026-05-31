@@ -1,13 +1,40 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { MapPin, Search } from "lucide-react";
 
-import LocationAutocomplete from "@/components/location/LocationAutocomplete";
 import type { LocationSuggestion } from "@/components/location/location-types";
-import KeywordAutocomplete from "@/components/search/KeywordAutocomplete";
 import type { KeywordSuggestion } from "@/components/search/keyword-types";
+
+const KeywordAutocomplete = dynamic(
+  () => import("@/components/search/KeywordAutocomplete"),
+  {
+    ssr: false,
+    loading: () => (
+      <input
+        disabled
+        placeholder="Role, skill, or department"
+        className="h-12 w-full border-0 bg-transparent pl-11 pr-3 text-sm text-neutral-400 shadow-none outline-none placeholder:text-neutral-400"
+      />
+    ),
+  },
+);
+
+const LocationAutocomplete = dynamic(
+  () => import("@/components/location/LocationAutocomplete"),
+  {
+    ssr: false,
+    loading: () => (
+      <input
+        disabled
+        placeholder="Location or remote"
+        className="h-12 w-full border-0 bg-transparent pl-11 pr-3 text-sm text-neutral-400 shadow-none outline-none placeholder:text-neutral-400"
+      />
+    ),
+  },
+);
 
 function locationLabel(location: LocationSuggestion) {
   return (
