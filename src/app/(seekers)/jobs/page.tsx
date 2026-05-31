@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import type { Metadata } from "next";
 
 import JobsPage from "@/job-seekers/job/listing/JobsPage";
@@ -24,9 +23,5 @@ type JobsRouteProps = {
 };
 
 export default function Jobs({ searchParams }: JobsRouteProps) {
-  return (
-    <Suspense fallback={null}>
-      <JobsPage searchParams={searchParams} />
-    </Suspense>
-  );
+  return <JobsPage searchParams={searchParams} />;
 }

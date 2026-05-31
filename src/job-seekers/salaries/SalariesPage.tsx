@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
@@ -15,9 +16,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-import LocationAutocomplete from "@/components/location/LocationAutocomplete";
 import type { LocationSuggestion } from "@/components/location/location-types";
-import KeywordAutocomplete from "@/components/search/KeywordAutocomplete";
 import type { KeywordSuggestion } from "@/components/search/keyword-types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -79,6 +78,34 @@ const popularSearches = [
   { career: "Civil Engineer", location: "Charlotte, NC" },
   { career: "Financial Analyst", location: "Chicago, IL" },
 ];
+
+const KeywordAutocomplete = dynamic(
+  () => import("@/components/search/KeywordAutocomplete"),
+  {
+    ssr: false,
+    loading: () => (
+      <input
+        disabled
+        placeholder="Software Engineer"
+        className="h-13 w-full border-0 bg-transparent pl-11 pr-3 text-base text-muted-foreground shadow-none outline-none placeholder:text-muted-foreground"
+      />
+    ),
+  },
+);
+
+const LocationAutocomplete = dynamic(
+  () => import("@/components/location/LocationAutocomplete"),
+  {
+    ssr: false,
+    loading: () => (
+      <input
+        disabled
+        placeholder="Atlanta, GA"
+        className="h-13 w-full border-0 bg-transparent pl-11 pr-3 text-base text-muted-foreground shadow-none outline-none placeholder:text-muted-foreground"
+      />
+    ),
+  },
+);
 
 function formatMoney(value: number | null, mode: "year" | "hour") {
   if (value === null) return null;
@@ -203,7 +230,7 @@ export default function SalariesPage() {
 
   return (
     <main className="min-h-screen bg-background">
-      <section className="relative overflow-hidden bg-hero-gradient px-4 py-16 md:py-24">
+      <section className="relative overflow-visible bg-hero-gradient px-4 py-16 md:py-24">
         <div className="pointer-events-none absolute -left-24 top-20 size-72 rounded-full bg-primary/10 blur-3xl" />
         <div className="pointer-events-none absolute -right-20 top-12 size-80 rounded-full bg-accent/10 blur-3xl" />
 
@@ -255,7 +282,7 @@ export default function SalariesPage() {
           </div>
 
           <form
-            className="rounded-3xl border border-border/70 bg-card p-6 shadow-lift"
+            className="relative z-40 overflow-visible rounded-3xl border border-border/70 bg-card p-6 shadow-lift"
             onSubmit={(event) => {
               event.preventDefault();
               calculate();
@@ -265,6 +292,7 @@ export default function SalariesPage() {
               <div className="grid size-11 place-items-center rounded-2xl bg-primary-gradient text-primary-foreground shadow-pop">
                 <Calculator className="size-5" />
               </div>
+
               <div>
                 <h2 className="text-xl font-bold tracking-tight">
                   Calculate salary
@@ -275,7 +303,7 @@ export default function SalariesPage() {
               </div>
             </div>
 
-            <div className="mt-6 space-y-3">
+            <div className="relative z-50 mt-6 space-y-3 overflow-visible">
               <div>
                 <Label
                   htmlFor="salary-career"
@@ -283,14 +311,20 @@ export default function SalariesPage() {
                 >
                   Career
                 </Label>
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
+
+                <div className="relative z-50 min-h-13 overflow-visible rounded-xl border border-input bg-background transition-colors focus-within:border-primary/50">
+                  <Search
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-3 top-1/2 z-10 size-5 -translate-y-1/2 text-muted-foreground"
+                  />
+
                   <KeywordAutocomplete
                     id="salary-career"
                     value={career}
                     placeholder="Software Engineer"
                     showClearButton={false}
-                    className="h-13 rounded-xl bg-background pl-11 text-base"
+                    containerClassName="relative w-full"
+                    className="h-13 w-full border-0 bg-transparent pl-11 pr-3 text-base shadow-none focus-visible:ring-0"
                     onValueChange={setCareer}
                     onKeywordSelect={(suggestion: KeywordSuggestion) => {
                       setCareer(suggestion.term);
@@ -306,14 +340,20 @@ export default function SalariesPage() {
                 >
                   Location
                 </Label>
-                <div className="relative">
-                  <MapPin className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
+
+                <div className="relative z-40 min-h-13 overflow-visible rounded-xl border border-input bg-background transition-colors focus-within:border-primary/50">
+                  <MapPin
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-3 top-1/2 z-10 size-5 -translate-y-1/2 text-muted-foreground"
+                  />
+
                   <LocationAutocomplete
                     id="salary-location"
                     value={location}
                     placeholder="Atlanta, GA"
                     showClearButton={false}
-                    className="h-13 rounded-xl bg-background pl-11 text-base"
+                    containerClassName="relative w-full"
+                    className="h-13 w-full border-0 bg-transparent pl-11 pr-3 text-base shadow-none focus-visible:ring-0"
                     onValueChange={setLocation}
                     onLocationSelect={(locationSuggestion) => {
                       setLocation(toSalaryLocationLabel(locationSuggestion));
@@ -340,11 +380,12 @@ export default function SalariesPage() {
                 </>
               )}
             </Button>
+
             {(career || location || result) && (
               <Button
                 type="button"
                 variant="ghost"
-                className="h-10 w-full rounded-full bg-muted/40 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground mt-3"
+                className="mt-3 h-10 w-full rounded-full bg-muted/40 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
                 onClick={clearSearch}
               >
                 Clear search
@@ -373,7 +414,7 @@ export default function SalariesPage() {
         </div>
       </section>
 
-      <section className="px-4 py-12 md:py-16 mb-20">
+      <section className="mb-20 px-4 py-12 md:py-16">
         <div className="mx-auto max-w-7xl md:px-6">
           {!result ? (
             <div className="grid gap-5 lg:grid-cols-3">
@@ -592,6 +633,7 @@ export default function SalariesPage() {
                     <div className="grid size-10 place-items-center rounded-2xl bg-secondary text-secondary-foreground">
                       <Database className="size-5" />
                     </div>
+
                     <div>
                       <h3 className="font-bold tracking-tight">Data source</h3>
                       <p className="text-sm text-muted-foreground">
