@@ -381,16 +381,23 @@ export default function SalariesPage() {
               )}
             </Button>
 
-            {(career || location || result) && (
+            <div className="mt-3 h-10">
               <Button
                 type="button"
                 variant="ghost"
-                className="mt-3 h-10 w-full rounded-full bg-muted/40 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                className={cn(
+                  "h-10 w-full rounded-full bg-muted/40 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground",
+                  career || location || result
+                    ? "visible"
+                    : "invisible pointer-events-none",
+                )}
                 onClick={clearSearch}
+                tabIndex={career || location || result ? undefined : -1}
+                aria-hidden={career || location || result ? undefined : true}
               >
                 Clear search
               </Button>
-            )}
+            </div>
 
             {error && (
               <p className="mt-3 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
@@ -502,7 +509,7 @@ export default function SalariesPage() {
                       </p>
 
                       <div className="mt-3 flex flex-wrap items-end gap-x-2 gap-y-1">
-                        <p className="text-5xl font-black tracking-tight text-foreground md:text-6xl">
+                        <p className="text-5xl font-black tracking-tight text-foreground md:text-5xl">
                           {median ?? "Not enough data"}
                         </p>
 
