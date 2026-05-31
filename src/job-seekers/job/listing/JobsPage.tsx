@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 
 import JobsPageClient from "./JobsPageClient";
+import { JobsResultsList } from "./JobsResultsList";
 import {
   buildJobsApiParams,
   normalizeJobsPageData,
@@ -82,6 +83,8 @@ export default async function JobsPage({ searchParams }: JobsPageProps) {
   const initialData = await getInitialJobsData(initialState);
 
   return (
-    <JobsPageClient initialState={initialState} initialData={initialData} />
+    <JobsPageClient initialState={initialState}>
+      <JobsResultsList state={initialState} data={initialData} />
+    </JobsPageClient>
   );
 }

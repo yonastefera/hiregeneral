@@ -1,14 +1,8 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  useTransition,
-} from "react";
-import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { ReactNode } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import {
   CalendarDays,
   ChevronDown,
@@ -22,18 +16,7 @@ import LocationAutocomplete from "@/components/location/LocationAutocomplete";
 import type { LocationSuggestion } from "@/components/location/location-types";
 import KeywordAutocomplete from "@/components/search/KeywordAutocomplete";
 import type { KeywordSuggestion } from "@/components/search/keyword-types";
-import { JobCard } from "@/components/jobs/JobCard";
 import { Button } from "@/components/ui/button";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
-import { toJobCardShape } from "@/lib/jobs/card-shape";
 import { cn } from "@/lib/utils";
 
 import {
@@ -41,15 +24,13 @@ import {
   DEFAULT_DISTANCE,
   DEFAULT_POSTED,
   distanceOptions,
-  PAGE_SIZE,
   postedOptions,
-  type JobsPageData,
   type JobsSearchState,
 } from "./search-options";
 
 type JobsPageClientProps = {
   initialState: JobsSearchState;
-  initialData: JobsPageData;
+  children: ReactNode;
 };
 
 type SelectedKeyword = {
@@ -84,11 +65,10 @@ function toSelectedLocation(location: LocationSuggestion): SelectedLocation {
 
 export default function JobsPageClient({
   initialState,
-  initialData,
+  children,
 }: JobsPageClientProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
   const [query, setQuery] = useState(initialState.query);
@@ -105,15 +85,9 @@ export default function JobsPageClient({
   const [dateFilter, setDateFilter] = useState(initialState.dateFilter);
   const [distance, setDistance] = useState(initialState.distance);
 
-  const jobs = initialData.jobs;
-  const totalJobs = initialData.totalJobs;
-  const newJobs = initialData.newJobs;
-  const totalPages = initialData.totalPages;
-  const currentPage = Math.min(initialState.page, totalPages);
-
   /**
-   * Keep local form inputs aligned when the server sends new search params.
-   * This matters for back/forward navigation and URL-driven updates.
+   * Keep the client form fields aligned with the URL/server state.
+   * This is important when users navigate with browser back/forward buttons.
    */
   useEffect(() => {
     setQuery(initialState.query);
@@ -131,21 +105,11 @@ export default function JobsPageClient({
     initialState.distance,
   ]);
 
-  /**
-   * Public /jobs should not load Supabase saved-job logic on first page load.
-   * Clicking save sends the visitor to sign in and preserves the current route.
-   */
-  const handlePublicSave = useCallback(() => {
-    const queryString = searchParams.toString();
-    const currentPath = queryString ? `${pathname}?${queryString}` : pathname;
-
-    router.push(`/signin?next=${encodeURIComponent(currentPath)}`);
-  }, [pathname, router, searchParams]);
-
   const navigateToState = useCallback(
     (nextState: JobsSearchState, options?: { scrollToTop?: boolean }) => {
       const nextParams = buildJobsUrlParams(nextState);
       const nextQueryString = nextParams.toString();
+
       const nextHref = nextQueryString
         ? `${pathname}?${nextQueryString}`
         : pathname;
@@ -234,75 +198,10 @@ export default function JobsPageClient({
     );
   };
 
-  const goToPage = (targetPage: number) => {
-    const nextPage = Math.min(Math.max(1, targetPage), totalPages);
-
-    navigateToState(
-      {
-        query: submittedQuery,
-        location: submittedLocation,
-        dateFilter,
-        distance,
-        page: nextPage,
-      },
-      { scrollToTop: true },
-    );
-  };
-
   const hasActiveFilters =
     Boolean(query || location || submittedQuery || submittedLocation) ||
     dateFilter !== DEFAULT_POSTED ||
     distance !== DEFAULT_DISTANCE;
-
-  const getPageHref = (targetPage: number) => {
-    const nextPage = Math.min(Math.max(1, targetPage), totalPages);
-    const params = new URLSearchParams(searchParams.toString());
-
-    /**
-     * Normalize legacy q= into query= for pagination links.
-     */
-    const legacyQuery = params.get("q");
-
-    if (!params.get("query") && legacyQuery) {
-      params.set("query", legacyQuery);
-    }
-
-    params.delete("q");
-
-    if (nextPage <= 1) {
-      params.delete("page");
-    } else {
-      params.set("page", String(nextPage));
-    }
-
-    const queryString = params.toString();
-
-    return queryString ? `${pathname}?${queryString}` : pathname;
-  };
-
-  const pageNumbers = useMemo(() => {
-    const nums: (number | "ellipsis")[] = [];
-    const windowSize = 1;
-
-    for (let i = 1; i <= totalPages; i++) {
-      if (
-        i === 1 ||
-        i === totalPages ||
-        Math.abs(i - currentPage) <= windowSize
-      ) {
-        nums.push(i);
-      } else if (nums[nums.length - 1] !== "ellipsis") {
-        nums.push("ellipsis");
-      }
-    }
-
-    return nums;
-  }, [totalPages, currentPage]);
-
-  const cardJobs = useMemo(() => jobs.map(toJobCardShape), [jobs]);
-
-  const resultStart = totalJobs > 0 ? (currentPage - 1) * PAGE_SIZE + 1 : 0;
-  const resultEnd = Math.min(currentPage * PAGE_SIZE, totalJobs);
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-background">
@@ -512,198 +411,14 @@ export default function JobsPageClient({
           </div>
         </aside>
 
-        <section
-          className="min-w-0 space-y-5"
-          aria-labelledby="job-results-heading"
-        >
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <p
-                className="text-sm text-muted-foreground"
-                aria-live="polite"
-                aria-atomic="true"
-              >
-                {totalJobs} {totalJobs === 1 ? "job" : "jobs"} found
-                {totalJobs > 0 && (
-                  <>
-                    {newJobs > 0 && <> ({newJobs} new)</>} · showing{" "}
-                    <span className="font-medium text-foreground">
-                      {resultStart}–{resultEnd}
-                    </span>
-                  </>
-                )}
-                {isPending && (
-                  <span className="ml-2 text-primary">Updating...</span>
-                )}
-              </p>
-
-              <h2
-                id="job-results-heading"
-                className="text-2xl font-bold tracking-tight"
-              >
-                Recommended listings
-              </h2>
-            </div>
-
-            <Button variant="glass" asChild>
-              <Link href="/signin">Save search</Link>
-            </Button>
-          </div>
-
-          {cardJobs.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center">
-              <h3 className="text-lg font-semibold">
-                No matches in your filters
-              </h3>
-
-              <p className="mt-2 text-sm text-muted-foreground">
-                Try widening the date range or distance, or clear filters.
-              </p>
-
-              {hasActiveFilters && (
-                <Button variant="outline" className="mt-4" onClick={clearAll}>
-                  Clear filters
-                </Button>
-              )}
-            </div>
-          ) : (
-            <>
-              <ul className="min-w-0 space-y-4" aria-label="Job listings">
-                {cardJobs.map((job) => (
-                  <li key={job.id}>
-                    <JobCard
-                      job={job}
-                      saved={false}
-                      saving={false}
-                      onSave={handlePublicSave}
-                    />
-                  </li>
-                ))}
-              </ul>
-
-              {totalPages > 1 && (
-                <nav
-                  className="flex flex-col items-center gap-3 pt-2"
-                  aria-label="Job results pagination"
-                >
-                  <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-2xl border border-border/70 bg-surface p-2 shadow-xs sm:hidden">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={currentPage === 1 || isPending}
-                      onClick={() => {
-                        if (currentPage > 1) {
-                          goToPage(currentPage - 1);
-                        }
-                      }}
-                      className="justify-self-start"
-                    >
-                      Previous
-                    </Button>
-
-                    <p className="text-xs font-medium text-muted-foreground">
-                      Page{" "}
-                      <span className="text-foreground">{currentPage}</span> of{" "}
-                      <span className="text-foreground">{totalPages}</span>
-                    </p>
-
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={currentPage === totalPages || isPending}
-                      onClick={() => {
-                        if (currentPage < totalPages) {
-                          goToPage(currentPage + 1);
-                        }
-                      }}
-                      className="justify-self-end"
-                    >
-                      Next
-                    </Button>
-                  </div>
-
-                  <Pagination className="hidden sm:flex">
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious
-                          href={
-                            currentPage === 1
-                              ? getPageHref(1)
-                              : getPageHref(currentPage - 1)
-                          }
-                          aria-disabled={currentPage === 1}
-                          tabIndex={currentPage === 1 ? -1 : undefined}
-                          onClick={(event) => {
-                            event.preventDefault();
-
-                            if (currentPage > 1) {
-                              goToPage(currentPage - 1);
-                            }
-                          }}
-                          className={cn(
-                            currentPage === 1 &&
-                              "pointer-events-none opacity-50",
-                          )}
-                        />
-                      </PaginationItem>
-
-                      {pageNumbers.map((pageNumber, index) => (
-                        <PaginationItem key={`${pageNumber}-${index}`}>
-                          {pageNumber === "ellipsis" ? (
-                            <PaginationEllipsis />
-                          ) : (
-                            <PaginationLink
-                              href={getPageHref(pageNumber)}
-                              isActive={pageNumber === currentPage}
-                              aria-current={
-                                pageNumber === currentPage ? "page" : undefined
-                              }
-                              onClick={(event) => {
-                                event.preventDefault();
-                                goToPage(pageNumber);
-                              }}
-                            >
-                              {pageNumber}
-                            </PaginationLink>
-                          )}
-                        </PaginationItem>
-                      ))}
-
-                      <PaginationItem>
-                        <PaginationNext
-                          href={
-                            currentPage === totalPages
-                              ? getPageHref(totalPages)
-                              : getPageHref(currentPage + 1)
-                          }
-                          aria-disabled={currentPage === totalPages}
-                          tabIndex={currentPage === totalPages ? -1 : undefined}
-                          onClick={(event) => {
-                            event.preventDefault();
-
-                            if (currentPage < totalPages) {
-                              goToPage(currentPage + 1);
-                            }
-                          }}
-                          className={cn(
-                            currentPage === totalPages &&
-                              "pointer-events-none opacity-50",
-                          )}
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
-
-                  <p className="hidden text-xs text-muted-foreground sm:block">
-                    Page {currentPage} of {totalPages}
-                  </p>
-                </nav>
-              )}
-            </>
+        <div
+          className={cn(
+            "min-w-0 transition-opacity",
+            isPending && "opacity-70",
           )}
-        </section>
+        >
+          {children}
+        </div>
       </section>
     </main>
   );
