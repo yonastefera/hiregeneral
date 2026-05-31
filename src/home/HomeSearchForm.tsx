@@ -1,11 +1,38 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { Crosshair, Loader2, MapPin, Search } from "lucide-react";
 
-import LocationAutocomplete from "@/components/location/LocationAutocomplete";
 import type { LocationSuggestion } from "@/components/location/location-types";
-import KeywordAutocomplete from "@/components/search/KeywordAutocomplete";
 import type { KeywordSuggestion } from "@/components/search/keyword-types";
+
+const KeywordAutocomplete = dynamic(
+  () => import("@/components/search/KeywordAutocomplete"),
+  {
+    ssr: false,
+    loading: () => (
+      <input
+        disabled
+        placeholder="Title, company, skill, keyword"
+        className="h-12 w-full border-0 bg-transparent py-3 pl-10 pr-4 text-sm text-neutral-400 shadow-none outline-none placeholder:text-neutral-400"
+      />
+    ),
+  },
+);
+
+const LocationAutocomplete = dynamic(
+  () => import("@/components/location/LocationAutocomplete"),
+  {
+    ssr: false,
+    loading: () => (
+      <input
+        disabled
+        placeholder="Location"
+        className="h-12 w-full border-0 bg-transparent py-3 pl-10 pr-12 text-sm text-neutral-400 shadow-none outline-none placeholder:text-neutral-400"
+      />
+    ),
+  },
+);
 
 export type SelectedKeyword = {
   term: string;

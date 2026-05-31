@@ -12,12 +12,39 @@ import {
   X,
 } from "lucide-react";
 
-import LocationAutocomplete from "@/components/location/LocationAutocomplete";
+import dynamic from "next/dynamic";
 import type { LocationSuggestion } from "@/components/location/location-types";
-import KeywordAutocomplete from "@/components/search/KeywordAutocomplete";
 import type { KeywordSuggestion } from "@/components/search/keyword-types";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+const KeywordAutocomplete = dynamic(
+  () => import("@/components/search/KeywordAutocomplete"),
+  {
+    ssr: false,
+    loading: () => (
+      <input
+        disabled
+        placeholder="Job title, skill, company, or keyword"
+        className="h-12 w-full rounded-xl border-0 bg-transparent pl-9 pr-3 text-sm text-muted-foreground shadow-none outline-none"
+      />
+    ),
+  },
+);
+
+const LocationAutocomplete = dynamic(
+  () => import("@/components/location/LocationAutocomplete"),
+  {
+    ssr: false,
+    loading: () => (
+      <input
+        disabled
+        placeholder="City, state, or ZIP"
+        className="h-12 w-full rounded-xl border-0 bg-transparent pl-9 pr-3 text-sm text-muted-foreground shadow-none outline-none"
+      />
+    ),
+  },
+);
 
 import {
   buildJobsUrlParams,
