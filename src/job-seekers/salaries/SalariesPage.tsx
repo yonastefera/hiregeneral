@@ -229,7 +229,7 @@ export default function SalariesPage() {
     payMode === "year" ? "Annual salary range" : "Hourly wage range";
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="min-h-screen bg-background overflow-x-hidden">
       <section className="relative overflow-visible bg-hero-gradient px-4 py-16 md:py-24">
         <div className="pointer-events-none absolute -left-24 top-20 size-72 rounded-full bg-primary/10 blur-3xl" />
         <div className="pointer-events-none absolute -right-20 top-12 size-80 rounded-full bg-accent/10 blur-3xl" />
@@ -282,7 +282,7 @@ export default function SalariesPage() {
           </div>
 
           <form
-            className="relative z-40 overflow-visible rounded-3xl border border-border/70 bg-card p-6 shadow-lift"
+            className="relative z-10 overflow-visible rounded-3xl border border-border/70 bg-card p-6 shadow-lift"
             onSubmit={(event) => {
               event.preventDefault();
               calculate();
