@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+import { redis } from "@/lib/rate-limit";
 import {
   US_STATE_NAMES_BY_ABBR,
   normalizeUsStateRegion,
@@ -16,6 +17,8 @@ const supabaseAdmin = createClient(
 
 const SAMPLE_LIMIT = 500;
 const HOURS_PER_YEAR = 2080;
+const SALARY_CACHE_TTL_SECONDS = 60 * 60 * 24; // 24 hours
+const SALARY_CACHE_VERSION = process.env.SALARY_CACHE_VERSION ?? "1";
 
 type SalaryJobRow = {
   id: string;
@@ -60,6 +63,42 @@ type SalarySample = {
   midpoint: number;
   source: "job_posting";
   url: string | null;
+};
+
+type SalaryEstimatePayload = {
+  career: string;
+  location: string;
+  source: "bls_oews" | "hiregeneral" | "benchmark";
+  dataSource: string;
+  sampleCount: number;
+  confidence: "high" | "medium" | "benchmark";
+  range: {
+    low: number | null;
+    median: number | null;
+    high: number | null;
+    formattedLow: string | null;
+    formattedMedian: string | null;
+    formattedHigh: string | null;
+  };
+  bls: {
+    occupationCode: string;
+    occupationName: string;
+    areaName: string;
+    releasePeriod: string;
+    employment: number | null;
+    annualMean: number | null;
+    annualP25: number | null;
+    annualP75: number | null;
+    hourlyMedian: number | null;
+    sourceName: string;
+    sourceUrl: string;
+  } | null;
+  samples: Array<
+    SalarySample & {
+      formattedSalaryMin: string | null;
+      formattedSalaryMax: string | null;
+    }
+  >;
 };
 
 const BLS_SALARY_SELECT = `
@@ -160,8 +199,6 @@ const OCCUPATION_ALIASES = [
       "application analyst",
     ],
   },
-
-  // Product / project / operations / management
   {
     codes: ["113021"],
     terms: ["technology manager", "it manager", "engineering manager"],
@@ -190,8 +227,6 @@ const OCCUPATION_ALIASES = [
     codes: ["119199"],
     terms: ["product manager", "product owner"],
   },
-
-  // Finance / accounting
   {
     codes: ["132011"],
     terms: ["accountant", "auditor", "accounting"],
@@ -208,8 +243,6 @@ const OCCUPATION_ALIASES = [
     codes: ["132031"],
     terms: ["budget analyst"],
   },
-
-  // HR
   {
     codes: ["131071"],
     terms: [
@@ -227,8 +260,6 @@ const OCCUPATION_ALIASES = [
     codes: ["131151"],
     terms: ["training specialist", "learning and development"],
   },
-
-  // Engineering
   {
     codes: ["172051"],
     terms: ["civil engineer"],
@@ -261,8 +292,6 @@ const OCCUPATION_ALIASES = [
     codes: ["172031"],
     terms: ["biomedical engineer", "bioengineer"],
   },
-
-  // Healthcare: nurses, PAs, doctors
   {
     codes: ["291141"],
     terms: ["registered nurse", "rn", "nurse"],
@@ -332,8 +361,6 @@ const OCCUPATION_ALIASES = [
     codes: ["292035"],
     terms: ["mri technologist", "mri tech"],
   },
-
-  // Support
   {
     codes: ["151232", "151231"],
     terms: [
@@ -395,6 +422,24 @@ function searchTokens(value: string) {
     .map((token) => token.trim())
     .filter((token) => token.length >= 3)
     .slice(0, 6);
+}
+
+function getSalaryCacheKey(career: string, location: string) {
+  return [
+    "salary-estimate",
+    SALARY_CACHE_VERSION,
+    normalize(career),
+    normalize(location || "united states"),
+  ].join(":");
+}
+
+function jsonResponse(payload: SalaryEstimatePayload, status = 200) {
+  return NextResponse.json(payload, {
+    status,
+    headers: {
+      "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800",
+    },
+  });
 }
 
 function parseLocation(value: string) {
@@ -671,6 +716,17 @@ function responseRange(
   };
 }
 
+function formatSamples(samples: SalarySample[]) {
+  return samples
+    .slice(-8)
+    .reverse()
+    .map((sample) => ({
+      ...sample,
+      formattedSalaryMin: formatCurrency(sample.salaryMin),
+      formattedSalaryMax: formatCurrency(sample.salaryMax),
+    }));
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = req.nextUrl;
@@ -684,6 +740,18 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    const cacheKey = getSalaryCacheKey(career, location);
+
+    try {
+      const cached = await redis.get<SalaryEstimatePayload>(cacheKey);
+
+      if (cached) {
+        return jsonResponse(cached);
+      }
+    } catch (error) {
+      console.error("[salary] Redis read failed. Continuing.", error);
+    }
+
     const [blsSalary, samples] = await Promise.all([
       findBlsSalary(career, location),
       loadJobSalarySamples(career, location),
@@ -694,7 +762,7 @@ export async function GET(req: NextRequest) {
       const median = blsSalary.annual_median;
       const high = blsSalary.annual_p90 ?? blsSalary.annual_p75 ?? null;
 
-      return NextResponse.json({
+      const payload: SalaryEstimatePayload = {
         career,
         location: location || blsSalary.area_name,
         source: "bls_oews",
@@ -715,15 +783,18 @@ export async function GET(req: NextRequest) {
           sourceName: blsSalary.source_name,
           sourceUrl: blsSalary.source_url,
         },
-        samples: samples
-          .slice(-8)
-          .reverse()
-          .map((sample) => ({
-            ...sample,
-            formattedSalaryMin: formatCurrency(sample.salaryMin),
-            formattedSalaryMax: formatCurrency(sample.salaryMax),
-          })),
-      });
+        samples: formatSamples(samples),
+      };
+
+      try {
+        await redis.set(cacheKey, payload, {
+          ex: SALARY_CACHE_TTL_SECONDS,
+        });
+      } catch (error) {
+        console.error("[salary] Redis write failed. Continuing.", error);
+      }
+
+      return jsonResponse(payload);
     }
 
     const midpoints = samples.map((sample) => sample.midpoint);
@@ -735,7 +806,7 @@ export async function GET(req: NextRequest) {
       : fallback.median;
     const high = hasStrongSample ? percentile(midpoints, 0.75) : fallback.high;
 
-    return NextResponse.json({
+    const payload: SalaryEstimatePayload = {
       career,
       location: location || "United States",
       source: hasStrongSample ? "hiregeneral" : "benchmark",
@@ -751,15 +822,18 @@ export async function GET(req: NextRequest) {
             : "benchmark",
       range: responseRange(low, median, high),
       bls: null,
-      samples: samples
-        .slice(-8)
-        .reverse()
-        .map((sample) => ({
-          ...sample,
-          formattedSalaryMin: formatCurrency(sample.salaryMin),
-          formattedSalaryMax: formatCurrency(sample.salaryMax),
-        })),
-    });
+      samples: formatSamples(samples),
+    };
+
+    try {
+      await redis.set(cacheKey, payload, {
+        ex: SALARY_CACHE_TTL_SECONDS,
+      });
+    } catch (error) {
+      console.error("[salary] Redis write failed. Continuing.", error);
+    }
+
+    return jsonResponse(payload);
   } catch (error) {
     return NextResponse.json(
       {

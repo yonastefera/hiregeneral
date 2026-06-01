@@ -10,6 +10,9 @@ type JobDetailsPageData = {
   related: Job[];
 };
 
+const JOB_DETAIL_REVALIDATE_SECONDS = 600; // 10 minutes
+const RELATED_JOBS_REVALIDATE_SECONDS = 1800; // 30 minutes
+
 async function getBaseUrl() {
   const headersList = await headers();
 
@@ -31,7 +34,10 @@ async function fetchJob(jobId: string) {
 
   try {
     const response = await fetch(`${baseUrl}/api/jobs/${jobId}`, {
-      next: { revalidate: 3600 },
+      next: {
+        // Public job detail data is mostly stable, but expiration/status can change.
+        revalidate: JOB_DETAIL_REVALIDATE_SECONDS,
+      },
     });
 
     if (!response.ok) return null;
@@ -44,12 +50,8 @@ async function fetchJob(jobId: string) {
   }
 }
 
-async function fetchRelatedJobs(job: Job, jobId: string) {
-  const baseUrl = await getBaseUrl();
-
-  if (!baseUrl) return [];
-
-  const searches = [
+function buildRelatedSearches(job: Job) {
+  return [
     job.category
       ? new URLSearchParams({
           category: job.category,
@@ -68,11 +70,22 @@ async function fetchRelatedJobs(job: Job, jobId: string) {
       excludeId: job.id,
     }),
   ].filter((params): params is URLSearchParams => Boolean(params));
+}
+
+async function fetchRelatedJobs(job: Job, jobId: string) {
+  const baseUrl = await getBaseUrl();
+
+  if (!baseUrl) return [];
+
+  const searches = buildRelatedSearches(job);
 
   for (const params of searches) {
     try {
       const response = await fetch(`${baseUrl}/api/jobs?${params.toString()}`, {
-        next: { revalidate: 3600 },
+        next: {
+          // Related jobs can be slightly less fresh than the main job detail.
+          revalidate: RELATED_JOBS_REVALIDATE_SECONDS,
+        },
       });
 
       if (!response.ok) continue;

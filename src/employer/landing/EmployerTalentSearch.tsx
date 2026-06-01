@@ -59,7 +59,7 @@ export function EmployerTalentSearch() {
       : location.trim();
 
     if (nextKeyword) {
-      params.set("q", nextKeyword);
+      params.set("query", nextKeyword);
     }
 
     if (nextLocation) {

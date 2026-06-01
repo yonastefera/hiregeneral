@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+
+import { redis } from "@/lib/rate-limit";
 import {
   JOB_ENRICHMENT_SELECT,
   mapJobEnrichments,
@@ -18,6 +20,10 @@ const MIN_BROWSE_CANDIDATE_JOBS = 600;
 const NEW_JOBS_WINDOW_DAYS = 7;
 const DEFAULT_COMPANY_BALANCE = "company";
 const DEFAULT_FRESHNESS_WINDOW_DAYS = 30;
+
+const JOBS_API_CACHE_VERSION = process.env.JOBS_API_CACHE_VERSION ?? "1";
+const JOBS_BROWSE_CACHE_TTL_SECONDS = 60 * 3; // 3 minutes
+const JOBS_KEYWORD_CACHE_TTL_SECONDS = 60; // 1 minute
 
 const JOB_CANDIDATE_SELECT = `
   id,
@@ -109,6 +115,97 @@ type JobDetailRow = Pick<
   JobRow,
   "id" | "description" | "responsibilities" | "requirements" | "benefits"
 >;
+
+type DiverseBrowseRpcRow = Omit<JobCandidateRow, "job_applicant_counts"> & {
+  applicant_count: number | null;
+  total_count: number | string | null;
+  new_jobs_count: number | string | null;
+};
+
+type JobsApiPayload = {
+  data: unknown[];
+  total: number;
+  newJobs: number;
+  newJobsWindowDays: number;
+  balance: "company" | "none";
+  seed: string | null;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
+function toCount(value: number | string | null | undefined): number {
+  if (typeof value === "number") return value;
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
+}
+
+function normalizeCachePart(value: string | number | null | undefined) {
+  return String(value ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function getJobsApiCacheKey(params: {
+  mode: "browse" | "keyword";
+  query: string;
+  location: string;
+  daysAgo: number;
+  page: number;
+  pageSize: number;
+  distance: string;
+}) {
+  return [
+    "jobs-api",
+    JOBS_API_CACHE_VERSION,
+    params.mode,
+    `q:${normalizeCachePart(params.query)}`,
+    `loc:${normalizeCachePart(params.location)}`,
+    `days:${params.daysAgo}`,
+    `distance:${normalizeCachePart(params.distance)}`,
+    `page:${params.page}`,
+    `size:${params.pageSize}`,
+  ].join(":");
+}
+
+function jobsJsonResponse(payload: JobsApiPayload, ttlSeconds: number) {
+  return NextResponse.json(payload, {
+    headers: {
+      "Cache-Control": `public, s-maxage=${ttlSeconds}, stale-while-revalidate=${
+        ttlSeconds * 10
+      }`,
+    },
+  });
+}
+
+async function readJobsCache(cacheKey: string) {
+  try {
+    return await redis.get<JobsApiPayload>(cacheKey);
+  } catch (error) {
+    console.error("[GET /api/jobs] Redis read failed. Continuing.", error);
+    return null;
+  }
+}
+
+async function writeJobsCache(
+  cacheKey: string,
+  payload: JobsApiPayload,
+  ttlSeconds: number,
+) {
+  try {
+    await redis.set(cacheKey, payload, {
+      ex: ttlSeconds,
+    });
+  } catch (error) {
+    console.error("[GET /api/jobs] Redis write failed. Continuing.", error);
+  }
+}
 
 function stripHtml(input: string | null | undefined) {
   if (!input) return "";
@@ -382,7 +479,10 @@ function buildJobSearchFilter(query: string, categories: string[]) {
 
   for (const term of terms) {
     const escaped = escapeIlikeValue(term);
-    for (const column of searchableColumns) {
+    const columns =
+      term === normalized ? ["title", ...searchableColumns] : searchableColumns;
+
+    for (const column of columns) {
       filters.push(`${column}.ilike.%${escaped}%`);
     }
   }
@@ -412,6 +512,9 @@ function expandedSearchRank<
   const title = job.title.toLowerCase();
   const company = job.company_name.toLowerCase();
   const category = job.category?.toLowerCase() ?? "";
+  const titleTokenMatches = tokens.filter((token) =>
+    title.includes(token),
+  ).length;
   const skillsText = Array.isArray(job.skills)
     ? job.skills.join(" ").toLowerCase()
     : "";
@@ -419,31 +522,39 @@ function expandedSearchRank<
   if (title === normalizedQuery) return 0;
   if (title.startsWith(normalizedQuery)) return 1;
   if (title.includes(normalizedQuery)) return 2;
-
-  const titleTokenMatches = tokens.filter((token) =>
-    title.includes(token),
-  ).length;
-
   if (tokens.length > 0 && titleTokenMatches === tokens.length) return 3;
-  if (titleTokenMatches > 0) return 10 - titleTokenMatches;
+  if (tokens.length > 0 && titleTokenMatches > 0) return 20 - titleTokenMatches;
 
-  if (company.includes(normalizedQuery)) return 20;
+  if (company.includes(normalizedQuery)) return 40;
 
   const skillTokenMatches = tokens.filter((token) =>
     skillsText.includes(token),
   ).length;
 
-  if (skillTokenMatches > 0) return 30 - skillTokenMatches;
+  if (skillTokenMatches > 0) return 50 - skillTokenMatches;
 
   const categoryMatchIndex = categories.findIndex((item) =>
     category.includes(item.toLowerCase()),
   );
 
-  if (categoryMatchIndex >= 0) return 50 + categoryMatchIndex;
+  if (categoryMatchIndex >= 0) return 70 + categoryMatchIndex;
 
-  if (tokens.some((token) => category.includes(token))) return 60;
+  if (tokens.some((token) => category.includes(token))) return 80;
 
   return 100;
+}
+
+function titleStronglyMatchesQuery(job: { title: string }, query: string) {
+  const normalizedQuery = normalizeSearchTerm(query);
+  if (!normalizedQuery) return true;
+
+  const title = normalizeSearchTerm(job.title);
+  const tokens = getSearchTokens(normalizedQuery);
+
+  return (
+    title.includes(normalizedQuery) ||
+    (tokens.length > 0 && tokens.every((token) => title.includes(token)))
+  );
 }
 
 function jobSearchableText<
@@ -571,6 +682,31 @@ async function hydrateJobDetails(candidates: JobCandidateRow[]) {
   });
 }
 
+function toJobCandidateRows(rows: DiverseBrowseRpcRow[]) {
+  return rows
+    .filter((row) => typeof row.id === "string" && row.id.length > 0)
+    .map((row) => {
+      const {
+        applicant_count,
+        total_count: _totalCount,
+        new_jobs_count: _newJobsCount,
+        ...job
+      } = row;
+
+      void _totalCount;
+      void _newJobsCount;
+
+      return {
+        ...job,
+        job_applicant_counts: [
+          {
+            applicant_count: applicant_count ?? 0,
+          },
+        ],
+      } satisfies JobCandidateRow;
+    });
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = req.nextUrl;
@@ -578,6 +714,8 @@ export async function GET(req: NextRequest) {
     const query = searchParams.get("query") ?? "";
     const location = searchParams.get("location") ?? "";
     const daysAgo = Number(searchParams.get("daysAgo") ?? "3650");
+    const safeDaysAgo = Number.isFinite(daysAgo) ? daysAgo : 3650;
+    const distance = searchParams.get("distance") ?? "";
     const workMode = searchParams.get("workMode") ?? "";
     const employmentType = searchParams.get("employmentType") ?? "";
     const category = searchParams.get("category") ?? "";
@@ -587,8 +725,158 @@ export async function GET(req: NextRequest) {
     const loadMode = searchParams.get("loadMode") ?? "pool";
     const seed = searchParams.get("seed") ?? defaultBrowseSeed();
     const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
-    const pageSize = Math.min(25, Number(searchParams.get("pageSize") ?? "10"));
+    const pageSize = Math.min(
+      25,
+      Math.max(1, Number(searchParams.get("pageSize") ?? "20")),
+    );
+
+    const shouldUseDiverseBrowse =
+      loadMode === "diverse" &&
+      !query.trim() &&
+      !workMode &&
+      !employmentType &&
+      !category &&
+      !company.trim() &&
+      !excludeId;
+
+    const shouldUseKeywordSearchRpc =
+      loadMode === "pool" &&
+      query.trim().length > 0 &&
+      !workMode &&
+      !employmentType &&
+      !category &&
+      !company.trim() &&
+      !excludeId;
+
+    if (shouldUseDiverseBrowse) {
+      const cacheKey = getJobsApiCacheKey({
+        mode: "browse",
+        query,
+        location,
+        daysAgo: safeDaysAgo,
+        page,
+        pageSize,
+        distance,
+      });
+
+      const cached = await readJobsCache(cacheKey);
+
+      if (cached) {
+        return jobsJsonResponse(cached, JOBS_BROWSE_CACHE_TTL_SECONDS);
+      }
+
+      const { data: diverseRows, error: diverseError } =
+        await supabaseAdmin.rpc("search_jobs_diverse_browse", {
+          p_days_ago: safeDaysAgo,
+          p_location: location.trim() || null,
+          p_page: page,
+          p_page_size: pageSize,
+        });
+
+      if (diverseError) {
+        console.error(
+          "[GET /api/jobs] search_jobs_diverse_browse failed:",
+          diverseError,
+        );
+
+        return NextResponse.json(
+          {
+            error: "Failed to load jobs.",
+            details: diverseError,
+          },
+          { status: 500 },
+        );
+      }
+
+      const rows = (diverseRows ?? []) as DiverseBrowseRpcRow[];
+      const total = toCount(rows[0]?.total_count);
+      const newJobs = toCount(rows[0]?.new_jobs_count);
+      const pageCandidates = toJobCandidateRows(rows);
+      const pageJobs = await hydrateJobDetails(pageCandidates);
+
+      const payload: JobsApiPayload = {
+        data: pageJobs,
+        total,
+        newJobs,
+        newJobsWindowDays: NEW_JOBS_WINDOW_DAYS,
+        balance: "company",
+        seed: null,
+        page,
+        pageSize,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      };
+
+      await writeJobsCache(cacheKey, payload, JOBS_BROWSE_CACHE_TTL_SECONDS);
+
+      return jobsJsonResponse(payload, JOBS_BROWSE_CACHE_TTL_SECONDS);
+    }
+
+    if (shouldUseKeywordSearchRpc) {
+      const cacheKey = getJobsApiCacheKey({
+        mode: "keyword",
+        query,
+        location,
+        daysAgo: safeDaysAgo,
+        page,
+        pageSize,
+        distance,
+      });
+
+      const cached = await readJobsCache(cacheKey);
+
+      if (cached) {
+        return jobsJsonResponse(cached, JOBS_KEYWORD_CACHE_TTL_SECONDS);
+      }
+
+      const { data: keywordRows, error: keywordError } =
+        await supabaseAdmin.rpc("search_jobs_keyword_diverse", {
+          p_query: query.trim(),
+          p_days_ago: safeDaysAgo,
+          p_location: location.trim() || null,
+          p_page: page,
+          p_page_size: pageSize,
+        });
+
+      if (keywordError) {
+        console.error(
+          "[GET /api/jobs] search_jobs_keyword_diverse failed:",
+          keywordError,
+        );
+
+        return NextResponse.json(
+          {
+            error: "Failed to search jobs.",
+            details: keywordError,
+          },
+          { status: 500 },
+        );
+      }
+
+      const rows = (keywordRows ?? []) as DiverseBrowseRpcRow[];
+      const total = toCount(rows[0]?.total_count);
+      const newJobs = toCount(rows[0]?.new_jobs_count);
+      const pageCandidates = toJobCandidateRows(rows);
+      const pageJobs = await hydrateJobDetails(pageCandidates);
+
+      const payload: JobsApiPayload = {
+        data: pageJobs,
+        total,
+        newJobs,
+        newJobsWindowDays: NEW_JOBS_WINDOW_DAYS,
+        balance: "company",
+        seed: null,
+        page,
+        pageSize,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      };
+
+      await writeJobsCache(cacheKey, payload, JOBS_KEYWORD_CACHE_TTL_SECONDS);
+
+      return jobsJsonResponse(payload, JOBS_KEYWORD_CACHE_TTL_SECONDS);
+    }
+
     const keywordCategories = await getKeywordCategories(query);
+
     const shouldBalanceByCompany = shouldBalanceCompanyResults({
       query,
       location,
@@ -616,7 +904,7 @@ export async function GET(req: NextRequest) {
       .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
       .gte(
         "posted_at",
-        new Date(Date.now() - daysAgo * 86_400_000).toISOString(),
+        new Date(Date.now() - safeDaysAgo * 86_400_000).toISOString(),
       )
       .order("posted_at", { ascending: false });
 
@@ -695,7 +983,16 @@ export async function GET(req: NextRequest) {
     const displayCandidates = shouldBalanceByCompany
       ? balanceJobsByCompany(broadBrowseCandidates)
       : query.trim()
-        ? balanceJobsByCompany(rankedCandidates)
+        ? [
+            ...rankedCandidates.filter((job) =>
+              titleStronglyMatchesQuery(job, query),
+            ),
+            ...balanceJobsByCompany(
+              rankedCandidates.filter(
+                (job) => !titleStronglyMatchesQuery(job, query),
+              ),
+            ),
+          ]
         : rankedCandidates;
 
     const total = query.trim()
@@ -713,7 +1010,7 @@ export async function GET(req: NextRequest) {
       const loc = locationSearchTerm(location);
       const newestAllowedDate = new Date(
         Math.max(
-          Date.now() - daysAgo * 86_400_000,
+          Date.now() - safeDaysAgo * 86_400_000,
           Date.now() - NEW_JOBS_WINDOW_DAYS * 86_400_000,
         ),
       ).toISOString();

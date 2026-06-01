@@ -23,7 +23,7 @@ const fallbackCompanies: HiringCompany[] = featuredCompanies.map((company) => ({
 
 function companyJobsHref(companyName: string) {
   const params = new URLSearchParams({
-    q: companyName,
+    query: companyName,
   });
 
   return `/jobs?${params.toString()}`;
@@ -76,7 +76,7 @@ export function EmployerMarketplace({ companies }: EmployerMarketplaceProps) {
               className="group relative rounded-3xl border border-black/5 bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:-translate-y-1 hover:shadow-[0_24px_70px_-24px_rgba(20,30,50,0.24)]"
             >
               <div
-                className={`absolute inset-x-0 top-0 h-24 rounded-t-3xl bg-gradient-to-br ${company.accent} opacity-60`}
+                className={`absolute inset-x-0 top-0 h-24 rounded-t-3xl bg-linear-to-br ${company.accent} opacity-60`}
               />
 
               <div className="relative flex items-start justify-between">

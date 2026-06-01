@@ -1,9 +1,11 @@
 import "server-only";
 
+import { redis } from "@/lib/rate-limit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
-const ONE_DAY_MS = 86_400_000;
-const MAX_COMPANY_ROWS = 5000;
+const HIRING_COMPANIES_CACHE_TTL_SECONDS = 60 * 30; // 30 minutes
+const HIRING_COMPANIES_CACHE_VERSION =
+  process.env.HIRING_COMPANIES_CACHE_VERSION ?? "1";
 
 const accents = [
   "from-[oklch(0.92_0.08_80)] to-[oklch(0.86_0.12_45)]",
@@ -14,14 +16,15 @@ const accents = [
   "from-[oklch(0.91_0.08_130)] to-[oklch(0.84_0.12_155)]",
 ];
 
-type CompanyJobRow = {
+type HiringCompanyRpcRow = {
   company_name: string | null;
   company_logo_url: string | null;
   company_size: string | null;
   company_website: string | null;
-  category: string | null;
-  work_mode: string | null;
-  posted_at: string | null;
+  industry: string | null;
+  roles: number | string | null;
+  new_roles: number | string | null;
+  has_remote: boolean | null;
 };
 
 export type HiringCompany = {
@@ -36,101 +39,97 @@ export type HiringCompany = {
   website: string | null;
 };
 
-function mostCommon(values: Array<string | null | undefined>) {
-  const counts = new Map<string, number>();
-
-  for (const value of values) {
-    const normalized = value?.trim();
-
-    if (!normalized) continue;
-
-    counts.set(normalized, (counts.get(normalized) ?? 0) + 1);
-  }
-
-  return (
-    [...counts.entries()].sort(
-      (a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
-    )[0]?.[0] ?? null
-  );
+function getHiringCompaniesCacheKey(limit: number) {
+  return `hiring-companies:${HIRING_COMPANIES_CACHE_VERSION}:limit:${limit}`;
 }
 
-function companyTag(params: { newRoles: number; workModes: string[] }) {
-  const hasRemote = params.workModes.some((mode) =>
-    mode.toLowerCase().includes("remote"),
-  );
+function toCount(value: number | string | null | undefined) {
+  if (typeof value === "number") return value;
 
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
+}
+
+function cleanText(value: string | null | undefined) {
+  return value?.trim().replace(/\s+/g, " ") || null;
+}
+
+function companyTag(params: { newRoles: number; hasRemote: boolean }) {
   if (params.newRoles >= 10) return "Hiring fast";
   if (params.newRoles > 0) return `${params.newRoles} new this week`;
-  if (hasRemote) return "Remote friendly";
+  if (params.hasRemote) return "Remote friendly";
 
   return "Actively hiring";
 }
 
-export async function getHiringCompaniesThisWeek(limit = 6) {
-  const supabase = createSupabaseAdminClient();
-  const now = new Date();
-  const weekStart = new Date(now.getTime() - 7 * ONE_DAY_MS);
+function toHiringCompany(
+  row: HiringCompanyRpcRow,
+  index: number,
+): HiringCompany | null {
+  const name = cleanText(row.company_name);
 
-  const { data, error } = await supabase
-    .from("jobs")
-    .select(
-      "company_name, company_logo_url, company_size, company_website, category, work_mode, posted_at",
-    )
-    .eq("status", "published")
-    .or(`expires_at.is.null,expires_at.gt.${now.toISOString()}`)
-    .limit(MAX_COMPANY_ROWS);
+  if (!name) return null;
+
+  const roles = toCount(row.roles);
+  const newRoles = toCount(row.new_roles);
+  const hasRemote = Boolean(row.has_remote);
+
+  return {
+    name,
+    industry: cleanText(row.industry) ?? "Hiring",
+    roles,
+    newRoles,
+    size: cleanText(row.company_size) ?? "Growing",
+    tag: companyTag({ newRoles, hasRemote }),
+    accent: accents[index % accents.length],
+    logoUrl: cleanText(row.company_logo_url),
+    website: cleanText(row.company_website),
+  };
+}
+
+async function loadHiringCompaniesThisWeek(limit: number) {
+  const supabase = createSupabaseAdminClient();
+
+  const { data, error } = await supabase.rpc("get_hiring_companies_this_week", {
+    p_limit: limit,
+  });
 
   if (error) {
     throw new Error(`Could not load hiring companies: ${error.message}`);
   }
 
-  const groups = new Map<string, CompanyJobRow[]>();
+  return ((data ?? []) as HiringCompanyRpcRow[])
+    .map(toHiringCompany)
+    .filter((company): company is HiringCompany => Boolean(company));
+}
 
-  for (const row of (data ?? []) as CompanyJobRow[]) {
-    const companyName = row.company_name?.trim();
+export async function getHiringCompaniesThisWeek(limit = 6) {
+  const safeLimit = Math.min(Math.max(limit, 1), 12);
+  const cacheKey = getHiringCompaniesCacheKey(safeLimit);
 
-    if (!companyName) continue;
+  try {
+    const cached = await redis.get<HiringCompany[]>(cacheKey);
 
-    const existing = groups.get(companyName);
-
-    if (existing) {
-      existing.push(row);
-    } else {
-      groups.set(companyName, [row]);
+    if (cached) {
+      return cached;
     }
+  } catch (error) {
+    console.error("[hiring-this-week] Redis read failed. Continuing.", error);
   }
 
-  return [...groups.entries()]
-    .map(([name, rows], index): HiringCompany => {
-      const newRoles = rows.filter((row) => {
-        const postedAt = row.posted_at ? new Date(row.posted_at).getTime() : 0;
+  const companies = await loadHiringCompaniesThisWeek(safeLimit);
 
-        return Number.isFinite(postedAt) && postedAt >= weekStart.getTime();
-      }).length;
+  try {
+    await redis.set(cacheKey, companies, {
+      ex: HIRING_COMPANIES_CACHE_TTL_SECONDS,
+    });
+  } catch (error) {
+    console.error("[hiring-this-week] Redis write failed. Continuing.", error);
+  }
 
-      const industry = mostCommon(rows.map((row) => row.category)) ?? "Hiring";
-      const size = mostCommon(rows.map((row) => row.company_size)) ?? "Growing";
-      const workModes = rows
-        .map((row) => row.work_mode?.trim())
-        .filter(Boolean) as string[];
-
-      return {
-        name,
-        industry,
-        roles: rows.length,
-        newRoles,
-        size,
-        tag: companyTag({ newRoles, workModes }),
-        accent: accents[index % accents.length],
-        logoUrl: mostCommon(rows.map((row) => row.company_logo_url)),
-        website: mostCommon(rows.map((row) => row.company_website)),
-      };
-    })
-    .sort(
-      (a, b) =>
-        b.newRoles - a.newRoles ||
-        b.roles - a.roles ||
-        a.name.localeCompare(b.name),
-    )
-    .slice(0, limit);
+  return companies;
 }

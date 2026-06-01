@@ -28,6 +28,10 @@ function normalizeQuery(value: string | null) {
   return value?.trim().replace(/\s+/g, " ") ?? "";
 }
 
+function getKeywordCacheKey(query: string) {
+  return `keyword-suggestions:${KEYWORD_CACHE_VERSION}:${query.toLowerCase()}`;
+}
+
 function toSuggestion(row: KeywordSuggestionRow): KeywordSuggestion {
   return {
     id: row.id,
@@ -54,7 +58,7 @@ export async function GET(request: Request) {
     return jsonResponse({ suggestions: [] });
   }
 
-  const cacheKey = `keyword-suggestions:${KEYWORD_CACHE_VERSION}:${query.toLowerCase()}`;
+  const cacheKey = getKeywordCacheKey(query);
 
   try {
     const cached = await redis.get<KeywordSuggestionsPayload>(cacheKey);

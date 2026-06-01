@@ -24,6 +24,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  productionBrowserSourceMaps: false,
   devIndicators: false,
   images: {
     remotePatterns: [

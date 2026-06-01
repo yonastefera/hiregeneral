@@ -192,9 +192,7 @@ export default function SalariesPage() {
         params.set("location", trimmedLocation);
       }
 
-      const response = await fetch(`/api/salaries?${params.toString()}`, {
-        cache: "no-store",
-      });
+      const response = await fetch(`/api/salaries?${params.toString()}`);
 
       const body = (await response.json()) as SalaryResponse;
 

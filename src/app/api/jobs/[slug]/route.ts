@@ -1,7 +1,7 @@
-// app/api/jobs/[slug]/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+
+import { redis } from "@/lib/rate-limit";
 import { htmlToText, cleanTextArray } from "@/lib/text/html";
 import { JOB_ENRICHMENT_SELECT, mapJobEnrichment } from "@/lib/jobs/enrichment";
 
@@ -12,6 +12,9 @@ const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
+
+const JOB_DETAIL_CACHE_TTL_SECONDS = 60 * 10; // 10 minutes
+const JOB_DETAIL_CACHE_VERSION = process.env.JOB_DETAIL_CACHE_VERSION ?? "1";
 
 type JobApplicantCountRow = {
   applicant_count: number | null;
@@ -54,10 +57,35 @@ type JobRow = {
   job_applicant_counts?: JobApplicantCountRow[] | null;
 };
 
+type JobDetailPayload = Omit<JobRow, "job_applicant_counts"> & {
+  title: string;
+  description: string;
+  company_tagline: string | null;
+  responsibilities: string[];
+  requirements: string[];
+  benefits: string[];
+  skills: string[];
+  applicant_count: number;
+  enrichment: ReturnType<typeof mapJobEnrichment>;
+};
+
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
   );
+}
+
+function getJobDetailCacheKey(slug: string) {
+  return `job-detail:${JOB_DETAIL_CACHE_VERSION}:${slug.toLowerCase()}`;
+}
+
+function jsonResponse(payload: JobDetailPayload, status = 200) {
+  return NextResponse.json(payload, {
+    status,
+    headers: {
+      "Cache-Control": "public, s-maxage=300, stale-while-revalidate=3600",
+    },
+  });
 }
 
 async function loadJobEnrichment(jobId: string) {
@@ -77,7 +105,7 @@ async function loadJobEnrichment(jobId: string) {
   return mapJobEnrichment(data);
 }
 
-async function cleanJob(job: JobRow) {
+async function cleanJob(job: JobRow): Promise<JobDetailPayload> {
   const { job_applicant_counts, ...rest } = job;
   const enrichment = await loadJobEnrichment(rest.id);
 
@@ -103,9 +131,22 @@ export async function GET(
 ) {
   try {
     const { slug } = await context.params;
+    const normalizedSlug = slug?.trim();
 
-    if (!slug) {
+    if (!normalizedSlug) {
       return NextResponse.json({ error: "Missing job slug" }, { status: 400 });
+    }
+
+    const cacheKey = getJobDetailCacheKey(normalizedSlug);
+
+    try {
+      const cached = await redis.get<JobDetailPayload>(cacheKey);
+
+      if (cached) {
+        return jsonResponse(cached);
+      }
+    } catch (error) {
+      console.error("[GET /api/jobs/[slug]] Redis read failed:", error);
     }
 
     let query = supabaseAdmin
@@ -151,9 +192,9 @@ export async function GET(
       .eq("status", "published")
       .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
 
-    query = isUuid(slug)
-      ? query.or(`slug.eq.${slug},id.eq.${slug}`)
-      : query.eq("slug", slug);
+    query = isUuid(normalizedSlug)
+      ? query.or(`slug.eq.${normalizedSlug},id.eq.${normalizedSlug}`)
+      : query.eq("slug", normalizedSlug);
 
     const { data, error } = await query.maybeSingle();
 
@@ -164,10 +205,29 @@ export async function GET(
     }
 
     if (!data) {
-      return NextResponse.json({ error: "Job not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Job not found" },
+        {
+          status: 404,
+          headers: {
+            // Briefly cache 404s to reduce repeated misses, but not too long.
+            "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+          },
+        },
+      );
     }
 
-    return NextResponse.json(await cleanJob(data as JobRow));
+    const payload = await cleanJob(data as JobRow);
+
+    try {
+      await redis.set(cacheKey, payload, {
+        ex: JOB_DETAIL_CACHE_TTL_SECONDS,
+      });
+    } catch (error) {
+      console.error("[GET /api/jobs/[slug]] Redis write failed:", error);
+    }
+
+    return jsonResponse(payload);
   } catch (error) {
     console.error("[GET /api/jobs/[slug]] Fatal error:", error);
 

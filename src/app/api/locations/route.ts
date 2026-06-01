@@ -26,6 +26,7 @@ type LocationSearchPayload = {
 };
 
 const LOCATION_CACHE_TTL_SECONDS = 60 * 60 * 24 * 7;
+const LOCATION_CACHE_VERSION = process.env.LOCATION_CACHE_VERSION ?? "6";
 
 function normalizeQuery(value: string | null) {
   return value?.trim().replace(/\s+/g, " ") ?? "";
@@ -33,6 +34,10 @@ function normalizeQuery(value: string | null) {
 
 function cleanText(value: string | null | undefined) {
   return value?.trim().replace(/\s+/g, " ") ?? "";
+}
+
+function getLocationCacheKey(query: string) {
+  return `locations:${LOCATION_CACHE_VERSION}:${query.toLowerCase()}`;
 }
 
 function getClientIdentifier(request: Request) {
@@ -101,13 +106,22 @@ export async function GET(request: Request) {
     return jsonResponse({ locations: [] });
   }
 
-  /*
-   * Bump this whenever location label formatting changes.
-   * Old malformed Redis entries may otherwise keep showing.
-   */
-  const LOCATION_CACHE_VERSION = process.env.LOCATION_CACHE_VERSION ?? "6";
+  const cacheKey = getLocationCacheKey(query);
 
-  const cacheKey = `locations:${LOCATION_CACHE_VERSION}:${query.toLowerCase()}`;
+  /**
+   * Read Redis before rate limiting.
+   * Cached public autocomplete responses should return fast without spending
+   * an additional rate-limit operation.
+   */
+  try {
+    const cached = await redis.get<LocationSearchPayload>(cacheKey);
+
+    if (cached) {
+      return jsonResponse(cached);
+    }
+  } catch (error) {
+    console.error("[locations] Redis cache read failed. Continuing.", error);
+  }
 
   try {
     const identifier = getClientIdentifier(request);
@@ -134,16 +148,6 @@ export async function GET(request: Request) {
       "[locations] Rate limit failed. Continuing without it.",
       error,
     );
-  }
-
-  try {
-    const cached = await redis.get<LocationSearchPayload>(cacheKey);
-
-    if (cached) {
-      return jsonResponse(cached);
-    }
-  } catch (error) {
-    console.error("[locations] Redis cache read failed. Continuing.", error);
   }
 
   const supabase = await createClient();

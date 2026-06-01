@@ -8,7 +8,7 @@ import {
 
 const HIGHLIGHTED_JOBS_PAGE = "1";
 const HIGHLIGHTED_JOBS_PAGE_SIZE = "4";
-const HIGHLIGHTED_JOBS_LOOKBACK_DAYS = "3650";
+const HIGHLIGHTED_JOBS_LOOKBACK_DAYS = "30";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ??
@@ -28,11 +28,14 @@ export async function getIndexPageData(): Promise<{
 
   try {
     const seed = `home:${new Date().toISOString().slice(0, 13)}`;
+
     const params = new URLSearchParams({
       page: HIGHLIGHTED_JOBS_PAGE,
       pageSize: HIGHLIGHTED_JOBS_PAGE_SIZE,
       daysAgo: HIGHLIGHTED_JOBS_LOOKBACK_DAYS,
       seed,
+      loadMode: "diverse",
+      balance: "company",
     });
 
     const [jobsResult, insights] = await Promise.all([

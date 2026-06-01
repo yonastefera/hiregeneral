@@ -45,11 +45,11 @@ async function getInitialJobsData(
     const params = buildJobsApiParams(state);
 
     const response = await fetch(`${baseUrl}/api/jobs?${params.toString()}`, {
-      /**
-       * Keep this no-store for now because your job search filters are dynamic.
-       * Later, we can add revalidate/cache rules for empty browse pages.
-       */
-      cache: "no-store",
+      next: {
+        // Keyword search is more intent-specific, so cache it briefly.
+        // Browse/location pages can be cached slightly longer.
+        revalidate: state.query.trim() ? 60 : 180,
+      },
     });
 
     const body = (await response.json().catch(() => null)) as

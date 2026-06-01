@@ -1,6 +1,6 @@
 import type { Job } from "@/lib/db/types";
 
-export const DEFAULT_POSTED = "3650";
+export const DEFAULT_POSTED = "60";
 export const DEFAULT_DISTANCE = "100";
 export const PAGE_SIZE = 20;
 export const SEARCH_DEBOUNCE_MS = 300;
@@ -34,7 +34,8 @@ export const postedOptions = [
   { value: "7", label: "Last 7 days" },
   { value: "14", label: "Last 14 days" },
   { value: "30", label: "Last 30 days" },
-  { value: DEFAULT_POSTED, label: "Any time" },
+  { value: DEFAULT_POSTED, label: "Last 60 days" },
+  { value: "3650", label: "Any time" },
 ] as const;
 
 export const distanceOptions = [
@@ -86,20 +87,20 @@ export function parseJobsSearchParams(
 export function buildJobsApiParams(state: JobsSearchState) {
   const query = state.query.trim();
   const location = state.location.trim();
+  const hasKeywordSearch = query.length > 0;
 
   const params = new URLSearchParams({
     page: String(state.page),
     pageSize: String(PAGE_SIZE),
     daysAgo: state.dateFilter,
     distance: state.distance,
+
+    loadMode: hasKeywordSearch ? "pool" : "diverse",
+    balance: "company",
   });
 
-  if (query) {
+  if (hasKeywordSearch) {
     params.set("query", query);
-    params.set("loadMode", "pool");
-  } else {
-    params.set("loadMode", "page");
-    params.set("balance", "none");
   }
 
   if (location) {
