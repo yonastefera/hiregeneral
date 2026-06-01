@@ -50,6 +50,12 @@ function expectedAuthHeaders() {
     .map((secret) => `Bearer ${secret}`);
 }
 
+function isVercelCronRequest(request: Request) {
+  return (
+    process.env.VERCEL === "1" && request.headers.get("x-vercel-cron") === "1"
+  );
+}
+
 function metadataNumber(
   metadata: Record<string, unknown> | undefined,
   key: string,
@@ -77,6 +83,7 @@ async function runJobsIngestion(request: Request) {
   try {
     const missing = missingEnvVars();
     const authHeaders = expectedAuthHeaders();
+    const isCronRequest = isVercelCronRequest(request);
 
     if (missing.length > 0) {
       return NextResponse.json(
@@ -88,7 +95,7 @@ async function runJobsIngestion(request: Request) {
       );
     }
 
-    if (authHeaders.length === 0) {
+    if (authHeaders.length === 0 && !isCronRequest) {
       return NextResponse.json(
         {
           ok: false,
@@ -99,8 +106,10 @@ async function runJobsIngestion(request: Request) {
     }
 
     const authHeader = request.headers.get("authorization");
+    const isAuthorizedBySecret = authHeaders.includes(authHeader ?? "");
+    const isAuthorizedByCron = isCronRequest;
 
-    if (!authHeaders.includes(authHeader ?? "")) {
+    if (!isAuthorizedBySecret && !isAuthorizedByCron) {
       return NextResponse.json(
         {
           ok: false,
@@ -182,6 +191,7 @@ async function runJobsIngestion(request: Request) {
         } finally {
           clearTimeout(timeout);
         }
+
         const validation = validateImportedJobs(rawJobs);
 
         sourceResult.fetchedJobs = rawJobs.length;
