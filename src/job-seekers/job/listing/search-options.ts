@@ -84,6 +84,9 @@ export function parseJobsSearchParams(
 }
 
 export function buildJobsApiParams(state: JobsSearchState) {
+  const query = state.query.trim();
+  const location = state.location.trim();
+
   const params = new URLSearchParams({
     page: String(state.page),
     pageSize: String(PAGE_SIZE),
@@ -91,12 +94,16 @@ export function buildJobsApiParams(state: JobsSearchState) {
     distance: state.distance,
   });
 
-  if (state.query.trim()) {
-    params.set("query", state.query.trim());
+  if (query) {
+    params.set("query", query);
+    params.set("loadMode", "pool");
+  } else {
+    params.set("loadMode", "page");
+    params.set("balance", "none");
   }
 
-  if (state.location.trim()) {
-    params.set("location", state.location.trim());
+  if (location) {
+    params.set("location", location);
   }
 
   return params;
