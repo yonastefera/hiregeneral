@@ -18,6 +18,7 @@ import {
   buildJobsUrlParams,
   DEFAULT_DISTANCE,
   DEFAULT_POSTED,
+  DEFAULT_WORK_MODE,
   PAGE_SIZE,
   type JobsPageData,
   type JobsSearchState,
@@ -71,7 +72,9 @@ export function JobsResultsList({ state, data }: JobsResultsListProps) {
   const hasActiveFilters =
     Boolean(state.query || state.location) ||
     state.dateFilter !== DEFAULT_POSTED ||
-    state.distance !== DEFAULT_DISTANCE;
+    state.distance !== DEFAULT_DISTANCE ||
+    state.workMode !== DEFAULT_WORK_MODE ||
+    state.easyApply;
 
   const pageNumbers = getPageNumbers(currentPage, totalPages);
   const currentHref = getJobsHref(state);

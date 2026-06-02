@@ -2,6 +2,7 @@ import type { Job } from "@/lib/db/types";
 
 export const DEFAULT_POSTED = "60";
 export const DEFAULT_DISTANCE = "100";
+export const DEFAULT_WORK_MODE = "";
 export const PAGE_SIZE = 20;
 export const SEARCH_DEBOUNCE_MS = 300;
 
@@ -10,6 +11,8 @@ export type JobsSearchState = {
   location: string;
   dateFilter: string;
   distance: string;
+  workMode: string;
+  easyApply: boolean;
   page: number;
 };
 
@@ -46,6 +49,13 @@ export const distanceOptions = [
   { value: DEFAULT_DISTANCE, label: "Within 100 miles" },
 ] as const;
 
+export const workModeOptions = [
+  { value: DEFAULT_WORK_MODE, label: "Any setting" },
+  { value: "Remote", label: "Remote" },
+  { value: "Hybrid", label: "Hybrid" },
+  { value: "On-site", label: "Onsite" },
+] as const;
+
 export function getValidPage(value: string | null | undefined) {
   const parsed = Number(value);
 
@@ -80,6 +90,8 @@ export function parseJobsSearchParams(
     location: getSearchParamValue(searchParams.location),
     dateFilter: getSearchParamValue(searchParams.posted, DEFAULT_POSTED),
     distance: getSearchParamValue(searchParams.distance, DEFAULT_DISTANCE),
+    workMode: getSearchParamValue(searchParams.workMode, DEFAULT_WORK_MODE),
+    easyApply: getSearchParamValue(searchParams.easyApply) === "1",
     page: getValidPage(getSearchParamValue(searchParams.page, "1")),
   };
 }
@@ -107,6 +119,14 @@ export function buildJobsApiParams(state: JobsSearchState) {
     params.set("location", location);
   }
 
+  if (state.workMode) {
+    params.set("workMode", state.workMode);
+  }
+
+  if (state.easyApply) {
+    params.set("easyApply", "1");
+  }
+
   return params;
 }
 
@@ -127,6 +147,14 @@ export function buildJobsUrlParams(state: JobsSearchState) {
 
   if (state.distance !== DEFAULT_DISTANCE) {
     params.set("distance", state.distance);
+  }
+
+  if (state.workMode) {
+    params.set("workMode", state.workMode);
+  }
+
+  if (state.easyApply) {
+    params.set("easyApply", "1");
   }
 
   if (state.page > 1) {

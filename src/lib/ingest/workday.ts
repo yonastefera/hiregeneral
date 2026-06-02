@@ -20,6 +20,7 @@ import type { JobSourceAdapter } from "./source";
 const PAGE_SIZE = 20;
 const MAX_PAGES = 10;
 const DETAIL_CONCURRENCY = 5;
+const MAX_POSTINGS = 80;
 const SEARCH_RETRY_DELAYS_MS = [500, 1500];
 
 type WorkdaySearchPosting = {
@@ -63,6 +64,8 @@ type WorkdayConfig = {
   site: string;
   sourceSlug: string;
   appliedFacets: Record<string, string[]>;
+  detailConcurrency: number;
+  maxPostings: number;
 };
 
 type WorkdaySearchHttpResponse = {
@@ -161,6 +164,17 @@ function workdayConfig(source: JobSource): WorkdayConfig {
     site,
     sourceSlug: source.sourceSlug,
     appliedFacets: metadataStringArrayMap(source, "appliedFacets"),
+    detailConcurrency: Math.min(
+      Math.max(
+        metadataNumber(source, "detailConcurrency") ?? DETAIL_CONCURRENCY,
+        1,
+      ),
+      10,
+    ),
+    maxPostings: Math.min(
+      Math.max(metadataNumber(source, "maxPostings") ?? MAX_POSTINGS, 1),
+      500,
+    ),
   };
 }
 
@@ -631,6 +645,9 @@ async function fetchWorkdayPostings(
 
       for (const posting of pagePostings) {
         postingsBySourceId.set(sourceId(config.sourceSlug, posting), posting);
+        if (postingsBySourceId.size >= config.maxPostings) {
+          return [...postingsBySourceId.values()];
+        }
       }
 
       if (pagePostings.length < config.pageSize) break;
@@ -687,7 +704,7 @@ export async function fetchWorkdayJobs(
 
   const detailedPostings = await mapWithConcurrency(
     postings,
-    DETAIL_CONCURRENCY,
+    config.detailConcurrency,
     async (posting) => ({
       posting,
       detail: await fetchWorkdayDetail(config, posting, context?.signal),

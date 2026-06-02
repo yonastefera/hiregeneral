@@ -7,6 +7,8 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   CalendarDays,
   ChevronDown,
+  CheckCircle2,
+  Laptop,
   MapPin,
   Search,
   SlidersHorizontal,
@@ -22,8 +24,10 @@ import {
   buildJobsUrlParams,
   DEFAULT_DISTANCE,
   DEFAULT_POSTED,
+  DEFAULT_WORK_MODE,
   distanceOptions,
   postedOptions,
+  workModeOptions,
   type JobsSearchState,
 } from "./search-options";
 
@@ -85,6 +89,10 @@ export default function JobsPageClient({
 
   const [dateFilter, setDateFilter] = useState(initialState.dateFilter);
   const [distance, setDistance] = useState(initialState.distance);
+  const [workMode, setWorkMode] = useState(
+    initialState.workMode ?? DEFAULT_WORK_MODE,
+  );
+  const [easyApply, setEasyApply] = useState(Boolean(initialState.easyApply));
 
   useEffect(() => {
     setQuery(initialState.query);
@@ -95,11 +103,15 @@ export default function JobsPageClient({
 
     setDateFilter(initialState.dateFilter);
     setDistance(initialState.distance);
+    setWorkMode(initialState.workMode ?? DEFAULT_WORK_MODE);
+    setEasyApply(Boolean(initialState.easyApply));
   }, [
     initialState.query,
     initialState.location,
     initialState.dateFilter,
     initialState.distance,
+    initialState.workMode,
+    initialState.easyApply,
   ]);
 
   const navigateToState = useCallback(
@@ -131,6 +143,8 @@ export default function JobsPageClient({
 
     setDateFilter(DEFAULT_POSTED);
     setDistance(DEFAULT_DISTANCE);
+    setWorkMode(DEFAULT_WORK_MODE);
+    setEasyApply(false);
 
     navigateToState(
       {
@@ -138,6 +152,8 @@ export default function JobsPageClient({
         location: "",
         dateFilter: DEFAULT_POSTED,
         distance: DEFAULT_DISTANCE,
+        workMode: DEFAULT_WORK_MODE,
+        easyApply: false,
         page: 1,
       },
       { scrollToTop: true },
@@ -157,6 +173,8 @@ export default function JobsPageClient({
         location: nextLocation,
         dateFilter,
         distance,
+        workMode,
+        easyApply,
         page: 1,
       },
       { scrollToTop: true },
@@ -172,6 +190,8 @@ export default function JobsPageClient({
         location: submittedLocation,
         dateFilter: nextDateFilter,
         distance,
+        workMode,
+        easyApply,
         page: 1,
       },
       { scrollToTop: true },
@@ -187,6 +207,42 @@ export default function JobsPageClient({
         location: submittedLocation,
         dateFilter,
         distance: nextDistance,
+        workMode,
+        easyApply,
+        page: 1,
+      },
+      { scrollToTop: true },
+    );
+  };
+
+  const updateWorkMode = (nextWorkMode: string) => {
+    setWorkMode(nextWorkMode);
+
+    navigateToState(
+      {
+        query: submittedQuery,
+        location: submittedLocation,
+        dateFilter,
+        distance,
+        workMode: nextWorkMode,
+        easyApply,
+        page: 1,
+      },
+      { scrollToTop: true },
+    );
+  };
+
+  const updateEasyApply = (nextEasyApply: boolean) => {
+    setEasyApply(nextEasyApply);
+
+    navigateToState(
+      {
+        query: submittedQuery,
+        location: submittedLocation,
+        dateFilter,
+        distance,
+        workMode,
+        easyApply: nextEasyApply,
         page: 1,
       },
       { scrollToTop: true },
@@ -196,7 +252,9 @@ export default function JobsPageClient({
   const hasActiveFilters =
     Boolean(query || location || submittedQuery || submittedLocation) ||
     dateFilter !== DEFAULT_POSTED ||
-    distance !== DEFAULT_DISTANCE;
+    distance !== DEFAULT_DISTANCE ||
+    workMode !== DEFAULT_WORK_MODE ||
+    easyApply;
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-background">
@@ -367,6 +425,47 @@ export default function JobsPageClient({
             />
           </div>
 
+          <label
+            htmlFor="work-mode-filter"
+            className="mt-6 block text-sm font-medium"
+          >
+            Work setting
+          </label>
+
+          <div className="relative mt-2">
+            <select
+              id="work-mode-filter"
+              value={workMode}
+              onChange={(event) => updateWorkMode(event.target.value)}
+              className="h-11 w-full appearance-none rounded-lg border border-input bg-background px-3 pr-9 text-sm transition-colors focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            >
+              {workModeOptions.map((option) => (
+                <option key={option.value || "any"} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+
+            <ChevronDown
+              aria-hidden="true"
+              className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-primary"
+            />
+          </div>
+
+          <label
+            htmlFor="easy-apply-filter"
+            className="mt-6 flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-input bg-background px-3 text-sm font-medium transition-colors hover:border-primary/40"
+          >
+            <input
+              id="easy-apply-filter"
+              type="checkbox"
+              checked={easyApply}
+              onChange={(event) => updateEasyApply(event.target.checked)}
+              className="size-4 rounded border-input text-primary focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            />
+            Easy apply
+          </label>
+
           <div className="mt-6 space-y-2 border-t border-border/60 pt-5 text-xs text-muted-foreground">
             <p className="flex items-center gap-2">
               <CalendarDays aria-hidden="true" className="size-3.5" />
@@ -379,6 +478,20 @@ export default function JobsPageClient({
               <MapPin aria-hidden="true" className="size-3.5" />
               {distance} mile radius
             </p>
+
+            {workMode && (
+              <p className="flex items-center gap-2">
+                <Laptop aria-hidden="true" className="size-3.5" />
+                {workMode}
+              </p>
+            )}
+
+            {easyApply && (
+              <p className="flex items-center gap-2">
+                <CheckCircle2 aria-hidden="true" className="size-3.5" />
+                Easy apply
+              </p>
+            )}
           </div>
         </aside>
 

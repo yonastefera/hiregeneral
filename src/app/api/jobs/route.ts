@@ -15,49 +15,18 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
-const MAX_CANDIDATE_JOBS = 5000;
-const MIN_BROWSE_CANDIDATE_JOBS = 600;
 const NEW_JOBS_WINDOW_DAYS = 7;
 const DEFAULT_COMPANY_BALANCE = "company";
-const DEFAULT_FRESHNESS_WINDOW_DAYS = 30;
+const DEFAULT_DAYS_AGO = 3650;
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 25;
+const EASY_APPLY_SCAN_PAGE_SIZE = 25;
+const EASY_APPLY_MAX_SCAN_PAGES = 40;
 
 const JOBS_API_CACHE_VERSION = process.env.JOBS_API_CACHE_VERSION ?? "1";
 const JOBS_BROWSE_CACHE_TTL_SECONDS = 60 * 3; // 3 minutes
-const JOBS_KEYWORD_CACHE_TTL_SECONDS = 60; // 1 minute
-
-const JOB_CANDIDATE_SELECT = `
-  id,
-  recruiter_id,
-  company_id,
-  company_name,
-  company_logo_url,
-  company_tagline,
-  company_size,
-  company_website,
-  title,
-  location,
-  latitude,
-  longitude,
-  employment_type,
-  work_mode,
-  experience_level,
-  category,
-  salary_min,
-  salary_max,
-  salary_currency,
-  skills,
-  status,
-  slug,
-  apply_url,
-  source_name,
-  source_id,
-  posted_at,
-  expires_at,
-  created_at,
-  updated_at,
-  description,
-  job_applicant_counts ( applicant_count )
-`;
+const JOBS_SEARCH_CACHE_TTL_SECONDS = 60; // 1 minute
+const JOBS_FILTER_CACHE_TTL_SECONDS = 60 * 2; // 2 minutes
 
 const JOB_DETAIL_SELECT = `
   id,
@@ -116,7 +85,7 @@ type JobDetailRow = Pick<
   "id" | "description" | "responsibilities" | "requirements" | "benefits"
 >;
 
-type DiverseBrowseRpcRow = Omit<JobCandidateRow, "job_applicant_counts"> & {
+type JobsPublicRpcRow = Omit<JobCandidateRow, "job_applicant_counts"> & {
   applicant_count: number | null;
   total_count: number | string | null;
   new_jobs_count: number | string | null;
@@ -145,6 +114,20 @@ function toCount(value: number | string | null | undefined): number {
   return 0;
 }
 
+function toPositiveInteger(
+  value: string | null,
+  fallback: number,
+  max?: number,
+) {
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return fallback;
+  }
+
+  return max ? Math.min(parsed, max) : parsed;
+}
+
 function normalizeCachePart(value: string | number | null | undefined) {
   return String(value ?? "")
     .trim()
@@ -152,22 +135,76 @@ function normalizeCachePart(value: string | number | null | undefined) {
     .toLowerCase();
 }
 
+function hasAnyAdvancedFilter(params: {
+  location: string;
+  workMode: string;
+  employmentType: string;
+  category: string;
+  company: string;
+  excludeId: string;
+  easyApply: boolean;
+}) {
+  return Boolean(
+    params.location.trim() ||
+    params.workMode ||
+    params.employmentType ||
+    params.category ||
+    params.company.trim() ||
+    params.excludeId ||
+    params.easyApply,
+  );
+}
+
+function cacheTtlForRequest(params: {
+  query: string;
+  location: string;
+  workMode: string;
+  employmentType: string;
+  category: string;
+  company: string;
+  excludeId: string;
+  easyApply: boolean;
+}) {
+  if (params.query.trim()) {
+    return JOBS_SEARCH_CACHE_TTL_SECONDS;
+  }
+
+  if (hasAnyAdvancedFilter(params)) {
+    return JOBS_FILTER_CACHE_TTL_SECONDS;
+  }
+
+  return JOBS_BROWSE_CACHE_TTL_SECONDS;
+}
+
 function getJobsApiCacheKey(params: {
-  mode: "browse" | "keyword";
   query: string;
   location: string;
   daysAgo: number;
+  workMode: string;
+  employmentType: string;
+  category: string;
+  company: string;
+  excludeId: string;
+  balance: string;
   page: number;
   pageSize: number;
   distance: string;
+  easyApply: boolean;
 }) {
   return [
     "jobs-api",
     JOBS_API_CACHE_VERSION,
-    params.mode,
+    "public",
     `q:${normalizeCachePart(params.query)}`,
     `loc:${normalizeCachePart(params.location)}`,
     `days:${params.daysAgo}`,
+    `work:${normalizeCachePart(params.workMode)}`,
+    `type:${normalizeCachePart(params.employmentType)}`,
+    `category:${normalizeCachePart(params.category)}`,
+    `company:${normalizeCachePart(params.company)}`,
+    `exclude:${normalizeCachePart(params.excludeId)}`,
+    `balance:${normalizeCachePart(params.balance)}`,
+    `easy:${params.easyApply ? "1" : "0"}`,
     `distance:${normalizeCachePart(params.distance)}`,
     `page:${params.page}`,
     `size:${params.pageSize}`,
@@ -241,401 +278,6 @@ function stripHtml(input: string | null | undefined) {
     .trim();
 }
 
-function seededHash(value: string) {
-  let hash = 2166136261;
-
-  for (let i = 0; i < value.length; i += 1) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-
-  return hash >>> 0;
-}
-
-function defaultBrowseSeed() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function freshnessTier(postedAt: string) {
-  const postedTime = new Date(postedAt).getTime();
-
-  if (Number.isNaN(postedTime)) return 3;
-
-  const ageDays = Math.floor((Date.now() - postedTime) / 86_400_000);
-
-  if (ageDays <= NEW_JOBS_WINDOW_DAYS) return 0;
-  if (ageDays <= DEFAULT_FRESHNESS_WINDOW_DAYS) return 1;
-
-  return 2;
-}
-
-function rotateBroadBrowseJobs<
-  T extends { id: string; company_name: string; posted_at: string },
->(jobs: T[], seed: string) {
-  return [...jobs].sort((a, b) => {
-    const freshnessDiff =
-      freshnessTier(a.posted_at) - freshnessTier(b.posted_at);
-
-    if (freshnessDiff !== 0) return freshnessDiff;
-
-    const companyDiff =
-      seededHash(`${seed}:company:${a.company_name.toLowerCase()}`) -
-      seededHash(`${seed}:company:${b.company_name.toLowerCase()}`);
-
-    if (companyDiff !== 0) return companyDiff;
-
-    return (
-      seededHash(`${seed}:job:${a.id}`) - seededHash(`${seed}:job:${b.id}`)
-    );
-  });
-}
-
-function balanceJobsByCompany<T extends { company_name: string }>(jobs: T[]) {
-  const groups = new Map<string, T[]>();
-  const order: string[] = [];
-
-  for (const job of jobs) {
-    const key = job.company_name.toLowerCase();
-    const group = groups.get(key);
-
-    if (group) {
-      group.push(job);
-    } else {
-      groups.set(key, [job]);
-      order.push(key);
-    }
-  }
-
-  const balanced: T[] = [];
-  let added = true;
-
-  while (added) {
-    added = false;
-
-    for (const key of order) {
-      const job = groups.get(key)?.shift();
-
-      if (job) {
-        balanced.push(job);
-        added = true;
-      }
-    }
-  }
-
-  return balanced;
-}
-
-function shouldBalanceCompanyResults(params: {
-  query: string;
-  location: string;
-  workMode: string;
-  employmentType: string;
-  category: string;
-  company: string;
-  excludeId: string;
-  balance: string;
-}) {
-  if (params.balance !== "company") return false;
-
-  const hasKeywordIntent = Boolean(params.query.trim());
-  const hasSpecificCompanyIntent = Boolean(params.company.trim());
-  const hasDetailIntent = Boolean(
-    params.workMode ||
-    params.employmentType ||
-    params.category ||
-    params.excludeId,
-  );
-
-  // Balance broad browsing searches, including location-only searches.
-  return !hasKeywordIntent && !hasSpecificCompanyIntent && !hasDetailIntent;
-}
-
-function candidateLimitForRequest(params: {
-  page: number;
-  pageSize: number;
-  shouldBalanceByCompany: boolean;
-}) {
-  if (!params.shouldBalanceByCompany) return MAX_CANDIDATE_JOBS;
-
-  return Math.min(
-    MAX_CANDIDATE_JOBS,
-    Math.max(MIN_BROWSE_CANDIDATE_JOBS, params.page * params.pageSize * 4),
-  );
-}
-
-function locationSearchTerm(value: string) {
-  return value
-    .split(",")
-    .map((part) => part.trim())
-    .find(Boolean);
-}
-
-function normalizeSearchTerm(value: string) {
-  return value.trim().replace(/\s+/g, " ").toLowerCase();
-}
-
-function escapeIlikeValue(value: string) {
-  return value.replace(/[%_]/g, "\\$&").replace(/,/g, " ");
-}
-
-function getSearchTokens(query: string) {
-  const normalized = normalizeSearchTerm(query);
-
-  if (!normalized) return [];
-
-  return normalized
-    .split(" ")
-    .map((token) => token.trim())
-    .filter((token) => token.length >= 3)
-    .slice(0, 6);
-}
-
-function expandedSearchTerms(query: string) {
-  const normalized = normalizeSearchTerm(query);
-  if (!normalized) return [];
-
-  const terms = new Set([normalized, ...getSearchTokens(normalized)]);
-
-  if (/\bdata\s+engineer\b/.test(normalized)) {
-    terms.add("data engineering");
-    terms.add("data platform");
-    terms.add("etl");
-  }
-
-  if (/\bdata\s+science\b|\bdata\s+scientist\b/.test(normalized)) {
-    terms.add("machine learning");
-    terms.add("analytics");
-  }
-
-  if (/\bdata\s+analytics?\b|\banalytics?\b/.test(normalized)) {
-    terms.add("business intelligence");
-    terms.add("data analyst");
-  }
-
-  if (/\bdata\s+governance\b/.test(normalized)) {
-    terms.add("data management");
-    terms.add("data quality");
-  }
-
-  return Array.from(terms).slice(0, 12);
-}
-
-async function getKeywordCategories(query: string) {
-  const normalized = normalizeSearchTerm(query);
-
-  if (!normalized) return [];
-
-  const tokens = getSearchTokens(normalized);
-  const lookupTerms = Array.from(new Set([normalized, ...tokens])).slice(0, 5);
-
-  if (lookupTerms.length === 0) return [];
-
-  const filter = lookupTerms
-    .map((term) => `term.ilike.%${escapeIlikeValue(term)}%`)
-    .join(",");
-
-  try {
-    const { data, error } = await supabaseAdmin
-      .from("keyword_suggestions")
-      .select("category")
-      .or(filter)
-      .not("category", "is", null)
-      .limit(10);
-
-    if (error) {
-      console.error("[GET /api/jobs] Keyword category lookup failed:", error);
-      return [];
-    }
-
-    return Array.from(
-      new Set(
-        (data ?? [])
-          .map((row) =>
-            typeof row.category === "string" ? row.category.trim() : "",
-          )
-          .filter(Boolean),
-      ),
-    );
-  } catch (error) {
-    console.error("[GET /api/jobs] Keyword category lookup crashed:", error);
-    return [];
-  }
-}
-
-function buildJobSearchFilter(query: string, categories: string[]) {
-  const normalized = normalizeSearchTerm(query);
-
-  if (!normalized) return null;
-
-  const terms = expandedSearchTerms(normalized);
-  const filters: string[] = [];
-  const searchableColumns = [
-    "title",
-    "company_name",
-    "category",
-    "location",
-    "description",
-  ];
-
-  for (const term of terms) {
-    const escaped = escapeIlikeValue(term);
-    const columns =
-      term === normalized ? ["title", ...searchableColumns] : searchableColumns;
-
-    for (const column of columns) {
-      filters.push(`${column}.ilike.%${escaped}%`);
-    }
-  }
-
-  for (const category of categories.slice(0, 3)) {
-    filters.push(`category.ilike.%${escapeIlikeValue(category)}%`);
-  }
-
-  return Array.from(new Set(filters)).join(",");
-}
-
-function expandedSearchRank<
-  T extends {
-    company_name: string;
-    location: string;
-    title: string;
-    category: string | null;
-    posted_at: string;
-    skills?: string[] | null;
-  },
->(job: T, query: string, categories: string[]) {
-  const normalizedQuery = normalizeSearchTerm(query);
-  const tokens = getSearchTokens(query);
-
-  if (!normalizedQuery) return 0;
-
-  const title = job.title.toLowerCase();
-  const company = job.company_name.toLowerCase();
-  const category = job.category?.toLowerCase() ?? "";
-  const titleTokenMatches = tokens.filter((token) =>
-    title.includes(token),
-  ).length;
-  const skillsText = Array.isArray(job.skills)
-    ? job.skills.join(" ").toLowerCase()
-    : "";
-
-  if (title === normalizedQuery) return 0;
-  if (title.startsWith(normalizedQuery)) return 1;
-  if (title.includes(normalizedQuery)) return 2;
-  if (tokens.length > 0 && titleTokenMatches === tokens.length) return 3;
-  if (tokens.length > 0 && titleTokenMatches > 0) return 20 - titleTokenMatches;
-
-  if (company.includes(normalizedQuery)) return 40;
-
-  const skillTokenMatches = tokens.filter((token) =>
-    skillsText.includes(token),
-  ).length;
-
-  if (skillTokenMatches > 0) return 50 - skillTokenMatches;
-
-  const categoryMatchIndex = categories.findIndex((item) =>
-    category.includes(item.toLowerCase()),
-  );
-
-  if (categoryMatchIndex >= 0) return 70 + categoryMatchIndex;
-
-  if (tokens.some((token) => category.includes(token))) return 80;
-
-  return 100;
-}
-
-function titleStronglyMatchesQuery(job: { title: string }, query: string) {
-  const normalizedQuery = normalizeSearchTerm(query);
-  if (!normalizedQuery) return true;
-
-  const title = normalizeSearchTerm(job.title);
-  const tokens = getSearchTokens(normalizedQuery);
-
-  return (
-    title.includes(normalizedQuery) ||
-    (tokens.length > 0 && tokens.every((token) => title.includes(token)))
-  );
-}
-
-function jobSearchableText<
-  T extends {
-    company_name: string;
-    location: string;
-    title: string;
-    category: string | null;
-    description?: string | null;
-    skills?: string[] | null;
-  },
->(job: T) {
-  return normalizeSearchTerm(
-    [
-      job.title,
-      job.company_name,
-      job.category,
-      job.location,
-      job.description,
-      ...(Array.isArray(job.skills) ? job.skills : []),
-    ]
-      .filter(Boolean)
-      .join(" "),
-  );
-}
-
-function jobMatchesExpandedSearch<
-  T extends {
-    company_name: string;
-    location: string;
-    title: string;
-    category: string | null;
-    description?: string | null;
-    skills?: string[] | null;
-  },
->(job: T, query: string, categories: string[]) {
-  const normalizedQuery = normalizeSearchTerm(query);
-  if (!normalizedQuery) return true;
-
-  const text = jobSearchableText(job);
-  const tokens = getSearchTokens(normalizedQuery);
-  const terms = expandedSearchTerms(normalizedQuery);
-
-  if (text.includes(normalizedQuery)) return true;
-
-  if (tokens.length > 0 && tokens.every((token) => text.includes(token))) {
-    return true;
-  }
-
-  if (terms.some((term) => term.includes(" ") && text.includes(term))) {
-    return true;
-  }
-
-  return categories.some((category) =>
-    text.includes(normalizeSearchTerm(category)),
-  );
-}
-
-function rankExpandedSearchResults<
-  T extends {
-    company_name: string;
-    location: string;
-    title: string;
-    category: string | null;
-    posted_at: string;
-    skills?: string[] | null;
-  },
->(jobs: T[], query: string, categories: string[]) {
-  if (!query.trim()) return jobs;
-
-  return [...jobs].sort((a, b) => {
-    const rankDiff =
-      expandedSearchRank(a, query, categories) -
-      expandedSearchRank(b, query, categories);
-
-    if (rankDiff !== 0) return rankDiff;
-
-    return new Date(b.posted_at).getTime() - new Date(a.posted_at).getTime();
-  });
-}
-
 async function hydrateJobDetails(candidates: JobCandidateRow[]) {
   if (candidates.length === 0) return [];
 
@@ -682,7 +324,7 @@ async function hydrateJobDetails(candidates: JobCandidateRow[]) {
   });
 }
 
-function toJobCandidateRows(rows: DiverseBrowseRpcRow[]) {
+function toJobCandidateRows(rows: JobsPublicRpcRow[]) {
   return rows
     .filter((row) => typeof row.id === "string" && row.id.length > 0)
     .map((row) => {
@@ -707,177 +349,125 @@ function toJobCandidateRows(rows: DiverseBrowseRpcRow[]) {
     });
 }
 
+function isEasyApplyRow(row: JobsPublicRpcRow) {
+  return !row.apply_url?.trim();
+}
+
+function isNewJob(row: JobsPublicRpcRow) {
+  const postedAt = Date.parse(row.posted_at);
+  if (Number.isNaN(postedAt)) return false;
+
+  return Date.now() - postedAt <= NEW_JOBS_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+}
+
+async function searchJobsPublic(params: {
+  query: string;
+  daysAgo: number;
+  location: string;
+  workMode: string;
+  employmentType: string;
+  category: string;
+  company: string;
+  excludeId: string;
+  page: number;
+  pageSize: number;
+  balance: string;
+}) {
+  const { data, error } = await supabaseAdmin.rpc("search_jobs_public", {
+    p_query: params.query.trim() || null,
+    p_days_ago: params.daysAgo,
+    p_location: params.location.trim() || null,
+    p_work_mode: params.workMode || null,
+    p_employment_type: params.employmentType || null,
+    p_category: params.category || null,
+    p_company: params.company.trim() || null,
+    p_exclude_id: params.excludeId || null,
+    p_page: params.page,
+    p_page_size: params.pageSize,
+    p_balance: params.balance,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as JobsPublicRpcRow[];
+}
+
+async function getEasyApplyRows(params: {
+  query: string;
+  daysAgo: number;
+  location: string;
+  workMode: string;
+  employmentType: string;
+  category: string;
+  company: string;
+  excludeId: string;
+  page: number;
+  pageSize: number;
+  balance: string;
+}) {
+  const matchedRows: JobsPublicRpcRow[] = [];
+  let originalTotal = 0;
+
+  for (let page = 1; page <= EASY_APPLY_MAX_SCAN_PAGES; page += 1) {
+    const rows = await searchJobsPublic({
+      ...params,
+      page,
+      pageSize: EASY_APPLY_SCAN_PAGE_SIZE,
+    });
+
+    if (page === 1) {
+      originalTotal = toCount(rows[0]?.total_count);
+    }
+
+    matchedRows.push(...rows.filter(isEasyApplyRow));
+
+    if (
+      rows.length < EASY_APPLY_SCAN_PAGE_SIZE ||
+      page * EASY_APPLY_SCAN_PAGE_SIZE >= originalTotal
+    ) {
+      break;
+    }
+  }
+
+  const total = matchedRows.length;
+  const start = (params.page - 1) * params.pageSize;
+  const end = start + params.pageSize;
+
+  return {
+    rows: matchedRows.slice(start, end),
+    total,
+    newJobs: matchedRows.filter(isNewJob).length,
+  };
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = req.nextUrl;
 
     const query = searchParams.get("query") ?? "";
     const location = searchParams.get("location") ?? "";
-    const daysAgo = Number(searchParams.get("daysAgo") ?? "3650");
-    const safeDaysAgo = Number.isFinite(daysAgo) ? daysAgo : 3650;
+    const daysAgo = toPositiveInteger(
+      searchParams.get("daysAgo"),
+      DEFAULT_DAYS_AGO,
+    );
     const distance = searchParams.get("distance") ?? "";
     const workMode = searchParams.get("workMode") ?? "";
+    const easyApply = searchParams.get("easyApply") === "1";
     const employmentType = searchParams.get("employmentType") ?? "";
     const category = searchParams.get("category") ?? "";
     const company = searchParams.get("company") ?? "";
     const excludeId = searchParams.get("excludeId") ?? "";
     const balance = searchParams.get("balance") ?? DEFAULT_COMPANY_BALANCE;
-    const loadMode = searchParams.get("loadMode") ?? "pool";
-    const seed = searchParams.get("seed") ?? defaultBrowseSeed();
-    const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
-    const pageSize = Math.min(
-      25,
-      Math.max(1, Number(searchParams.get("pageSize") ?? "20")),
+    const page = toPositiveInteger(searchParams.get("page"), 1);
+    const pageSize = toPositiveInteger(
+      searchParams.get("pageSize"),
+      DEFAULT_PAGE_SIZE,
+      MAX_PAGE_SIZE,
     );
 
-    const shouldUseDiverseBrowse =
-      loadMode === "diverse" &&
-      !query.trim() &&
-      !workMode &&
-      !employmentType &&
-      !category &&
-      !company.trim() &&
-      !excludeId;
-
-    const shouldUseKeywordSearchRpc =
-      loadMode === "pool" &&
-      query.trim().length > 0 &&
-      !workMode &&
-      !employmentType &&
-      !category &&
-      !company.trim() &&
-      !excludeId;
-
-    if (shouldUseDiverseBrowse) {
-      const cacheKey = getJobsApiCacheKey({
-        mode: "browse",
-        query,
-        location,
-        daysAgo: safeDaysAgo,
-        page,
-        pageSize,
-        distance,
-      });
-
-      const cached = await readJobsCache(cacheKey);
-
-      if (cached) {
-        return jobsJsonResponse(cached, JOBS_BROWSE_CACHE_TTL_SECONDS);
-      }
-
-      const { data: diverseRows, error: diverseError } =
-        await supabaseAdmin.rpc("search_jobs_diverse_browse", {
-          p_days_ago: safeDaysAgo,
-          p_location: location.trim() || null,
-          p_page: page,
-          p_page_size: pageSize,
-        });
-
-      if (diverseError) {
-        console.error(
-          "[GET /api/jobs] search_jobs_diverse_browse failed:",
-          diverseError,
-        );
-
-        return NextResponse.json(
-          {
-            error: "Failed to load jobs.",
-            details: diverseError,
-          },
-          { status: 500 },
-        );
-      }
-
-      const rows = (diverseRows ?? []) as DiverseBrowseRpcRow[];
-      const total = toCount(rows[0]?.total_count);
-      const newJobs = toCount(rows[0]?.new_jobs_count);
-      const pageCandidates = toJobCandidateRows(rows);
-      const pageJobs = await hydrateJobDetails(pageCandidates);
-
-      const payload: JobsApiPayload = {
-        data: pageJobs,
-        total,
-        newJobs,
-        newJobsWindowDays: NEW_JOBS_WINDOW_DAYS,
-        balance: "company",
-        seed: null,
-        page,
-        pageSize,
-        totalPages: Math.max(1, Math.ceil(total / pageSize)),
-      };
-
-      await writeJobsCache(cacheKey, payload, JOBS_BROWSE_CACHE_TTL_SECONDS);
-
-      return jobsJsonResponse(payload, JOBS_BROWSE_CACHE_TTL_SECONDS);
-    }
-
-    if (shouldUseKeywordSearchRpc) {
-      const cacheKey = getJobsApiCacheKey({
-        mode: "keyword",
-        query,
-        location,
-        daysAgo: safeDaysAgo,
-        page,
-        pageSize,
-        distance,
-      });
-
-      const cached = await readJobsCache(cacheKey);
-
-      if (cached) {
-        return jobsJsonResponse(cached, JOBS_KEYWORD_CACHE_TTL_SECONDS);
-      }
-
-      const { data: keywordRows, error: keywordError } =
-        await supabaseAdmin.rpc("search_jobs_keyword_diverse", {
-          p_query: query.trim(),
-          p_days_ago: safeDaysAgo,
-          p_location: location.trim() || null,
-          p_page: page,
-          p_page_size: pageSize,
-        });
-
-      if (keywordError) {
-        console.error(
-          "[GET /api/jobs] search_jobs_keyword_diverse failed:",
-          keywordError,
-        );
-
-        return NextResponse.json(
-          {
-            error: "Failed to search jobs.",
-            details: keywordError,
-          },
-          { status: 500 },
-        );
-      }
-
-      const rows = (keywordRows ?? []) as DiverseBrowseRpcRow[];
-      const total = toCount(rows[0]?.total_count);
-      const newJobs = toCount(rows[0]?.new_jobs_count);
-      const pageCandidates = toJobCandidateRows(rows);
-      const pageJobs = await hydrateJobDetails(pageCandidates);
-
-      const payload: JobsApiPayload = {
-        data: pageJobs,
-        total,
-        newJobs,
-        newJobsWindowDays: NEW_JOBS_WINDOW_DAYS,
-        balance: "company",
-        seed: null,
-        page,
-        pageSize,
-        totalPages: Math.max(1, Math.ceil(total / pageSize)),
-      };
-
-      await writeJobsCache(cacheKey, payload, JOBS_KEYWORD_CACHE_TTL_SECONDS);
-
-      return jobsJsonResponse(payload, JOBS_KEYWORD_CACHE_TTL_SECONDS);
-    }
-
-    const keywordCategories = await getKeywordCategories(query);
-
-    const shouldBalanceByCompany = shouldBalanceCompanyResults({
+    const ttlSeconds = cacheTtlForRequest({
       query,
       location,
       workMode,
@@ -885,169 +475,103 @@ export async function GET(req: NextRequest) {
       category,
       company,
       excludeId,
-      balance,
+      easyApply,
     });
-    const from = (page - 1) * pageSize;
-    const to = from + pageSize;
-    const shouldUseDatabasePage =
-      loadMode === "page" && !shouldBalanceByCompany && !query.trim();
-    const candidateLimit = candidateLimitForRequest({
+
+    const cacheKey = getJobsApiCacheKey({
+      query,
+      location,
+      daysAgo,
+      workMode,
+      employmentType,
+      category,
+      company,
+      excludeId,
+      balance,
+      easyApply,
       page,
       pageSize,
-      shouldBalanceByCompany,
+      distance,
     });
 
-    let dbQuery = supabaseAdmin
-      .from("jobs")
-      .select(JOB_CANDIDATE_SELECT, { count: "exact" })
-      .eq("status", "published")
-      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
-      .gte(
-        "posted_at",
-        new Date(Date.now() - safeDaysAgo * 86_400_000).toISOString(),
-      )
-      .order("posted_at", { ascending: false });
+    const cached = await readJobsCache(cacheKey);
 
-    if (query.trim()) {
-      const keywordFilter = buildJobSearchFilter(query, keywordCategories);
+    if (cached) {
+      return jobsJsonResponse(cached, ttlSeconds);
+    }
 
-      if (keywordFilter) {
-        dbQuery = dbQuery.or(keywordFilter);
+    let rows: JobsPublicRpcRow[];
+    let total: number;
+    let newJobs: number;
+
+    try {
+      if (easyApply) {
+        const easyApplyResult = await getEasyApplyRows({
+          query,
+          daysAgo,
+          location,
+          workMode,
+          employmentType,
+          category,
+          company,
+          excludeId,
+          page,
+          pageSize,
+          balance,
+        });
+
+        rows = easyApplyResult.rows;
+        total = easyApplyResult.total;
+        newJobs = easyApplyResult.newJobs;
+      } else {
+        rows = await searchJobsPublic({
+          query,
+          daysAgo,
+          location,
+          workMode,
+          employmentType,
+          category,
+          company,
+          excludeId,
+          page,
+          pageSize,
+          balance,
+        });
+
+        total = toCount(rows[0]?.total_count);
+        newJobs = toCount(rows[0]?.new_jobs_count);
       }
-    }
-
-    if (location.trim()) {
-      const loc = locationSearchTerm(location);
-
-      if (loc) {
-        dbQuery = dbQuery.ilike("location", `%${loc}%`);
-      }
-    }
-
-    if (workMode) {
-      dbQuery = dbQuery.eq("work_mode", workMode);
-    }
-
-    if (employmentType) {
-      dbQuery = dbQuery.eq("employment_type", employmentType);
-    }
-
-    if (category) {
-      dbQuery = dbQuery.eq("category", category);
-    }
-
-    if (company.trim()) {
-      dbQuery = dbQuery.eq("company_name", company.trim());
-    }
-
-    if (excludeId) {
-      dbQuery = dbQuery.neq("id", excludeId);
-    }
-
-    if (shouldUseDatabasePage) {
-      dbQuery = dbQuery.range(from, to - 1);
-    } else {
-      dbQuery = dbQuery.limit(candidateLimit);
-    }
-
-    const { count, data, error } = await dbQuery;
-
-    if (error) {
-      console.error("[GET /api/jobs] Supabase error:", error);
+    } catch (rpcError) {
+      console.error("[GET /api/jobs] search_jobs_public failed:", rpcError);
 
       return NextResponse.json(
         {
-          error: error.message,
-          details: error,
+          error: "Failed to load jobs.",
+          details: rpcError,
         },
         { status: 500 },
       );
     }
 
-    const candidateJobs = (data ?? []) as JobCandidateRow[];
-    const filteredCandidateJobs = query.trim()
-      ? candidateJobs.filter((job) =>
-          jobMatchesExpandedSearch(job, query, keywordCategories),
-        )
-      : candidateJobs;
-
-    const broadBrowseCandidates = shouldBalanceByCompany
-      ? rotateBroadBrowseJobs(filteredCandidateJobs, seed)
-      : filteredCandidateJobs;
-
-    const rankedCandidates = rankExpandedSearchResults(
-      filteredCandidateJobs,
-      query,
-      keywordCategories,
-    );
-    const displayCandidates = shouldBalanceByCompany
-      ? balanceJobsByCompany(broadBrowseCandidates)
-      : query.trim()
-        ? [
-            ...rankedCandidates.filter((job) =>
-              titleStronglyMatchesQuery(job, query),
-            ),
-            ...balanceJobsByCompany(
-              rankedCandidates.filter(
-                (job) => !titleStronglyMatchesQuery(job, query),
-              ),
-            ),
-          ]
-        : rankedCandidates;
-
-    const total = query.trim()
-      ? displayCandidates.length
-      : (count ?? displayCandidates.length);
-    let newJobs = displayCandidates.filter((job) => {
-      const postedTime = new Date(job.posted_at).getTime();
-
-      if (Number.isNaN(postedTime)) return false;
-
-      return postedTime >= Date.now() - NEW_JOBS_WINDOW_DAYS * 86_400_000;
-    }).length;
-
-    if (loadMode === "page") {
-      const loc = locationSearchTerm(location);
-      const newestAllowedDate = new Date(
-        Math.max(
-          Date.now() - safeDaysAgo * 86_400_000,
-          Date.now() - NEW_JOBS_WINDOW_DAYS * 86_400_000,
-        ),
-      ).toISOString();
-      let newJobsQuery = supabaseAdmin
-        .from("jobs")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "published")
-        .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
-        .gte("posted_at", newestAllowedDate);
-
-      if (loc) {
-        newJobsQuery = newJobsQuery.ilike("location", `%${loc}%`);
-      }
-
-      const { count: newJobsCount, error: newJobsError } = await newJobsQuery;
-
-      if (!newJobsError) {
-        newJobs = newJobsCount ?? 0;
-      }
-    }
-
-    const pageCandidates = shouldUseDatabasePage
-      ? displayCandidates
-      : displayCandidates.slice(from, to);
+    const pageCandidates = toJobCandidateRows(rows);
     const pageJobs = await hydrateJobDetails(pageCandidates);
+    const isCompanyBalanced = balance === "company";
 
-    return NextResponse.json({
+    const payload: JobsApiPayload = {
       data: pageJobs,
       total,
       newJobs,
       newJobsWindowDays: NEW_JOBS_WINDOW_DAYS,
-      balance: shouldBalanceByCompany ? "company" : "none",
-      seed: shouldBalanceByCompany ? seed : null,
+      balance: isCompanyBalanced ? "company" : "none",
+      seed: null,
       page,
       pageSize,
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
-    });
+    };
+
+    await writeJobsCache(cacheKey, payload, ttlSeconds);
+
+    return jobsJsonResponse(payload, ttlSeconds);
   } catch (error) {
     console.error("[GET /api/jobs] Fatal error:", error);
 

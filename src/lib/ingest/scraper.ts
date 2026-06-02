@@ -340,6 +340,49 @@ type KulaJob = {
   title?: string;
 };
 
+type SuccessFactorsTileJob = {
+  applyUrl: string;
+  category: string | null;
+  dateText: string | null;
+  location: string;
+  sourceId: string;
+  title: string;
+};
+
+type NlxSolrJob = {
+  date_new?: string;
+  date_updated?: string;
+  description?: string;
+  guid?: string;
+  id?: string;
+  job_category?: string;
+  job_function?: string;
+  job_type?: string;
+  location_exact?: string;
+  other?: string;
+  reqid?: string;
+  title_exact?: string;
+};
+
+type NlxSolrResponse = {
+  featured_jobs?: NlxSolrJob[];
+  jobs?: NlxSolrJob[];
+  pagination?: {
+    has_more_pages?: boolean;
+    total?: number;
+  };
+};
+
+type CoveoResult = {
+  title?: string;
+  raw?: Record<string, unknown>;
+};
+
+type CoveoResponse = {
+  results?: CoveoResult[];
+  totalCount?: number;
+};
+
 const PLAYRIX_DEFAULT_API_URL =
   "https://playrix.com/api/v1/index.php?action=job/getList";
 const AVATURE_DEFAULT_PAGE_SIZE = 10;
@@ -373,6 +416,11 @@ const FOX_DEFAULT_API_URL = "https://www.foxcareers.com/Search/JobsList/";
 const FOX_DEFAULT_MAX_PAGES = 4;
 const ATTRAX_DEFAULT_MAX_PAGES = 3;
 const JIBE_DEFAULT_MAX_PAGES = 8;
+const NLX_SOLR_DEFAULT_API_BASE = "https://prod-search-api.jobsyn.org/api";
+const NLX_SOLR_DEFAULT_PAGE_SIZE = 10;
+const NLX_SOLR_DEFAULT_MAX_PAGES = 4;
+const COVEO_DEFAULT_PAGE_SIZE = 25;
+const COVEO_DEFAULT_MAX_PAGES = 4;
 
 function metadataString(source: JobSource, key: string) {
   const value = source.metadata[key];
@@ -797,8 +845,141 @@ function avatureArticleBlocks(html: string) {
 }
 
 function parseAvatureJobs(source: JobSource, html: string) {
-  return avatureArticleBlocks(html)
+  const articleJobs = avatureArticleBlocks(html)
     .map((article) => parseAvatureArticle(source, article))
+    .filter((job): job is NonNullable<typeof job> => Boolean(job));
+
+  if (articleJobs.length > 0) {
+    return articleJobs;
+  }
+
+  return parseAvatureStructuredJobs(source, html);
+}
+
+function avatureStructuredLocation(value: unknown): string {
+  if (!value) return "";
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(avatureStructuredLocation).filter(Boolean).join(" | ");
+  }
+
+  if (typeof value !== "object") return "";
+
+  const record = value as Record<string, unknown>;
+  const address = record.address;
+
+  if (address && typeof address === "object") {
+    const addressRecord = address as Record<string, unknown>;
+    return [
+      addressRecord.addressLocality,
+      addressRecord.addressRegion,
+      addressRecord.addressCountry,
+    ]
+      .filter((part): part is string => typeof part === "string" && part !== "")
+      .join(", ");
+  }
+
+  return [
+    record.name,
+    record.addressLocality,
+    record.addressRegion,
+    record.addressCountry,
+  ]
+    .filter((part): part is string => typeof part === "string" && part !== "")
+    .join(", ");
+}
+
+function avatureStructuredApplyUrl(
+  source: JobSource,
+  record: Record<string, unknown>,
+) {
+  const sourceUrl = source.sourceUrl ?? "https://smurfitwestrockta.avature.net";
+  const url = record.url;
+
+  if (typeof url === "string" && url.trim()) {
+    return new URL(decodeHtml(url), sourceUrl).toString();
+  }
+
+  const identifier = record.identifier;
+  const id =
+    typeof identifier === "string"
+      ? identifier
+      : identifier && typeof identifier === "object"
+        ? (identifier as Record<string, unknown>).value
+        : null;
+
+  if (typeof id === "string" && id.trim()) {
+    const fallback = new URL(sourceUrl);
+    fallback.searchParams.set("pid", id);
+    return fallback.toString();
+  }
+
+  return sourceUrl;
+}
+
+function avatureStructuredJobId(record: Record<string, unknown>) {
+  const identifier = record.identifier;
+
+  if (typeof identifier === "string") return identifier;
+
+  if (identifier && typeof identifier === "object") {
+    const value = (identifier as Record<string, unknown>).value;
+    if (typeof value === "string") return value;
+  }
+
+  const url = record.url;
+  if (typeof url === "string") {
+    const pid = new URL(url, "https://example.com").searchParams.get("pid");
+    if (pid) return pid;
+    return url.match(/\/(\d+)(?:[/?#]|$)/)?.[1] ?? "";
+  }
+
+  return "";
+}
+
+function parseAvatureStructuredJobs(source: JobSource, html: string) {
+  return [
+    ...html.matchAll(
+      /<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
+    ),
+  ]
+    .flatMap((match) => {
+      try {
+        const parsed = JSON.parse(decodeHtml(match[1]).trim()) as unknown;
+        return Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        return [];
+      }
+    })
+    .filter(
+      (item): item is Record<string, unknown> =>
+        Boolean(item) &&
+        typeof item === "object" &&
+        (item as Record<string, unknown>)["@type"] === "JobPosting",
+    )
+    .map((record) => {
+      const title = typeof record.title === "string" ? record.title.trim() : "";
+      if (!title) return null;
+
+      return {
+        title,
+        applyUrl: avatureStructuredApplyUrl(source, record),
+        location: avatureStructuredLocation(record.jobLocation),
+        employmentType:
+          typeof record.employmentType === "string"
+            ? record.employmentType
+            : "",
+        postedAt:
+          typeof record.datePosted === "string"
+            ? avaturePostedAt(record.datePosted)
+            : new Date().toISOString(),
+        jobId: avatureStructuredJobId(record),
+      };
+    })
     .filter((job): job is NonNullable<typeof job> => Boolean(job));
 }
 
@@ -2230,6 +2411,10 @@ async function fetchEightfoldJobs(
       metadataString(source, "searchText") ?? "technology",
     ].filter(Boolean),
   );
+  const requiredTerms = metadataStringArray(source, "requiredTerms") ?? [];
+  const titleTerms = metadataStringArray(source, "titleTerms") ?? [];
+  const excludedTitleTerms =
+    metadataStringArray(source, "excludedTitleTerms") ?? [];
   const companyWebsite =
     metadataString(source, "companyWebsite") ??
     (source.companyDomain ? `https://${source.companyDomain}` : null);
@@ -2286,6 +2471,18 @@ async function fetchEightfoldJobs(
 
               if (!isUsText(eightfoldLocationSearchText(job))) continue;
               if (!isEngineeringText(searchText)) continue;
+              if (
+                requiredTerms.length > 0 &&
+                !includesAnyTerm(searchText, requiredTerms)
+              )
+                continue;
+              if (titleTerms.length > 0 && !includesAnyTerm(title, titleTerms))
+                continue;
+              if (
+                excludedTitleTerms.length > 0 &&
+                includesAnyTerm(title, excludedTitleTerms)
+              )
+                continue;
               if (isInternshipText(searchText)) continue;
 
               jobs.push({
@@ -2382,6 +2579,18 @@ async function fetchEightfoldJobs(
 
         if (!isUsText(eightfoldLocationSearchText(job))) continue;
         if (!isEngineeringText(searchText)) continue;
+        if (
+          requiredTerms.length > 0 &&
+          !includesAnyTerm(searchText, requiredTerms)
+        )
+          continue;
+        if (titleTerms.length > 0 && !includesAnyTerm(title, titleTerms))
+          continue;
+        if (
+          excludedTitleTerms.length > 0 &&
+          includesAnyTerm(title, excludedTitleTerms)
+        )
+          continue;
         if (isInternshipText(searchText)) continue;
 
         const detailedJob = await fetchEightfoldJobDetails(
@@ -3205,7 +3414,11 @@ function talentBrewPlainResults(html: string, publicBase: string) {
   const section =
     html.match(
       /<section\b[^>]*id=["']search-results-list["'][^>]*>([\s\S]*?)<\/section>/i,
-    )?.[1] ?? "";
+    )?.[1] ??
+    html.match(
+      /<div\b[^>]*id=["']search-results-list["'][^>]*>([\s\S]*?)<\/div>\s*<\/section>/i,
+    )?.[1] ??
+    "";
 
   return [...section.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)]
     .map((match): TalentBrewSearchJob | null => {
@@ -3229,9 +3442,13 @@ function talentBrewPlainResults(html: string, publicBase: string) {
         body.match(
           /<span\b[^>]*class=["'][^"']*\bjob-location\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i,
         )?.[1];
-      const category = body.match(
-        /<span\b[^>]*class=["']category["'][^>]*>([\s\S]*?)<\/span>/i,
-      )?.[1];
+      const category =
+        body.match(
+          /<span\b[^>]*class=["']category["'][^>]*>([\s\S]*?)<\/span>/i,
+        )?.[1] ??
+        body.match(
+          /<span\b[^>]*class=["'][^"']*\bjob-category\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i,
+        )?.[1];
 
       if (!heading) return null;
 
@@ -3241,12 +3458,36 @@ function talentBrewPlainResults(html: string, publicBase: string) {
           .replace(/^Category:\s*/i, "")
           .trim(),
         dateText: "",
-        location: htmlToText(decodeHtml(location ?? "")).trim(),
+        location: htmlToText(decodeHtml(location ?? ""))
+          .replace(/^Location:\s*/i, "")
+          .trim(),
         sourceId,
         title: htmlToText(decodeHtml(heading)).trim(),
       };
     })
     .filter((job): job is TalentBrewSearchJob => job !== null);
+}
+
+function talentBrewIsUsJob(job: TalentBrewSearchJob) {
+  if (isUsText(job.location)) return true;
+
+  const normalizedUrl = job.applyUrl.toLowerCase().replace(/[_/]+/g, "-");
+  const knownUsPathMarkers = [
+    "cambridge",
+    "framingham",
+    "bridgewater",
+    "swiftwater",
+    "waltham",
+    "morristown",
+    "new-york",
+    "boston",
+    "washington",
+  ];
+
+  return (
+    /multiple\s+locations/i.test(job.location) &&
+    knownUsPathMarkers.some((marker) => normalizedUrl.includes(marker))
+  );
 }
 
 function talentBrewResults(html: string, publicBase: string) {
@@ -4036,7 +4277,7 @@ async function fetchTalentBrewJobs(
         const searchText = `${job.title} ${job.category ?? ""} ${job.location} ${searchTerm}`;
         const sourceSearchText = `${job.title} ${job.category ?? ""} ${job.location}`;
         if (isNonJobTitle(job.title)) continue;
-        if (!isUsText(job.location)) continue;
+        if (!talentBrewIsUsJob(job)) continue;
         if (
           requiredTerms.length > 0 &&
           !includesAnyTerm(sourceSearchText, requiredTerms)
@@ -4352,6 +4593,18 @@ function jibeLocation(job: JibeJobData) {
   );
 }
 
+function jibeIsUsJob(job: JibeJobData, location: string) {
+  const countryCode = job.country_code?.trim().toUpperCase();
+  const country = job.country?.trim().toLowerCase();
+
+  if (countryCode && countryCode !== "US") return false;
+  if (country && country !== "united states" && country !== "usa") {
+    return false;
+  }
+
+  return isUsText(`${location} ${job.state ?? ""} ${country ?? ""}`);
+}
+
 function jibePostedAt(job: JibeJobData) {
   return (
     isoDateFromText(job.posted_date) ??
@@ -4446,12 +4699,7 @@ async function fetchJibeJobs(
           .filter(Boolean)
           .join(" ");
 
-        if (
-          !isUsText(
-            `${location} ${job.country_code ?? ""} ${job.country ?? ""}`,
-          )
-        )
-          continue;
+        if (!jibeIsUsJob(job, location)) continue;
         if (!isEngineeringText(searchText)) continue;
         if (isInternshipText(searchText)) continue;
 
@@ -4749,6 +4997,639 @@ async function fetchKulaJobs(
   return jobs;
 }
 
+function successFactorsTileBlocks(html: string) {
+  const starts = [
+    ...html.matchAll(/<li\b[^>]*class=["'][^"']*\bjob-tile\b/gi),
+  ].map((match) => match.index ?? 0);
+
+  return starts.map((start, index) =>
+    html.slice(start, starts[index + 1] ?? html.length),
+  );
+}
+
+function successFactorsTileResults(html: string, publicBase: string) {
+  return successFactorsTileBlocks(html)
+    .map((block): SuccessFactorsTileJob | null => {
+      const href =
+        htmlAttribute(block, "data-url") ??
+        block.match(
+          /<a\b[^>]*class=["'][^"']*\bjobTitle-link\b[^"']*["'][^>]*href=["']([^"']+)["']/i,
+        )?.[1];
+      const title =
+        block.match(
+          /<a\b[^>]*class=["'][^"']*\bjobTitle-link\b[^"']*["'][^>]*>[\s\S]*?([^<>]+)[\s\S]*?<\/a>/i,
+        )?.[1] ??
+        block.match(
+          /<span\b[^>]*class=["'][^"']*\bsection-title\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i,
+        )?.[1];
+      const location =
+        block.match(
+          /<div\b[^>]*section-location-value[^>]*>([\s\S]*?)<\/div>/i,
+        )?.[1] ??
+        block.match(
+          /<div\b[^>]*class=["'][^"']*\blocation\b[^"']*["'][^>]*>[\s\S]*?<div[^>]*>([\s\S]*?)<\/div>/i,
+        )?.[1];
+      const dateText =
+        block.match(
+          /<div\b[^>]*section-date-value[^>]*>([\s\S]*?)<\/div>/i,
+        )?.[1] ?? null;
+      const category =
+        block.match(
+          /<div\b[^>]*section-department-value[^>]*>([\s\S]*?)<\/div>/i,
+        )?.[1] ??
+        block.match(
+          /<div\b[^>]*section-dept-value[^>]*>([\s\S]*?)<\/div>/i,
+        )?.[1] ??
+        null;
+
+      if (!href || !title) return null;
+
+      const applyUrl = new URL(decodeHtml(href), publicBase).toString();
+
+      return {
+        applyUrl,
+        category: category ? htmlToText(decodeHtml(category)).trim() : null,
+        dateText: dateText ? htmlToText(decodeHtml(dateText)).trim() : null,
+        location: location
+          ? htmlToText(decodeHtml(location)).trim()
+          : "United States",
+        sourceId:
+          htmlAttribute(block, "data-focus-tile")?.match(
+            /job-id-([0-9]+)/,
+          )?.[1] ?? decodeHtml(href),
+        title: htmlToText(decodeHtml(title)).trim(),
+      };
+    })
+    .filter((job): job is SuccessFactorsTileJob => Boolean(job?.title));
+}
+
+function successFactorsTilePostedAt(value: string | null) {
+  if (!value) return new Date().toISOString();
+
+  const parsed = new Date(value);
+
+  return Number.isNaN(parsed.getTime())
+    ? new Date().toISOString()
+    : parsed.toISOString();
+}
+
+async function fetchSuccessFactorsTileJobs(
+  source: JobSource,
+  context?: {
+    signal?: AbortSignal;
+  },
+): Promise<ImportedJob[]> {
+  const recruiterId = process.env.SYSTEM_RECRUITER_ID;
+
+  if (!recruiterId) {
+    throw new Error("Missing SYSTEM_RECRUITER_ID");
+  }
+
+  const publicBase =
+    metadataString(source, "publicBase") ??
+    source.sourceUrl ??
+    "https://jobs.pseg.com";
+  const category = metadataString(source, "category") ?? "Technology";
+  const companyWebsite =
+    metadataString(source, "companyWebsite") ??
+    (source.companyDomain ? `https://${source.companyDomain}` : null);
+  const response = await fetch(source.sourceUrl ?? publicBase, {
+    headers: {
+      Accept: "text/html",
+      "User-Agent": "HireGeneralJobBoard/1.0",
+    },
+    cache: "no-store",
+    signal: context?.signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(`SuccessFactors tile fetch failed: ${response.status}`);
+  }
+
+  return successFactorsTileResults(await response.text(), publicBase)
+    .filter((job) => {
+      const searchText = `${job.title} ${job.category ?? ""} ${job.location}`;
+
+      return (
+        isUsText(job.location) &&
+        isEngineeringText(searchText) &&
+        !isInternshipText(searchText)
+      );
+    })
+    .map((job) => ({
+      recruiterId,
+      companyId: null,
+      companyName: source.companyName,
+      companyLogoUrl: source.companyLogoUrl ?? null,
+
+      title: job.title,
+      description: safeDescription({
+        title: job.title,
+        companyName: source.companyName,
+        description: `${job.title} role at ${source.companyName}. Visit the company careers site for the complete description and application details.`,
+      }),
+      location: job.location || "United States",
+
+      latitude: null,
+      longitude: null,
+
+      employmentType: normalizeEmploymentType(null),
+      workMode: detectWorkMode(job.title, job.location),
+
+      salaryMin: null,
+      salaryMax: null,
+      salaryCurrency: "USD",
+
+      skills: [],
+      responsibilities: [],
+      requirements: [],
+      benefits: [],
+
+      status: "published",
+
+      postedAt: successFactorsTilePostedAt(job.dateText),
+      expiresAt: defaultExpiryDate(30),
+
+      sourceName: "scraper",
+      sourceId: `${source.sourceSlug}:${job.sourceId}`,
+      applyUrl: job.applyUrl,
+
+      experienceLevel: null,
+      category: job.category || category,
+
+      companyTagline: null,
+      companySize: null,
+      companyWebsite,
+    }));
+}
+
+function nlxSolrOther(job: NlxSolrJob) {
+  if (!job.other) return {};
+
+  try {
+    const parsed = JSON.parse(job.other) as unknown;
+    return parsed && typeof parsed === "object"
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function nlxSolrUrl(source: JobSource, searchTerm: string, offset: number) {
+  const apiBase =
+    metadataString(source, "apiBase") ?? NLX_SOLR_DEFAULT_API_BASE;
+  const endpoint = metadataString(source, "endpoint") ?? "v1/solr/search";
+  const url = new URL(endpoint, `${apiBase.replace(/\/$/, "")}/`);
+  const buids = metadataStringArray(source, "buids") ?? [];
+  const pageSize =
+    metadataNumber(source, "pageSize") ?? NLX_SOLR_DEFAULT_PAGE_SIZE;
+  const categorySlug = metadataString(source, "categorySlug");
+
+  url.searchParams.set("q", searchTerm);
+  url.searchParams.set("num_items", String(pageSize));
+  url.searchParams.set("offset", String(offset));
+  url.searchParams.set("source", "solr");
+
+  for (const buid of buids) {
+    url.searchParams.append("buids", buid);
+  }
+
+  if (categorySlug) {
+    url.searchParams.set("positioncategory", categorySlug);
+  }
+
+  return url;
+}
+
+async function fetchNlxSolrJobs(
+  source: JobSource,
+  context?: {
+    signal?: AbortSignal;
+  },
+): Promise<ImportedJob[]> {
+  const recruiterId = process.env.SYSTEM_RECRUITER_ID;
+
+  if (!recruiterId) {
+    throw new Error("Missing SYSTEM_RECRUITER_ID");
+  }
+
+  const origin = metadataString(source, "origin") ?? source.companyDomain;
+  if (!origin) {
+    throw new Error(`NLX Solr source ${source.companyName} is missing origin`);
+  }
+
+  const searchTerms = uniqueItems(
+    metadataStringArray(source, "searchTerms") ?? [
+      "software",
+      "data",
+      "technology",
+      "security",
+    ],
+  );
+  const maxPages = Math.max(
+    metadataNumber(source, "maxPages") ?? NLX_SOLR_DEFAULT_MAX_PAGES,
+    1,
+  );
+  const pageSize =
+    metadataNumber(source, "pageSize") ?? NLX_SOLR_DEFAULT_PAGE_SIZE;
+  const category = metadataString(source, "category") ?? "Technology";
+  const companyWebsite =
+    metadataString(source, "companyWebsite") ??
+    (source.companyDomain ? `https://${source.companyDomain}` : null);
+  const jobs: ImportedJob[] = [];
+  const seenSourceIds = new Set<string>();
+
+  for (const searchTerm of searchTerms) {
+    for (let page = 0; page < maxPages; page += 1) {
+      const response = await fetch(
+        nlxSolrUrl(source, searchTerm, page * pageSize),
+        {
+          headers: {
+            Accept: "application/json",
+            "User-Agent": "HireGeneralJobBoard/1.0",
+            "X-Origin": origin,
+          },
+          cache: "no-store",
+          signal: context?.signal,
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`NLX Solr fetch failed: ${response.status}`);
+      }
+
+      const data = (await response.json()) as NlxSolrResponse;
+      const pageJobs = [...(data.featured_jobs ?? []), ...(data.jobs ?? [])];
+
+      if (pageJobs.length === 0) break;
+
+      for (const job of pageJobs) {
+        const title = recordString(job, ["title_exact"]);
+        if (!title) continue;
+
+        const sourceId = `${source.sourceSlug}:${
+          recordString(job, ["guid", "reqid", "id"]) ||
+          normalizedJobTitleKey(title)
+        }`;
+        if (seenSourceIds.has(sourceId)) continue;
+        seenSourceIds.add(sourceId);
+
+        const location =
+          recordString(job, ["location_exact"]) || "United States";
+        const other = nlxSolrOther(job);
+        const remoteType =
+          typeof other["Remote Type"] === "string" ? other["Remote Type"] : "";
+        const salary = numberRangeFromText(
+          typeof other["Pay Range"] === "string" ? other["Pay Range"] : "",
+        );
+        const description = safeDescription({
+          description: recordString(job, ["description"]),
+          title,
+          companyName: source.companyName,
+        });
+        const searchText = [
+          title,
+          description,
+          recordString(job, ["job_category", "job_function"]),
+          category,
+          searchTerm,
+        ]
+          .filter(Boolean)
+          .join(" ");
+
+        if (isNonJobTitle(title)) continue;
+        if (!isUsText(location)) continue;
+        if (!isEngineeringText(searchText)) continue;
+        if (isInternshipText(searchText)) continue;
+
+        const applyUrl = new URL(
+          `/job/${normalizedJobTitleKey(title)}/${recordString(job, [
+            "guid",
+            "reqid",
+            "id",
+          ])}/job/`,
+          source.sourceUrl ?? companyWebsite ?? `https://${origin}`,
+        ).toString();
+
+        jobs.push({
+          recruiterId,
+          companyId: null,
+          companyName: source.companyName,
+          companyLogoUrl: source.companyLogoUrl ?? null,
+
+          title,
+          description,
+          location,
+
+          latitude: null,
+          longitude: null,
+
+          employmentType: normalizeEmploymentType(
+            recordString(job, ["job_type"]),
+          ),
+          workMode: detectWorkMode(`${title} ${remoteType}`, location),
+
+          salaryMin: salary.min,
+          salaryMax: salary.max,
+          salaryCurrency: "USD",
+
+          skills: [],
+          responsibilities: splitListItems(description, 12),
+          requirements: splitListItems(description, 14),
+          benefits: [],
+
+          status: "published",
+
+          postedAt:
+            isoDateFromText(recordString(job, ["date_new", "date_updated"])) ??
+            new Date().toISOString(),
+          expiresAt: defaultExpiryDate(30),
+
+          sourceName: "scraper",
+          sourceId,
+          applyUrl,
+
+          experienceLevel: null,
+          category,
+
+          companyTagline: null,
+          companySize: null,
+          companyWebsite,
+        });
+      }
+
+      if (!data.pagination?.has_more_pages) break;
+    }
+  }
+
+  return jobs;
+}
+
+function coveoString(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => coveoString(item))
+      .filter(Boolean)
+      .join(", ");
+  }
+
+  return "";
+}
+
+function coveoTimestamp(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return new Date(value).toISOString();
+  }
+
+  return isoDateFromText(coveoString(value)) ?? new Date().toISOString();
+}
+
+function coveoSearchEndpoint(
+  source: JobSource,
+  html: string,
+): { organizationId: string; token: string; searchUrl: string } {
+  const configuredOrganizationId = metadataString(source, "organizationId");
+  const configuredSearchUrl =
+    metadataString(source, "searchUrl") ??
+    "https://platform.cloud.coveo.com/rest/search/v2";
+  const literalMatch = html.match(
+    /Coveo\.SearchEndpoint\.configureCloudV2Endpoint\(\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]/i,
+  );
+  const variableMatch = html.match(
+    /Coveo\.SearchEndpoint\.configureCloudV2Endpoint\(\s*[^,]+,\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]/i,
+  );
+  const organizationMatch = html.match(
+    /var\s+organizationID\s*=\s*['"]([^'"]+)['"]/i,
+  );
+
+  const organizationId =
+    configuredOrganizationId ?? literalMatch?.[1] ?? organizationMatch?.[1];
+  const token =
+    metadataString(source, "token") ?? literalMatch?.[2] ?? variableMatch?.[1];
+  const searchUrl =
+    metadataString(source, "searchUrl") ??
+    literalMatch?.[3] ??
+    variableMatch?.[2] ??
+    configuredSearchUrl;
+
+  if (!organizationId || !token) {
+    throw new Error(
+      `Coveo source ${source.companyName} is missing organization/token metadata`,
+    );
+  }
+
+  return { organizationId, token, searchUrl };
+}
+
+async function fetchCoveoJobs(
+  source: JobSource,
+  context?: {
+    signal?: AbortSignal;
+  },
+): Promise<ImportedJob[]> {
+  const recruiterId = process.env.SYSTEM_RECRUITER_ID;
+
+  if (!recruiterId) {
+    throw new Error("Missing SYSTEM_RECRUITER_ID");
+  }
+
+  if (!source.sourceUrl) {
+    throw new Error(`Coveo source ${source.companyName} is missing source_url`);
+  }
+
+  const pageResponse = await fetch(source.sourceUrl, {
+    headers: {
+      Accept: "text/html",
+      "User-Agent": "HireGeneralJobBoard/1.0",
+    },
+    cache: "no-store",
+    signal: context?.signal,
+  });
+
+  if (!pageResponse.ok) {
+    throw new Error(`Coveo source page fetch failed: ${pageResponse.status}`);
+  }
+
+  const { organizationId, token, searchUrl } = coveoSearchEndpoint(
+    source,
+    await pageResponse.text(),
+  );
+  const searchTerms = uniqueItems(
+    metadataStringArray(source, "searchTerms") ?? [
+      "software engineer",
+      "data engineer",
+      "security engineer",
+    ],
+  );
+  const requiredTerms = metadataStringArray(source, "requiredTerms") ?? [];
+  const titleTerms = metadataStringArray(source, "titleTerms") ?? [];
+  const excludedTitleTerms =
+    metadataStringArray(source, "excludedTitleTerms") ?? [];
+  const pageSize = Math.max(
+    metadataNumber(source, "pageSize") ?? COVEO_DEFAULT_PAGE_SIZE,
+    1,
+  );
+  const maxPages = Math.max(
+    metadataNumber(source, "maxPages") ?? COVEO_DEFAULT_MAX_PAGES,
+    1,
+  );
+  const category = metadataString(source, "category") ?? "Technology";
+  const searchHub = metadataString(source, "searchHub") ?? "Search";
+  const publicBase =
+    metadataString(source, "publicBase") ??
+    (source.companyDomain
+      ? `https://www.${source.companyDomain}`
+      : source.sourceUrl);
+  const companyWebsite =
+    metadataString(source, "companyWebsite") ??
+    (source.companyDomain ? `https://${source.companyDomain}` : null);
+  const jobs: ImportedJob[] = [];
+  const seenSourceIds = new Set<string>();
+
+  for (const query of searchTerms) {
+    for (let page = 0; page < maxPages; page += 1) {
+      const url = new URL(searchUrl);
+      url.searchParams.set("organizationId", organizationId);
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "User-Agent": "HireGeneralJobBoard/1.0",
+        },
+        body: JSON.stringify({
+          q: query,
+          numberOfResults: pageSize,
+          firstResult: page * pageSize,
+          searchHub,
+        }),
+        cache: "no-store",
+        signal: context?.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Coveo search failed: ${response.status}`);
+      }
+
+      const data = (await response.json()) as CoveoResponse;
+      const pageJobs = data.results ?? [];
+      if (pageJobs.length === 0) break;
+
+      for (const result of pageJobs) {
+        const raw = result.raw ?? {};
+        const title = coveoString(raw.mrc_title) || result.title?.trim() || "";
+        if (!title) continue;
+
+        const sourceId = `${source.sourceSlug}:${
+          coveoString(raw.mrc_articleid) ||
+          coveoString(raw.jobviteid) ||
+          coveoString(raw.permanentid) ||
+          normalizedJobTitleKey(title)
+        }`;
+        if (seenSourceIds.has(sourceId)) continue;
+        seenSourceIds.add(sourceId);
+
+        const location =
+          coveoString(raw.mrc_joblocation) ||
+          coveoString(raw.mrc_joblocations) ||
+          "United States";
+        const description = safeDescription({
+          description: coveoString(raw.mrc_summary),
+          title,
+          companyName: source.companyName,
+        });
+        const jobType = coveoString(raw.mrc_jobtype);
+        const searchText = [
+          title,
+          description,
+          jobType,
+          coveoString(raw.mrc_industrytype),
+          category,
+        ]
+          .filter(Boolean)
+          .join(" ");
+
+        if (isNonJobTitle(title)) continue;
+        if (!isUsText(location)) continue;
+        if (!isEngineeringText(searchText)) continue;
+        if (
+          requiredTerms.length > 0 &&
+          !includesAnyTerm(searchText, requiredTerms)
+        )
+          continue;
+        if (titleTerms.length > 0 && !includesAnyTerm(title, titleTerms))
+          continue;
+        if (
+          excludedTitleTerms.length > 0 &&
+          includesAnyTerm(title, excludedTitleTerms)
+        )
+          continue;
+        if (isInternshipText(searchText)) continue;
+
+        const applyUrl = new URL(
+          coveoString(raw.mrc_url) ||
+            coveoString(raw.clickableuri) ||
+            coveoString(raw.uri) ||
+            source.sourceUrl,
+          publicBase,
+        ).toString();
+        const salary = numberRangeFromText(coveoString(raw.mrc_salaryrange));
+
+        jobs.push({
+          recruiterId,
+          companyId: null,
+          companyName: source.companyName,
+          companyLogoUrl: source.companyLogoUrl ?? null,
+
+          title,
+          description,
+          location,
+
+          latitude: null,
+          longitude: null,
+
+          employmentType: normalizeEmploymentType(jobType),
+          workMode: detectWorkMode(title, location),
+
+          salaryMin: salary.min,
+          salaryMax: salary.max,
+          salaryCurrency: "USD",
+
+          skills: [],
+          responsibilities: splitListItems(description, 12),
+          requirements: splitListItems(description, 14),
+          benefits: [],
+
+          status: "published",
+
+          postedAt: coveoTimestamp(raw.mrc_publishdate ?? raw.date),
+          expiresAt: defaultExpiryDate(30),
+
+          sourceName: "scraper",
+          sourceId,
+          applyUrl,
+
+          experienceLevel: coveoString(raw.mrc_experiencelevel) || null,
+          category,
+
+          companyTagline: null,
+          companySize: null,
+          companyWebsite,
+        });
+      }
+
+      if (pageJobs.length < pageSize) break;
+    }
+  }
+
+  return jobs;
+}
+
 export const scraperAdapter: JobSourceAdapter = {
   type: "scraper",
   fetchJobs: (source, context) => {
@@ -4821,6 +5702,18 @@ export const scraperAdapter: JobSourceAdapter = {
 
     if (adapter === "kula") {
       return fetchKulaJobs(source, context);
+    }
+
+    if (adapter === "successfactors-tile") {
+      return fetchSuccessFactorsTileJobs(source, context);
+    }
+
+    if (adapter === "nlx-solr") {
+      return fetchNlxSolrJobs(source, context);
+    }
+
+    if (adapter === "coveo") {
+      return fetchCoveoJobs(source, context);
     }
 
     throw new Error(

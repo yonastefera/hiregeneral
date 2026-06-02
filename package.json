@@ -16,7 +16,9 @@
     "seed:locations": "tsx scripts/seed-locations-geonames.ts",
     "seed:schools": "tsx scripts/seed-schools-scorecard.ts",
     "seed:bls-salaries": "tsx scripts/seed-bls-oews.ts",
-    "discover:kforce-leads": "node scripts/discover-kforce-leads.mjs"
+    "discover:kforce-leads": "node scripts/discover-kforce-leads.mjs",
+    "analyze": "next experimental-analyze",
+    "build:analyze": "npm run build && next experimental-analyze"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,css,md,yml,yaml}": [

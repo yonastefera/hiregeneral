@@ -18,8 +18,8 @@ import type { JobSourceAdapter } from "./source";
 type SuccessFactorsConfig = {
   locale: string;
   publicBase: string;
-  rssUrl: string;
-  searchText: string;
+  rssUrls: string[];
+  searchTexts: string[];
 };
 
 type RssItem = {
@@ -33,6 +33,16 @@ type RssItem = {
 function metadataString(source: JobSource, key: string) {
   const value = source.metadata[key];
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function metadataStringArray(source: JobSource, key: string) {
+  const value = source.metadata[key];
+
+  if (!Array.isArray(value)) return null;
+
+  return value
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter(Boolean);
 }
 
 function stripCdata(value: string) {
@@ -85,7 +95,9 @@ function parseRssItems(xml: string) {
 function successFactorsConfig(source: JobSource): SuccessFactorsConfig {
   const sourceUrl = source.sourceUrl ? new URL(source.sourceUrl) : null;
   const locale = metadataString(source, "locale") ?? "en_US";
-  const searchText = metadataString(source, "searchText") ?? "technology";
+  const searchTexts = metadataStringArray(source, "searchTexts") ?? [
+    metadataString(source, "searchText") ?? "technology",
+  ];
   const publicBase =
     metadataString(source, "publicBase") ??
     source.sourceUrl?.replace(/\/$/, "") ??
@@ -98,26 +110,26 @@ function successFactorsConfig(source: JobSource): SuccessFactorsConfig {
     );
   }
 
-  const rssUrl =
-    explicitRssUrl ??
-    (() => {
-      const url = new URL("/services/rss/job/", sourceUrl.origin);
-      const locationSearch = metadataString(source, "locationSearch");
-      const keywords = locationSearch
-        ? `(${searchText}) AND locationSearch:(${locationSearch})`
-        : `(${searchText})`;
+  const rssUrls = explicitRssUrl
+    ? [explicitRssUrl]
+    : searchTexts.map((searchText) => {
+        const url = new URL("/services/rss/job/", sourceUrl.origin);
+        const locationSearch = metadataString(source, "locationSearch");
+        const keywords = locationSearch
+          ? `(${searchText}) AND locationSearch:(${locationSearch})`
+          : `(${searchText})`;
 
-      url.searchParams.set("locale", locale);
-      url.searchParams.set("keywords", keywords);
+        url.searchParams.set("locale", locale);
+        url.searchParams.set("keywords", keywords);
 
-      return url.toString();
-    })();
+        return url.toString();
+      });
 
   return {
     locale,
     publicBase,
-    rssUrl,
-    searchText,
+    rssUrls,
+    searchTexts,
   };
 }
 
@@ -297,23 +309,30 @@ export async function fetchSuccessFactorsJobs(
   }
 
   const config = successFactorsConfig(source);
-  const response = await fetch(config.rssUrl, {
-    headers: {
-      Accept: "application/rss+xml, application/xml, text/xml",
-      "User-Agent": "HireGeneralJobBoard/1.0",
-    },
-    cache: "no-store",
-    signal: context?.signal,
-  });
+  const rssItemsById = new Map<string, RssItem>();
 
-  if (!response.ok) {
-    throw new Error(
-      `SuccessFactors fetch failed for ${source.companyName}: ${response.status}`,
-    );
+  for (const rssUrl of config.rssUrls) {
+    const response = await fetch(rssUrl, {
+      headers: {
+        Accept: "application/rss+xml, application/xml, text/xml",
+        "User-Agent": "HireGeneralJobBoard/1.0",
+      },
+      cache: "no-store",
+      signal: context?.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `SuccessFactors fetch failed for ${source.companyName}: ${response.status}`,
+      );
+    }
+
+    for (const item of parseRssItems(await response.text())) {
+      rssItemsById.set(sourceId(source.sourceSlug, item), item);
+    }
   }
 
-  const xml = await response.text();
-  const rssItems = parseRssItems(xml).filter((item) => {
+  const rssItems = [...rssItemsById.values()].filter((item) => {
     const { title, location } = parseTitleAndLocation(item.title);
     const text = `${title} ${location} ${htmlToText(item.description)}`;
 
