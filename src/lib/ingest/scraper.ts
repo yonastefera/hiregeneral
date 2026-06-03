@@ -14,6 +14,7 @@ import {
 } from "./filters";
 import type { JobSource } from "./job-sources";
 import type { JobSourceAdapter } from "./source";
+import { enhanceImportedJobFromDetailPage } from "./job-detail-extractor";
 
 type PlayrixJob = {
   id?: number | string;
@@ -4065,23 +4066,60 @@ async function fetchAttraxJobs(
 }
 
 function fedexPreloadState(html: string) {
-  const match = html.match(
-    /window\.__PRELOAD_STATE__\s*=\s*({[\s\S]*?});\s*<\/script>/i,
-  );
+  const marker = "window.__PRELOAD_STATE__";
+  const markerIndex = html.indexOf(marker);
+  if (markerIndex < 0) return [];
 
-  if (!match) return [];
+  const objectStart = html.indexOf("{", markerIndex + marker.length);
+  if (objectStart < 0) return [];
 
-  try {
-    const data = JSON.parse(match[1]) as {
-      jobSearch?: {
-        jobs?: FedExPreloadJob[];
+  let inString = false;
+  let escaped = false;
+  let depth = 0;
+
+  for (let index = objectStart; index < html.length; index += 1) {
+    const char = html[index];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (char === "{") {
+      depth += 1;
+      continue;
+    }
+
+    if (char !== "}") continue;
+
+    depth -= 1;
+    if (depth !== 0) continue;
+
+    try {
+      const data = JSON.parse(html.slice(objectStart, index + 1)) as {
+        jobSearch?: {
+          jobs?: FedExPreloadJob[];
+        };
       };
-    };
 
-    return Array.isArray(data.jobSearch?.jobs) ? data.jobSearch.jobs : [];
-  } catch {
-    return [];
+      return Array.isArray(data.jobSearch?.jobs) ? data.jobSearch.jobs : [];
+    } catch {
+      return [];
+    }
   }
+
+  return [];
 }
 
 function fedexLocation(job: FedExPreloadJob) {
@@ -4105,7 +4143,54 @@ function fedexLocation(job: FedExPreloadJob) {
   return uniqueItems(labels).slice(0, 4).join(", ") || "United States";
 }
 
-async function fetchFedExPreloadJobs(
+function preloadCustomField(job: FedExPreloadJob, pattern: RegExp) {
+  return (
+    job.customFields?.find((field) =>
+      pattern.test(`${field.cfKey ?? ""} ${field.value ?? ""}`),
+    )?.value ?? ""
+  );
+}
+
+function preloadCustomFieldsText(job: FedExPreloadJob) {
+  return (job.customFields ?? [])
+    .map((field) => field.value)
+    .filter(Boolean)
+    .join(" ");
+}
+
+function preloadSourceId(
+  source: JobSource,
+  job: FedExPreloadJob,
+  applyUrl: string,
+) {
+  return `${source.sourceSlug}:${
+    job.requisitionID ?? job.reference ?? job.uniqueID ?? applyUrl
+  }`;
+}
+
+function preloadSearchText(
+  source: JobSource,
+  job: FedExPreloadJob,
+  category: string,
+) {
+  return [
+    job.title,
+    job.brandName,
+    job.companyName,
+    job.reference,
+    job.requisitionID,
+    job.uniqueID,
+    job.employmentType?.join(" "),
+    fedexLocation(job),
+    preloadCustomFieldsText(job),
+    category,
+    source.companyName,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+async function fetchPreloadedCareerJobs(
   source: JobSource,
   context?: {
     signal?: AbortSignal;
@@ -4131,61 +4216,94 @@ async function fetchFedExPreloadJobs(
   );
 
   if (!response.ok) {
-    throw new Error(`FedEx careers fetch failed: ${response.status}`);
+    throw new Error(`Preloaded careers fetch failed: ${response.status}`);
   }
 
   const category = metadataString(source, "category") ?? "Technology";
+  const requiredTerms = metadataStringArray(source, "requiredTerms") ?? [];
+  const titleTerms = metadataStringArray(source, "titleTerms") ?? [];
+  const excludedTitleTerms =
+    metadataStringArray(source, "excludedTitleTerms") ?? [];
   const companyWebsite =
     metadataString(source, "companyWebsite") ??
     (source.companyDomain ? `https://${source.companyDomain}` : null);
+
   const jobs: ImportedJob[] = [];
   const seenSourceIds = new Set<string>();
+  const html = await response.text();
+  const preloadJobs = fedexPreloadState(html);
 
-  for (const job of fedexPreloadState(await response.text())) {
+  for (const job of preloadJobs) {
     const title = job.title?.trim();
     const applyUrl = job.applyURL?.trim();
+
     if (!title || !applyUrl) continue;
 
-    const sourceId = `${source.sourceSlug}:${
-      job.requisitionID ?? job.reference ?? job.uniqueID ?? applyUrl
-    }`;
+    const sourceId = preloadSourceId(source, job, applyUrl);
+
     if (seenSourceIds.has(sourceId)) continue;
     seenSourceIds.add(sourceId);
 
     const location = fedexLocation(job);
-    const fields = (job.customFields ?? [])
-      .map((field) => field.value)
-      .join(" ");
-    const searchText = `${title} ${location} ${fields} ${category}`;
+    const employmentTypeText = Array.isArray(job.employmentType)
+      ? job.employmentType.join(" ")
+      : "";
+    const fieldsText = preloadCustomFieldsText(job);
+    const remoteText = preloadCustomField(job, /remote/i);
+    const salary = numberRangeFromText(
+      preloadCustomField(job, /salary|pay|compensation/i),
+    );
+    const searchText = preloadSearchText(source, job, category);
 
     if (!isUsText(location)) continue;
     if (!isEngineeringText(searchText)) continue;
     if (isInternshipText(searchText)) continue;
 
-    const description = safeDescription({
+    if (
+      requiredTerms.length > 0 &&
+      !includesAnyTerm(`${searchText} ${fieldsText}`, requiredTerms)
+    ) {
+      continue;
+    }
+
+    if (titleTerms.length > 0 && !includesAnyTerm(title, titleTerms)) {
+      continue;
+    }
+
+    if (
+      excludedTitleTerms.length > 0 &&
+      includesAnyTerm(title, excludedTitleTerms)
+    ) {
+      continue;
+    }
+
+    const fallbackDescription = safeDescription({
       title,
       companyName: source.companyName,
       description: `${title} role at ${source.companyName}. Visit the company careers site for the complete description and application details.`,
     });
 
-    jobs.push({
+    const importedJob: ImportedJob = {
       recruiterId,
       companyId: null,
       companyName: source.companyName,
       companyLogoUrl: source.companyLogoUrl ?? null,
 
       title,
-      description,
+      description: fallbackDescription,
       location,
 
       latitude: null,
       longitude: null,
 
-      employmentType: normalizeEmploymentType(job.employmentType?.join(" ")),
-      workMode: detectWorkMode(title, `${location} ${String(job.isRemote)}`),
+      employmentType: normalizeEmploymentType(employmentTypeText),
+      workMode: detectWorkMode(
+        `${title} ${remoteText}`,
+        `${location} ${String(job.isRemote)}`,
+      ),
 
-      salaryMin: null,
-      salaryMax: null,
+      salaryMin: salary.min,
+      salaryMax: salary.max,
       salaryCurrency: "USD",
 
       skills: [],
@@ -4208,10 +4326,70 @@ async function fetchFedExPreloadJobs(
       companyTagline: null,
       companySize: null,
       companyWebsite,
+    };
+
+    const enhancedJob = await enhanceImportedJobFromDetailPage({
+      job: importedJob,
+      detailUrl: applyUrl,
+      signal: context?.signal,
     });
+
+    jobs.push(enhancedJob);
   }
 
   return jobs;
+}
+
+function fetchFedExPreloadJobs(
+  source: JobSource,
+  context?: {
+    signal?: AbortSignal;
+  },
+): Promise<ImportedJob[]> {
+  return fetchPreloadedCareerJobs(source, context);
+}
+
+function fetchParadoxPreloadJobs(
+  source: JobSource,
+  context?: {
+    signal?: AbortSignal;
+  },
+): Promise<ImportedJob[]> {
+  const maxPages = Math.max(metadataNumber(source, "maxPages") ?? 6, 1);
+  const jobs: ImportedJob[] = [];
+  const seenSourceIds = new Set<string>();
+
+  return (async () => {
+    for (let page = 1; page <= maxPages; page += 1) {
+      const pageUrl = new URL(
+        source.sourceUrl ?? "https://careers.nordstrom.com/jobs",
+      );
+
+      if (page > 1) {
+        const basePath = pageUrl.pathname.replace(/\/page\/\d+\/?$/i, "");
+        pageUrl.pathname = `${basePath.replace(/\/$/, "")}/page/${page}`;
+      }
+
+      const pageJobs = await fetchPreloadedCareerJobs(
+        {
+          ...source,
+          sourceUrl: pageUrl.toString(),
+        },
+        context,
+      );
+
+      if (pageJobs.length === 0) break;
+
+      for (const job of pageJobs) {
+        if (seenSourceIds.has(job.sourceId)) continue;
+
+        seenSourceIds.add(job.sourceId);
+        jobs.push(job);
+      }
+    }
+
+    return jobs;
+  })();
 }
 
 async function fetchTalentBrewJobs(
@@ -5694,6 +5872,10 @@ export const scraperAdapter: JobSourceAdapter = {
 
     if (adapter === "fedex-preload") {
       return fetchFedExPreloadJobs(source, context);
+    }
+
+    if (adapter === "paradox-preload") {
+      return fetchParadoxPreloadJobs(source, context);
     }
 
     if (adapter === "jibe") {
