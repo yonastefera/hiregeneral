@@ -238,6 +238,22 @@ function extractVisibleDetailText(html: string) {
   return stripNoise(cleanInlineText(mainHtml));
 }
 
+function chooseBestDescription(params: {
+  schemaDescription: string;
+  visibleText: string;
+  fallbackDescription: string;
+}) {
+  const schemaText = compactText(params.schemaDescription);
+  const visibleText = compactText(params.visibleText);
+  const fallbackText = compactText(params.fallbackDescription);
+
+  const candidates = [visibleText, schemaText, fallbackText]
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
+
+  return candidates[0] ?? fallbackText;
+}
+
 function sectionBetween(text: string, start: RegExp, end: RegExp) {
   const startMatch = text.match(start);
 
@@ -262,7 +278,7 @@ function splitSectionItems(value: string, maxItems: number) {
   const bulletItems = normalized
     .split(/\n|•| - | – /)
     .map(normalizeItem)
-    .filter((item) => item.length >= 12 && item.length <= 360);
+    .filter((item) => item.length >= 12 && item.length <= 420);
 
   if (bulletItems.length > 1) {
     return uniqueItems(bulletItems, maxItems);
@@ -271,7 +287,7 @@ function splitSectionItems(value: string, maxItems: number) {
   const sentenceItems = compactText(normalized)
     .split(/(?<=[.!?])\s+(?=[A-Z0-9])/)
     .map(normalizeItem)
-    .filter((item) => item.length >= 30 && item.length <= 360);
+    .filter((item) => item.length >= 30 && item.length <= 420);
 
   return uniqueItems(sentenceItems, maxItems);
 }
@@ -279,14 +295,26 @@ function splitSectionItems(value: string, maxItems: number) {
 function deriveSectionsFromDetailText(text: string): DerivedDetailSections {
   const responsibilitiesText = sectionBetween(
     text,
-    /(key responsibilities|responsibilities|what you(?:'|’)ll do|what you'll do|in this role, you will|role summary):?\s*/i,
-    /(required qualifications|preferred qualifications|qualifications|requirements|technical expertise|leadership competencies|benefits|pay range|pay range details|we(?:'|’)ve got you covered|we've got you covered):?\s*/i,
+    /(key responsibilities|responsibilities|what you(?:'|’)ll do|what you'll do|in this role, you will):?\s*/i,
+    /(required qualifications|preferred qualifications|qualifications|requirements|technical expertise|leadership competencies|example projects|benefits|pay range|pay range details|we(?:'|’)ve got you covered|we've got you covered):?\s*/i,
   );
 
   const requirementsText = sectionBetween(
     text,
-    /(required qualifications|preferred qualifications|qualifications|requirements|technical expertise):?\s*/i,
-    /(leadership competencies|benefits|pay range|pay range details|we(?:'|’)ve got you covered|we've got you covered|about the company|equal opportunity):?\s*/i,
+    /(required qualifications|qualifications|requirements):?\s*/i,
+    /(preferred qualifications|technical expertise|leadership competencies|benefits|pay range|pay range details|we(?:'|’)ve got you covered|we've got you covered|about the company|equal opportunity):?\s*/i,
+  );
+
+  const preferredText = sectionBetween(
+    text,
+    /(preferred qualifications):?\s*/i,
+    /(technical expertise|leadership competencies|benefits|pay range|pay range details|we(?:'|’)ve got you covered|we've got you covered|about the company|equal opportunity):?\s*/i,
+  );
+
+  const technicalText = sectionBetween(
+    text,
+    /(technical expertise|platforms & tools|languages & automation|strategic technologies):?\s*/i,
+    /(leadership competencies|benefits|pay range|required qualifications|preferred qualifications):?\s*/i,
   );
 
   const benefitsText = sectionBetween(
@@ -295,17 +323,18 @@ function deriveSectionsFromDetailText(text: string): DerivedDetailSections {
     /(learn more|equal opportunity|posting|application deadline|pay range details|pay offers are dependent):?\s*/i,
   );
 
-  const skillsText = sectionBetween(
-    text,
-    /(technical expertise|platforms & tools|languages & automation|skills):?\s*/i,
-    /(leadership competencies|benefits|pay range|required qualifications|preferred qualifications):?\s*/i,
-  );
-
   return {
     responsibilities: splitSectionItems(responsibilitiesText, 12),
-    requirements: splitSectionItems(requirementsText, 14),
+    requirements: uniqueItems(
+      [
+        ...splitSectionItems(requirementsText, 10),
+        ...splitSectionItems(preferredText, 6),
+        ...splitSectionItems(technicalText, 8),
+      ],
+      14,
+    ),
     benefits: splitSectionItems(benefitsText, 10),
-    skills: splitSectionItems(skillsText, 14),
+    skills: splitSectionItems(technicalText, 14),
   };
 }
 
@@ -409,7 +438,11 @@ export async function enhanceImportedJobFromDetailPage({
     const schemaDescription =
       typeof schema?.description === "string" ? schema.description : "";
     const visibleText = extractVisibleDetailText(html);
-    const fullDescription = compactText(schemaDescription || visibleText);
+    const fullDescription = chooseBestDescription({
+      schemaDescription,
+      visibleText,
+      fallbackDescription: job.description,
+    });
 
     if (fullDescription.length < MIN_USEFUL_DESCRIPTION_LENGTH) {
       return job;
