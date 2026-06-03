@@ -43,13 +43,15 @@ const supabaseAdmin = createClient(
 );
 
 function toJobSource(row: JobSourceRow): JobSource {
+  const fallbackLogoUrl = row.company_domain
+    ? (logoDevUrl(row.company_domain) ?? undefined)
+    : undefined;
+
   return {
     id: row.id,
     companyName: row.company_name,
     companyDomain: row.company_domain,
-    companyLogoUrl:
-      row.company_logo_url ??
-      (row.company_domain ? logoDevUrl(row.company_domain) : undefined),
+    companyLogoUrl: row.company_logo_url ?? fallbackLogoUrl,
     metadata: row.metadata ?? {},
     sourceType: row.source_type,
     sourceSlug: row.source_slug,

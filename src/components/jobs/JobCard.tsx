@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -8,12 +7,11 @@ import {
   MapPin,
 } from "lucide-react";
 
+import CompanyLogo from "@/components/jobs/CompanyLogo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SaveJobButton } from "@/components/jobs/SaveJobButton";
 import { listingLocation, listingTitle } from "@/lib/jobs/display";
-import { companyInitials, isSupportedLogoUrl } from "@/lib/logos";
-import { cn } from "@/lib/utils";
 import type { JobListing } from "@/data/jobPlatform";
 
 type JobCardProps = {
@@ -32,36 +30,15 @@ export function JobCard({ job, saved, saving = false, onSave }: JobCardProps) {
   const applyHref =
     isExternal && job.applyUrl ? job.applyUrl : `/jobs/${job.slug}/apply`;
 
-  const logoUrl = isSupportedLogoUrl(job.logo) ? job.logo : null;
-  const logoText = logoUrl
-    ? null
-    : job.logo.startsWith("http")
-      ? companyInitials(job.company)
-      : job.logo;
-
   return (
     <article className="group relative max-w-full overflow-hidden rounded-2xl border border-border/60 bg-card p-5 shadow-xs transition-shadow duration-200 hover:shadow-soft">
       <div className="flex items-start gap-4">
-        <div
-          className={cn(
-            "flex size-12 shrink-0 items-center justify-center rounded-2xl text-sm font-semibold",
-            logoUrl
-              ? "bg-secondary/50 text-foreground ring-1 ring-border/60 shadow-xs"
-              : "bg-primary-gradient text-primary-foreground shadow-pop",
-          )}
-        >
-          {logoUrl ? (
-            <Image
-              src={job.logo}
-              alt={`${job.company} logo`}
-              width={48}
-              height={48}
-              className="size-full rounded-2xl object-contain p-1.5"
-            />
-          ) : (
-            logoText
-          )}
-        </div>
+        <CompanyLogo
+          src={job.logo}
+          companyName={job.company}
+          size="md"
+          className="shadow-xs"
+        />
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-3">

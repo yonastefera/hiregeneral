@@ -27,6 +27,11 @@ const nextConfig: NextConfig = {
   productionBrowserSourceMaps: false,
   devIndicators: false,
   images: {
+    localPatterns: [
+      {
+        pathname: "/api/logos",
+      },
+    ],
     remotePatterns: [
       {
         protocol: "https",

@@ -1,6 +1,6 @@
 import type { Job } from "@/lib/db/types";
 import { listingLocation } from "@/lib/jobs/display";
-import { isSupportedLogoUrl } from "@/lib/logos";
+import { isSupportedLogoUrl, logoSrcFromUrl } from "@/lib/logos";
 import { cleanTextArray, htmlToText } from "@/lib/text/html";
 
 export function formatSalary(
@@ -34,7 +34,9 @@ export function daysAgoLabel(postedAt: string | null | undefined) {
 }
 
 export function supportedLogoUrl(value: string | null | undefined) {
-  return value && isSupportedLogoUrl(value) ? value : null;
+  if (!isSupportedLogoUrl(value)) return null;
+
+  return logoSrcFromUrl(value, 128);
 }
 
 export function cleanJob(job: Job): Job {
