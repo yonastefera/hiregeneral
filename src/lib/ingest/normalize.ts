@@ -7,12 +7,14 @@ const isoDateString = z
     message: "Expected a valid date string",
   });
 
+const companyLogoUrl = z.union([z.url(), z.string().startsWith("/api/logos?")]);
+
 export const importedJobSchema = z.object({
   recruiterId: z.uuid(),
 
   companyId: z.uuid().nullable(),
   companyName: z.string().trim().min(1),
-  companyLogoUrl: z.url().nullable(),
+  companyLogoUrl: companyLogoUrl.nullable(),
 
   title: z.string().trim().min(1),
   description: z.string().trim().min(1),

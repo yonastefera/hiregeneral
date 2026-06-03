@@ -47,15 +47,15 @@ function LogoMark({
   const logoUrl = supportedLogoUrl(job.company_logo_url);
   const logoInitials = job.company_name.slice(0, 2).toUpperCase();
   const sizeClass =
-    size === "lg" ? "size-24 rounded-3xl" : "size-10 rounded-xl";
+    size === "lg" ? "size-18 rounded-3xl" : "size-10 rounded-xl";
 
   if (logoUrl) {
     return (
       <Image
         src={logoUrl}
         alt={`${job.company_name} logo`}
-        width={size === "lg" ? 96 : 40}
-        height={size === "lg" ? 96 : 40}
+        width={size === "lg" ? 72 : 40}
+        height={size === "lg" ? 72 : 40}
         className={cn(
           sizeClass,
           "shrink-0 object-contain ring-1 ring-black/5",
@@ -68,7 +68,7 @@ function LogoMark({
   return (
     <div
       className={cn(
-        "grid shrink-0 place-items-center bg-gradient-to-br from-teal-400 to-emerald-500 font-bold text-white shadow-[0_24px_60px_-18px_rgba(13,148,136,0.35)] ring-1 ring-teal-900/10",
+        "grid shrink-0 place-items-center bg-linear-to-br from-teal-400 to-emerald-500 font-bold text-white shadow-[0_24px_60px_-18px_rgba(13,148,136,0.35)] ring-1 ring-teal-900/10",
         sizeClass,
         size === "lg" ? "text-xl" : "text-[11px]",
       )}
@@ -132,7 +132,7 @@ function CompanyRailCard({
   return (
     <section
       aria-labelledby="job-company-heading"
-      className="rounded-3xl border border-black/5 bg-gradient-to-br from-neutral-950 to-neutral-800 p-5 text-white shadow-[0_30px_80px_-40px_rgba(15,23,42,0.7)]"
+      className="rounded-3xl border border-black/5 bg-linear-to-br from-neutral-950 to-neutral-800 p-5 text-white shadow-[0_30px_80px_-40px_rgba(15,23,42,0.7)]"
     >
       <h2
         id="job-company-heading"
@@ -233,77 +233,77 @@ export default async function JobDetailsPage({ jobId }: JobDetailsPageProps) {
         <div className="relative mx-auto max-w-7xl px-4 pb-12 pt-6 md:px-6">
           <div className="grid items-start gap-6 lg:grid-cols-12">
             <div className="lg:col-span-8">
-              <div className="flex flex-wrap items-start gap-6">
-                <div className="relative">
-                  <LogoMark job={job} />
-                  <span className="absolute -bottom-1 -right-1 grid size-7 place-items-center rounded-full bg-emerald-500 text-white ring-2 ring-white">
-                    <Check
-                      aria-hidden="true"
-                      className="size-3.5"
-                      strokeWidth={3}
-                    />
-                  </span>
-                </div>
+              <div className="min-w-0 pt-14">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="relative">
+                    <LogoMark job={job} size="lg" />
+                    <span className="absolute -bottom-1 -right-1 grid size-7 place-items-center rounded-full bg-emerald-500 text-white ring-2 ring-white">
+                      <Check
+                        aria-hidden="true"
+                        className="size-3.5"
+                        strokeWidth={3}
+                      />
+                    </span>
+                  </div>
 
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2 text-[13px] font-semibold text-teal-700">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2 text-[13px] font-semibold text-teal-700">
                     <span className="rounded-md bg-teal-50 px-2 py-0.5 ring-1 ring-teal-200/60">
                       {job.company_name}
                     </span>
                     <span className="text-neutral-300">/</span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm shadow-emerald-500/30">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-linear-to-r from-emerald-500 to-teal-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm shadow-emerald-500/30">
                       <Sparkles aria-hidden="true" className="size-3" />
                       Curated role
                     </span>
                   </div>
-
-                  <h1 className="mt-3 text-balance text-4xl font-semibold leading-[1.05] tracking-tight md:text-5xl">
-                    {displayTitle}
-                  </h1>
-
-                  <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-neutral-700">
-                    <span className="inline-flex items-center gap-1.5">
-                      <MapPin
-                        aria-hidden="true"
-                        className="size-3.5 text-teal-600"
-                      />
-                      <span className="line-clamp-2" title={job.location}>
-                        {heroLocation}
-                      </span>
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <Briefcase
-                        aria-hidden="true"
-                        className="size-3.5 text-orange-500"
-                      />
-                      {job.employment_type}
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <Clock3
-                        aria-hidden="true"
-                        className="size-3.5 text-emerald-600"
-                      />
-                      {postedLabel(postedDays)}
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <Users
-                        aria-hidden="true"
-                        className="size-3.5 text-rose-500"
-                      />
-                      {applicantCount} applicants
-                    </span>
-                  </div>
-
-                  {heroPills.length > 0 && (
-                    <div className="mt-4 flex flex-wrap gap-1.5">
-                      {heroPills.map((pill) => (
-                        <HeroPill key={pill.label} className={pill.className}>
-                          {pill.label}
-                        </HeroPill>
-                      ))}
-                    </div>
-                  )}
                 </div>
+
+                <h1 className="mt-5 max-w-4xl text-balance text-3xl font-semibold leading-[1.1] tracking-tight md:text-4xl">
+                  {displayTitle}
+                </h1>
+
+                <div className="mt-4 flex max-w-4xl flex-col gap-2 text-[13px] text-neutral-700 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-5">
+                  <span className="inline-flex min-w-0 items-center gap-1.5">
+                    <MapPin
+                      aria-hidden="true"
+                      className="size-3.5 shrink-0 text-teal-600"
+                    />
+                    <span className="line-clamp-2" title={job.location}>
+                      {heroLocation}
+                    </span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Briefcase
+                      aria-hidden="true"
+                      className="size-3.5 text-orange-500"
+                    />
+                    {job.employment_type}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Clock3
+                      aria-hidden="true"
+                      className="size-3.5 text-emerald-600"
+                    />
+                    {postedLabel(postedDays)}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Users
+                      aria-hidden="true"
+                      className="size-3.5 text-rose-500"
+                    />
+                    {applicantCount} applicants
+                  </span>
+                </div>
+
+                {heroPills.length > 0 && (
+                  <div className="mt-4 flex flex-wrap gap-1.5">
+                    {heroPills.map((pill) => (
+                      <HeroPill key={pill.label} className={pill.className}>
+                        {pill.label}
+                      </HeroPill>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -311,7 +311,7 @@ export default async function JobDetailsPage({ jobId }: JobDetailsPageProps) {
               <div className="relative overflow-hidden rounded-3xl border border-teal-900/10 bg-white p-5 shadow-[0_30px_80px_-30px_rgba(13,148,136,0.35)]">
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute -right-16 -top-16 size-40 rounded-full bg-gradient-to-br from-teal-300/40 to-emerald-400/30 blur-2xl"
+                  className="pointer-events-none absolute -right-16 -top-16 size-40 rounded-full bg-linear-to-br from-teal-300/40 to-emerald-400/30 blur-2xl"
                 />
                 <div className="relative">
                   <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-emerald-700">
@@ -321,7 +321,7 @@ export default async function JobDetailsPage({ jobId }: JobDetailsPageProps) {
 
                   {salary && (
                     <div className="mt-2 flex items-baseline gap-1.5">
-                      <span className="bg-gradient-to-br from-neutral-900 to-teal-800 bg-clip-text text-3xl font-semibold tracking-tight text-transparent">
+                      <span className="bg-linear-to-br from-neutral-900 to-teal-800 bg-clip-text text-3xl font-semibold tracking-tight text-transparent">
                         {salary}
                       </span>
                       <span className="text-xs text-neutral-500">/ year</span>

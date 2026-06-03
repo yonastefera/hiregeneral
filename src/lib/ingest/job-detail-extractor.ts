@@ -295,14 +295,14 @@ function splitSectionItems(value: string, maxItems: number) {
 function deriveSectionsFromDetailText(text: string): DerivedDetailSections {
   const responsibilitiesText = sectionBetween(
     text,
-    /(key responsibilities|responsibilities|what you(?:'|’)ll do|what you'll do|in this role, you will):?\s*/i,
-    /(required qualifications|preferred qualifications|qualifications|requirements|technical expertise|leadership competencies|example projects|benefits|pay range|pay range details|we(?:'|’)ve got you covered|we've got you covered):?\s*/i,
+    /(key accountabilities|key responsibilities|responsibilities|what you(?:'|’)ll do|what you'll do|in this role, you will):?\s*/i,
+    /(what we(?:'|’)re looking for|what we're looking for|required qualifications|preferred qualifications|qualifications|requirements|technical expertise|leadership competencies|example projects|benefits|pay range|pay range details|we(?:'|’)ve got you covered|we've got you covered):?\s*/i,
   );
 
   const requirementsText = sectionBetween(
     text,
-    /(required qualifications|qualifications|requirements):?\s*/i,
-    /(preferred qualifications|technical expertise|leadership competencies|benefits|pay range|pay range details|we(?:'|’)ve got you covered|we've got you covered|about the company|equal opportunity):?\s*/i,
+    /(what we(?:'|’)re looking for|what we're looking for|required qualifications|qualifications|requirements):?\s*/i,
+    /(nice to have|preferred qualifications|technical expertise|leadership competencies|benefits|pay range|pay range details|we(?:'|’)ve got you covered|we've got you covered|about the company|equal opportunity):?\s*/i,
   );
 
   const preferredText = sectionBetween(
@@ -419,7 +419,38 @@ async function fetchDetailHtml(detailUrl: string, signal?: AbortSignal) {
     return null;
   }
 
-  return response.text();
+  const text = await response.text();
+
+  try {
+    const redirect = JSON.parse(text) as {
+      url?: unknown;
+      externalSpa?: unknown;
+      widget?: unknown;
+    };
+
+    if (
+      redirect.widget === "redirect" &&
+      typeof redirect.url === "string" &&
+      redirect.externalSpa === true
+    ) {
+      const redirectUrl = new URL(redirect.url, detailUrl).toString();
+      const redirectResponse = await fetch(redirectUrl, {
+        headers: {
+          Accept: "text/html,application/xhtml+xml",
+          "Accept-Language": "en-US,en;q=0.9",
+          "User-Agent": "HireGeneralJobBoard/1.0",
+        },
+        cache: "no-store",
+        signal,
+      });
+
+      return redirectResponse.ok ? redirectResponse.text() : null;
+    }
+  } catch {
+    // Non-JSON detail pages are the common case.
+  }
+
+  return text;
 }
 
 export async function enhanceImportedJobFromDetailPage({
@@ -448,7 +479,11 @@ export async function enhanceImportedJobFromDetailPage({
       return job;
     }
 
-    const derivedSections = deriveSectionsFromDetailText(visibleText);
+    const sectionSource =
+      visibleText.length >= MIN_USEFUL_DESCRIPTION_LENGTH
+        ? visibleText
+        : fullDescription;
+    const derivedSections = deriveSectionsFromDetailText(sectionSource);
     const schemaResponsibilities = toStringArray(schema?.responsibilities, 12);
     const schemaRequirements = [
       ...toStringArray(schema?.qualifications, 14),

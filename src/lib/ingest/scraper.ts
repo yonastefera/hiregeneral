@@ -1559,7 +1559,7 @@ async function fetchGoldmanHigherJobs(
           companyName: source.companyName,
         });
 
-        jobs.push({
+        const importedJob: ImportedJob = {
           recruiterId,
           companyId: null,
           companyName: source.companyName,
@@ -1599,7 +1599,9 @@ async function fetchGoldmanHigherJobs(
           companyTagline: null,
           companySize: null,
           companyWebsite,
-        });
+        };
+
+        jobs.push(importedJob);
       }
 
       if (pageJobs.length < pageSize) break;
@@ -1876,7 +1878,7 @@ async function fetchActivateJobs(
         if (!isEngineeringText(searchText)) continue;
         if (isInternshipText(searchText)) continue;
 
-        jobs.push({
+        const importedJob: ImportedJob = {
           recruiterId,
           companyId: null,
           companyName: source.companyName,
@@ -1916,7 +1918,9 @@ async function fetchActivateJobs(
           companyTagline: null,
           companySize: null,
           companyWebsite,
-        });
+        };
+
+        jobs.push(importedJob);
       }
 
       if (pageJobs.length < pageSize) break;
@@ -2606,7 +2610,7 @@ async function fetchEightfoldJobs(
           companyName: source.companyName,
         });
 
-        jobs.push({
+        const importedJob: ImportedJob = {
           recruiterId,
           companyId: null,
           companyName: source.companyName,
@@ -2654,7 +2658,9 @@ async function fetchEightfoldJobs(
           companyTagline: null,
           companySize: null,
           companyWebsite,
-        });
+        };
+
+        jobs.push(importedJob);
       }
 
       if (pageJobs.length < pageSize) break;
@@ -2847,7 +2853,7 @@ async function fetchTargetJobs(
             ? job.applyurl
             : targetPublicUrl(source, job);
 
-        jobs.push({
+        const importedJob: ImportedJob = {
           recruiterId,
           companyId: null,
           companyName: source.companyName,
@@ -2889,7 +2895,9 @@ async function fetchTargetJobs(
           companyTagline: null,
           companySize: null,
           companyWebsite,
-        });
+        };
+
+        jobs.push(importedJob);
       }
     }
   }
@@ -3081,7 +3089,7 @@ async function fetchWalmartJobs(
         if (!isEngineeringText(searchText)) continue;
         if (isInternshipText(searchText)) continue;
 
-        jobs.push({
+        const importedJob: ImportedJob = {
           recruiterId,
           companyId: null,
           companyName: source.companyName,
@@ -3123,7 +3131,9 @@ async function fetchWalmartJobs(
           companyTagline: null,
           companySize: null,
           companyWebsite,
-        });
+        };
+
+        jobs.push(importedJob);
       }
 
       if (pageJobs.length < pageSize) break;
@@ -3269,7 +3279,7 @@ async function fetchYahooJobs(
         if (!isEngineeringText(searchText)) continue;
         if (isInternshipText(searchText)) continue;
 
-        jobs.push({
+        const importedJob: ImportedJob = {
           recruiterId,
           companyId: null,
           companyName: source.companyName,
@@ -3309,7 +3319,9 @@ async function fetchYahooJobs(
           companyTagline: null,
           companySize: null,
           companyWebsite,
-        });
+        };
+
+        jobs.push(importedJob);
       }
 
       if (pageJobs.length < pageSize) break;
@@ -4254,6 +4266,19 @@ async function fetchPreloadedCareerJobs(
       preloadCustomField(job, /salary|pay|compensation/i),
     );
     const searchText = preloadSearchText(source, job, category);
+    const sourceSearchText = [
+      title,
+      job.brandName,
+      job.companyName,
+      job.reference,
+      job.requisitionID,
+      job.uniqueID,
+      employmentTypeText,
+      location,
+      fieldsText,
+    ]
+      .filter(Boolean)
+      .join(" ");
 
     if (!isUsText(location)) continue;
     if (!isEngineeringText(searchText)) continue;
@@ -4261,7 +4286,7 @@ async function fetchPreloadedCareerJobs(
 
     if (
       requiredTerms.length > 0 &&
-      !includesAnyTerm(`${searchText} ${fieldsText}`, requiredTerms)
+      !includesAnyTerm(sourceSearchText, requiredTerms)
     ) {
       continue;
     }
@@ -4470,7 +4495,7 @@ async function fetchTalentBrewJobs(
           description: `${job.title} role at ${source.companyName}. Visit the company careers site for the complete description and application details.`,
         });
 
-        jobs.push({
+        const importedJob: ImportedJob = {
           recruiterId,
           companyId: null,
           companyName: source.companyName,
@@ -4510,7 +4535,15 @@ async function fetchTalentBrewJobs(
           companyTagline: null,
           companySize: null,
           companyWebsite,
+        };
+
+        const enhancedJob = await enhanceImportedJobFromDetailPage({
+          job: importedJob,
+          detailUrl: job.applyUrl,
+          signal: context?.signal,
         });
+
+        jobs.push(enhancedJob);
       }
 
       if (pageJobs.length < 15) break;
