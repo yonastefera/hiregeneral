@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getJobSourceAdapter } from "@/lib/ingest/adapters";
+import { enhanceImportedJobFromDetailPage } from "@/lib/ingest/job-detail-extractor";
 import {
   finishIngestionRun,
   startIngestionRun,
@@ -10,11 +11,13 @@ import {
   expireStaleImportedJobs,
   upsertImportedJobs,
 } from "@/lib/ingest/upsert-jobs";
+import type { ImportedJob } from "@/lib/ingest/normalize";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const DEFAULT_SOURCE_TIMEOUT_MS = 90_000;
+const DEFAULT_DETAIL_ENHANCEMENT_CONCURRENCY = 3;
 
 type SourceResult = {
   companyName: string;
@@ -77,6 +80,56 @@ function sourceTimeoutMs(source?: { metadata?: Record<string, unknown> }) {
   return Number.isFinite(value) && value > 0
     ? value
     : DEFAULT_SOURCE_TIMEOUT_MS;
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>,
+) {
+  const results: R[] = [];
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await mapper(items[currentIndex]);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, () => worker()),
+  );
+
+  return results;
+}
+
+async function enhanceJobsFromSourceDetails(
+  jobs: ImportedJob[],
+  source: { metadata?: Record<string, unknown> },
+  signal?: AbortSignal,
+) {
+  const enabled = source.metadata?.enhanceDetails !== false;
+
+  if (!enabled || jobs.length === 0) return jobs;
+
+  const concurrency = Math.min(
+    Math.max(
+      metadataNumber(source.metadata, "detailEnhancementConcurrency") ??
+        DEFAULT_DETAIL_ENHANCEMENT_CONCURRENCY,
+      1,
+    ),
+    8,
+  );
+
+  return mapWithConcurrency(jobs, concurrency, (job) =>
+    enhanceImportedJobFromDetailPage({
+      job,
+      detailUrl: job.applyUrl,
+      signal,
+    }),
+  );
 }
 
 async function runJobsIngestion(request: Request) {
@@ -185,9 +238,14 @@ async function runJobsIngestion(request: Request) {
         let rawJobs;
 
         try {
-          rawJobs = await adapter.fetchJobs(source, {
+          const adapterJobs = await adapter.fetchJobs(source, {
             signal: abortController.signal,
           });
+          rawJobs = await enhanceJobsFromSourceDetails(
+            adapterJobs,
+            source,
+            abortController.signal,
+          );
         } finally {
           clearTimeout(timeout);
         }

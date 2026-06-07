@@ -8,6 +8,7 @@ import {
   safeDescription,
   type ImportedJob,
 } from "./normalize";
+import { sanitizeJobPostingHtml } from "@/lib/text/html";
 import {
   isEngineeringText,
   isInternshipText,
@@ -509,14 +510,21 @@ function parsedDescriptionSections(descriptionHtml: string | undefined) {
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
-  const markerPattern =
-    /^(About this role|About the role|About Accenture|In this role, you will|As an? [^.\n]{3,160}?, you will|What you(?:'|’)ll do|Responsibilities|Here(?:'|’)s What You Need|What You Need|Nice to Have|Required Qualifications|Minimum Qualifications|Basic Qualifications|Desired Qualifications|Preferred Qualifications|Qualifications|Requirements|Job Expectations|Pay Range|Benefits|Posting End Date|We Value Equal Opportunity|Applicants with Disabilities|Drug and Alcohol Policy|Wells Fargo Recruitment and Hiring Requirements):?$/gim;
+  const normalizedSectionText = text.replace(
+    /\s+(Basic Qualifications|Preferred Qualifications|Responsibilities|Benefits|Candidate Profile|The minimum and maximum full-time annual salaries for this role are listed below, by location|This role is eligible to earn performance based incentive compensation|Capital One offers a comprehensive, competitive, and inclusive set of health, financial and other benefits):?\s+/gi,
+    "\n\n$1\n",
+  );
 
-  const markers = [...text.matchAll(markerPattern)].map((match) => ({
-    label: match[1].toLowerCase(),
-    index: match.index ?? 0,
-    end: (match.index ?? 0) + match[0].length,
-  }));
+  const markerPattern =
+    /^(About this role|About the role|About Accenture|In this role, you will|As an? [^.\n]{3,160}?, you will|What you(?:'|’)ll do|Responsibilities|Candidate Profile|Here(?:'|’)s What You Need|What You Need|Nice to Have|Required Qualifications|Minimum Qualifications|Basic Qualifications|Desired Qualifications|Preferred Qualifications|Qualifications|Requirements|Job Expectations|Pay Range|The minimum and maximum full-time annual salaries for this role are listed below, by location|This role is eligible to earn performance based incentive compensation|Benefits|Capital One offers a comprehensive, competitive, and inclusive set of health, financial and other benefits|Posting End Date|We Value Equal Opportunity|Applicants with Disabilities|Drug and Alcohol Policy|Wells Fargo Recruitment and Hiring Requirements):?$/gim;
+
+  const markers = [...normalizedSectionText.matchAll(markerPattern)].map(
+    (match) => ({
+      label: match[1].toLowerCase(),
+      index: match.index ?? 0,
+      end: (match.index ?? 0) + match[0].length,
+    }),
+  );
 
   const section = (labels: string[]) => {
     const chunks: string[] = [];
@@ -525,7 +533,11 @@ function parsedDescriptionSections(descriptionHtml: string | undefined) {
       if (!labels.some((label) => marker.label.includes(label))) return;
 
       const next = markers[index + 1];
-      chunks.push(text.slice(marker.end, next?.index ?? text.length).trim());
+      chunks.push(
+        normalizedSectionText
+          .slice(marker.end, next?.index ?? normalizedSectionText.length)
+          .trim(),
+      );
     });
 
     return chunks.join("\n");
@@ -736,11 +748,13 @@ export async function fetchWorkdayJobs(
       companyName: source.companyName,
       companyLogoUrl: source.companyLogoUrl ?? null,
       title,
-      description: safeDescription({
-        description: parsedDescription.plainText || parsedDescription.about,
-        title,
-        companyName: source.companyName,
-      }),
+      description:
+        sanitizeJobPostingHtml(info?.jobDescription) ||
+        safeDescription({
+          description: parsedDescription.plainText || parsedDescription.about,
+          title,
+          companyName: source.companyName,
+        }),
       location,
 
       latitude: null,

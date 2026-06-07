@@ -28,6 +28,7 @@ import {
   formatSalary,
   getDisplayLocation,
   getDisplayTitle,
+  sourcePostingHtml,
   supportedLogoUrl,
 } from "./job-details-utils";
 
@@ -176,6 +177,7 @@ export default async function JobDetailsPage({ jobId }: JobDetailsPageProps) {
   }
 
   const sections = deriveDescriptionSections(job);
+  const sourceHtml = sourcePostingHtml(job);
   const salary = formatSalary(
     job.salary_min,
     job.salary_max,
@@ -375,7 +377,24 @@ export default async function JobDetailsPage({ jobId }: JobDetailsPageProps) {
       <section className="bg-gradient-to-b from-[#f0f6f7] via-[#f5f9fa] to-[#f0f6f7]">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 pb-12 pt-2 md:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(390px,430px)] xl:grid-cols-[minmax(0,1fr)_minmax(420px,460px)]">
           <div className="space-y-6">
-            {sections.about && (
+            {sourceHtml ? (
+              <SectionCard>
+                <span
+                  aria-hidden="true"
+                  className="absolute left-0 top-8 h-12 w-1 rounded-r bg-gradient-to-b from-teal-500 to-emerald-600"
+                />
+                <div className="text-[11px] uppercase tracking-[0.18em] text-emerald-700">
+                  About the role
+                </div>
+                <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+                  Job description
+                </h2>
+                <div
+                  className="source-job-posting mt-5 text-[14.5px] leading-[1.75] text-neutral-700 [&_h2:first-child]:mt-0 [&_h2]:mb-2 [&_h2]:mt-6 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:uppercase [&_h2]:tracking-[0.08em] [&_h2]:text-neutral-950 [&_h3:first-child]:mt-0 [&_h3]:mb-2 [&_h3]:mt-5 [&_h3]:text-[15px] [&_h3]:font-semibold [&_h3]:text-neutral-950 [&_li]:mb-2 [&_li]:pl-1 [&_ol]:my-4 [&_ol]:list-decimal [&_ol]:space-y-2 [&_ol]:pl-6 [&_p:first-child]:mt-0 [&_p]:my-3 [&_strong]:font-semibold [&_strong]:text-neutral-950 [&_ul]:my-4 [&_ul]:list-disc [&_ul]:space-y-2 [&_ul]:pl-6"
+                  dangerouslySetInnerHTML={{ __html: sourceHtml }}
+                />
+              </SectionCard>
+            ) : sections.about ? (
               <SectionCard>
                 <span
                   aria-hidden="true"
@@ -391,7 +410,7 @@ export default async function JobDetailsPage({ jobId }: JobDetailsPageProps) {
                   {sections.about}
                 </p>
               </SectionCard>
-            )}
+            ) : null}
 
             {sections.responsibilities.length > 0 && (
               <SectionCard>

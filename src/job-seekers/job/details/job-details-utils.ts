@@ -1,7 +1,11 @@
 import type { Job } from "@/lib/db/types";
 import { listingLocation } from "@/lib/jobs/display";
 import { isSupportedLogoUrl, logoSrcFromUrl } from "@/lib/logos";
-import { cleanTextArray, htmlToText } from "@/lib/text/html";
+import {
+  cleanTextArray,
+  htmlToText,
+  sanitizeJobPostingHtml,
+} from "@/lib/text/html";
 
 export function formatSalary(
   min: number | null,
@@ -43,7 +47,7 @@ export function cleanJob(job: Job): Job {
   return {
     ...job,
     title: htmlToText(job.title),
-    description: htmlToText(job.description),
+    description: job.description,
     company_tagline: job.company_tagline
       ? htmlToText(job.company_tagline)
       : job.company_tagline,
@@ -174,6 +178,12 @@ export type DerivedSections = {
   benefits: string[];
   extra: string[];
 };
+
+export function sourcePostingHtml(job: Job) {
+  const html = sanitizeJobPostingHtml(job.description);
+
+  return htmlToText(html).length >= 180 ? html : "";
+}
 
 function removeSectionHeading(value: string, headings: string[]) {
   let result = compactText(value);

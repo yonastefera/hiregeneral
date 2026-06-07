@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       {
         ok: false,
         error:
-          "Job enrichment is disabled. The local model workflow was removed because it was too slow for this app.",
+          "Job enrichment is disabled. HireGeneral now uses source-first rule-based job description rendering.",
       },
       { status: 410 },
     );

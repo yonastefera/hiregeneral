@@ -183,7 +183,6 @@ export function SiteHeaderClient({
       <nav className="mx-auto grid h-16 max-w-360 grid-cols-[auto_auto] items-center justify-between gap-4 px-4 md:relative md:grid-cols-[1fr_auto_1fr] md:px-6">
         <Link
           href="/"
-          prefetch={false}
           aria-label="HireGeneral home"
           className="flex shrink-0 items-center md:justify-self-start"
         >
@@ -198,7 +197,6 @@ export function SiteHeaderClient({
               <Link
                 key={link.href}
                 href={link.href}
-                prefetch={false}
                 className={cn(
                   "relative rounded-full px-3.5 py-1.5 text-sm font-medium tracking-tight transition-colors",
                   active
@@ -217,9 +215,7 @@ export function SiteHeaderClient({
             <>
               {isRecruiter && (
                 <Button variant="default" size="sm" asChild>
-                  <Link href="/employers/dashboard/post-job" prefetch={false}>
-                    Post a job
-                  </Link>
+                  <Link href="/employers/dashboard/post-job">Post a job</Link>
                 </Button>
               )}
 
@@ -370,15 +366,11 @@ export function SiteHeaderClient({
           ) : (
             <>
               <Button variant="ghost" size="sm" asChild>
-                <Link href="/signin" prefetch={false}>
-                  Sign in
-                </Link>
+                <Link href="/signin">Sign in</Link>
               </Button>
 
               <Button variant="default" size="sm" asChild>
-                <Link href="/employers" prefetch={false}>
-                  Post a job
-                </Link>
+                <Link href="/employers">Post a job</Link>
               </Button>
             </>
           )}
@@ -443,7 +435,6 @@ export function SiteHeaderClient({
             <Link
               key={link.href}
               href={link.href}
-              prefetch={false}
               style={{ transitionDelay: open ? `${index * 30}ms` : "0ms" }}
               className={cn(
                 "flex items-center justify-between rounded-md px-3 py-3 text-base font-medium text-foreground transition-all hover:bg-secondary",
@@ -509,21 +500,15 @@ export function SiteHeaderClient({
                 {isJobSeeker && (
                   <>
                     <Button variant="outline" asChild>
-                      <Link href="/profile" prefetch={false}>
-                        Profile
-                      </Link>
+                      <Link href="/profile">Profile</Link>
                     </Button>
 
                     <Button variant="outline" asChild>
-                      <Link href="/saved" prefetch={false}>
-                        Saved & applied
-                      </Link>
+                      <Link href="/saved">Saved & applied</Link>
                     </Button>
 
                     <Button variant="outline" asChild>
-                      <Link href="/applications" prefetch={false}>
-                        My applications
-                      </Link>
+                      <Link href="/applications">My applications</Link>
                     </Button>
                   </>
                 )}
@@ -531,16 +516,11 @@ export function SiteHeaderClient({
                 {isRecruiter && (
                   <>
                     <Button variant="outline" asChild>
-                      <Link href="/employers/dashboard" prefetch={false}>
-                        Dashboard
-                      </Link>
+                      <Link href="/employers/dashboard">Dashboard</Link>
                     </Button>
 
                     <Button asChild>
-                      <Link
-                        href="/employers/dashboard/post-job"
-                        prefetch={false}
-                      >
+                      <Link href="/employers/dashboard/post-job">
                         Post a job
                       </Link>
                     </Button>
@@ -552,15 +532,11 @@ export function SiteHeaderClient({
             ) : (
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="outline" asChild>
-                  <Link href="/signin" prefetch={false}>
-                    Sign in
-                  </Link>
+                  <Link href="/signin">Sign in</Link>
                 </Button>
 
                 <Button asChild>
-                  <Link href="/employers" prefetch={false}>
-                    Post a job
-                  </Link>
+                  <Link href="/employers">Post a job</Link>
                 </Button>
               </div>
             )}
@@ -585,7 +561,6 @@ function IconLink({
   return (
     <Link
       href={href}
-      prefetch={false}
       aria-label={label}
       className="relative grid size-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
     >
@@ -612,7 +587,6 @@ function AccountMenuLink({
   return (
     <Link
       href={href}
-      prefetch={false}
       onClick={onClick}
       className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-secondary"
     >
@@ -631,7 +605,6 @@ function MobileMenuLink({
   return (
     <Link
       href={href}
-      prefetch={false}
       className="flex items-center justify-between rounded-md px-3 py-3 text-base font-medium text-foreground hover:bg-secondary"
     >
       {children}

@@ -23,6 +23,148 @@ function decodeHtmlEntities(value: string) {
     );
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function normalizeAllowedJobHtml(input: string) {
+  return input
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<\s*(h2|h3|p|ul|ol|li|br|strong|b)\b[^>]*>/gi, "<$1>")
+    .replace(/<\s*\/\s*(h2|h3|p|ul|ol|li|strong|b)\s*>/gi, "</$1>")
+    .replace(/<br\s*\/?>/gi, "<br>")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/<b>/gi, "<strong>")
+    .replace(/<\/b>/gi, "</strong>")
+    .replace(
+      /<(h2|h3|p|ul|ol|li|br|strong)>/gi,
+      (_, tag: string) => `<${tag.toLowerCase()}>`,
+    )
+    .replace(
+      /<\/(h2|h3|p|ul|ol|li|strong)>/gi,
+      (_, tag: string) => `</${tag.toLowerCase()}>`,
+    )
+    .replace(/[ \t]+/g, " ")
+    .replace(/\s+\n/g, "\n")
+    .replace(/\n\s+/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+const INLINE_JOB_HEADING_PATTERN =
+  /\b(About (?:the )?(?:role|team|position)|Job Description|Pay Range|Benefits|What You(?:'|’)ll Do|What You'll Do|Responsibilities|Candidate Profile|Required Qualifications|Minimum Qualifications|Basic Qualifications|Preferred Qualifications|Desired Qualifications|Qualifications|Requirements|Desired Skills|Skills|Join the Journey|EEO Statement|Equal Opportunity|Posting End Date)\b:?/gi;
+
+function normalizeJobPostingText(input: string) {
+  return htmlToText(input)
+    .replace(/\r/g, "\n")
+    .replace(/\s*•\s*/g, "\n• ")
+    .replace(INLINE_JOB_HEADING_PATTERN, "\n\n$1\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function flushList(items: string[], blocks: string[]) {
+  if (items.length === 0) return;
+
+  blocks.push(
+    `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`,
+  );
+  items.length = 0;
+}
+
+function splitHeadingAndBody(value: string) {
+  const match = value.match(
+    /^(About (?:the )?(?:role|team|position)|Job Description|Pay Range|Benefits|What You(?:'|’)ll Do|What You'll Do|Responsibilities|Candidate Profile|Required Qualifications|Minimum Qualifications|Basic Qualifications|Preferred Qualifications|Desired Qualifications|Qualifications|Requirements|Desired Skills|Skills|Join the Journey|EEO Statement|Equal Opportunity|Posting End Date)\s*:?\s*([\s\S]*)$/i,
+  );
+
+  if (!match) {
+    return {
+      heading: null,
+      body: value,
+    };
+  }
+
+  return {
+    heading: match[1],
+    body: match[2]?.trim() ?? "",
+  };
+}
+
+function textToStructuredJobHtml(input: string) {
+  const text = normalizeJobPostingText(input);
+  const blocks: string[] = [];
+  const listItems: string[] = [];
+
+  for (const chunk of text.split(/\n{2,}/)) {
+    const lines = chunk
+      .split(/\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    for (const line of lines) {
+      if (line.startsWith("•")) {
+        listItems.push(line.replace(/^•\s*/, "").trim());
+        continue;
+      }
+
+      flushList(listItems, blocks);
+
+      const { heading, body } = splitHeadingAndBody(line);
+
+      if (heading) {
+        blocks.push(`<h2>${escapeHtml(heading)}</h2>`);
+
+        if (body) {
+          if (body.startsWith("•")) {
+            listItems.push(body.replace(/^•\s*/, "").trim());
+          } else {
+            blocks.push(`<p>${escapeHtml(body)}</p>`);
+          }
+        }
+
+        continue;
+      }
+
+      blocks.push(`<p>${escapeHtml(line)}</p>`);
+    }
+  }
+
+  flushList(listItems, blocks);
+
+  return blocks.join("");
+}
+
+export function sanitizeJobPostingHtml(input: string | null | undefined) {
+  if (!input) return "";
+
+  const hasTags = /<\/?[a-z][\s\S]*>/i.test(input);
+
+  if (!hasTags) {
+    return textToStructuredJobHtml(input);
+  }
+
+  const normalized = normalizeAllowedJobHtml(input);
+
+  if (!normalized || !htmlToText(normalized)) {
+    return textToStructuredJobHtml(input);
+  }
+
+  const hasUsefulStructure = /<(h2|h3|ul|ol|li|strong)\b/i.test(normalized);
+
+  if (!hasUsefulStructure && htmlToText(normalized).length > 700) {
+    return textToStructuredJobHtml(normalized);
+  }
+
+  return normalized;
+}
+
 export function htmlToText(input: string | null | undefined) {
   if (!input) return "";
 

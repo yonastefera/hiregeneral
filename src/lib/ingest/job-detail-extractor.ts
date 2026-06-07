@@ -4,6 +4,7 @@ import {
   safeDescription,
   type ImportedJob,
 } from "./normalize";
+import { sanitizeJobPostingHtml } from "@/lib/text/html";
 
 type JobPostingSchema = {
   "@type"?: string | string[];
@@ -33,6 +34,19 @@ type DerivedDetailSections = {
 };
 
 type SalaryRange = {
+  salaryMin: number | null;
+  salaryMax: number | null;
+};
+
+export type ExtractedJobDetailContent = {
+  description: string;
+  descriptionHtml: string;
+  responsibilities: string[];
+  requirements: string[];
+  benefits: string[];
+  skills: string[];
+  employmentType: string | null;
+  postedAt: string | null;
   salaryMin: number | null;
   salaryMax: number | null;
 };
@@ -254,6 +268,22 @@ function chooseBestDescription(params: {
   return candidates[0] ?? fallbackText;
 }
 
+function chooseBestDescriptionHtml(params: {
+  mainHtml: string;
+  schemaDescription: string;
+  fallbackDescription: string;
+}) {
+  const candidates = [
+    sanitizeJobPostingHtml(params.mainHtml),
+    sanitizeJobPostingHtml(params.schemaDescription),
+    sanitizeJobPostingHtml(params.fallbackDescription),
+  ]
+    .filter(Boolean)
+    .sort((a, b) => htmlToText(b).length - htmlToText(a).length);
+
+  return candidates[0] ?? "";
+}
+
 function sectionBetween(text: string, start: RegExp, end: RegExp) {
   const startMatch = text.match(start);
 
@@ -453,6 +483,84 @@ async function fetchDetailHtml(detailUrl: string, signal?: AbortSignal) {
   return text;
 }
 
+export async function extractJobDetailContentFromUrl({
+  detailUrl,
+  fallbackDescription,
+  signal,
+}: {
+  detailUrl: string;
+  fallbackDescription?: string;
+  signal?: AbortSignal;
+}): Promise<ExtractedJobDetailContent | null> {
+  const html = await fetchDetailHtml(detailUrl, signal);
+
+  if (!html) return null;
+
+  const schema = extractJobPostingSchema(html);
+  const schemaDescription =
+    typeof schema?.description === "string" ? schema.description : "";
+  const mainHtml = extractMainHtml(html);
+  const visibleText = extractVisibleDetailText(html);
+  const fullDescription = chooseBestDescription({
+    schemaDescription,
+    visibleText,
+    fallbackDescription: fallbackDescription ?? "",
+  });
+
+  if (fullDescription.length < MIN_USEFUL_DESCRIPTION_LENGTH) {
+    return null;
+  }
+
+  const sectionSource =
+    visibleText.length >= MIN_USEFUL_DESCRIPTION_LENGTH
+      ? visibleText
+      : fullDescription;
+  const derivedSections = deriveSectionsFromDetailText(sectionSource);
+  const schemaResponsibilities = toStringArray(schema?.responsibilities, 12);
+  const schemaRequirements = [
+    ...toStringArray(schema?.qualifications, 14),
+    ...toStringArray(schema?.skills, 14),
+  ];
+  const schemaBenefits = [
+    ...toStringArray(schema?.jobBenefits, 10),
+    ...toStringArray(schema?.benefits, 10),
+  ];
+  const schemaSalary = salaryFromSchema(schema?.baseSalary);
+  const textSalary = salaryFromText(visibleText);
+  const employmentType =
+    typeof schema?.employmentType === "string"
+      ? normalizeEmploymentType(schema.employmentType)
+      : Array.isArray(schema?.employmentType)
+        ? normalizeEmploymentType(schema.employmentType.join(" "))
+        : null;
+
+  return {
+    description: fullDescription,
+    descriptionHtml: chooseBestDescriptionHtml({
+      mainHtml,
+      schemaDescription,
+      fallbackDescription: fallbackDescription ?? "",
+    }),
+    responsibilities:
+      schemaResponsibilities.length > 0
+        ? schemaResponsibilities
+        : derivedSections.responsibilities,
+    requirements:
+      schemaRequirements.length > 0
+        ? uniqueItems(schemaRequirements, 14)
+        : derivedSections.requirements,
+    benefits:
+      schemaBenefits.length > 0
+        ? uniqueItems(schemaBenefits, 10)
+        : derivedSections.benefits,
+    skills: uniqueItems(derivedSections.skills, 14),
+    employmentType,
+    postedAt: validIsoDate(schema?.datePosted),
+    salaryMin: schemaSalary.salaryMin ?? textSalary.salaryMin,
+    salaryMax: schemaSalary.salaryMax ?? textSalary.salaryMax,
+  };
+}
+
 export async function enhanceImportedJobFromDetailPage({
   job,
   detailUrl,
@@ -461,84 +569,36 @@ export async function enhanceImportedJobFromDetailPage({
   if (!detailUrl) return job;
 
   try {
-    const html = await fetchDetailHtml(detailUrl, signal);
-
-    if (!html) return job;
-
-    const schema = extractJobPostingSchema(html);
-    const schemaDescription =
-      typeof schema?.description === "string" ? schema.description : "";
-    const visibleText = extractVisibleDetailText(html);
-    const fullDescription = chooseBestDescription({
-      schemaDescription,
-      visibleText,
+    const detail = await extractJobDetailContentFromUrl({
+      detailUrl,
       fallbackDescription: job.description,
+      signal,
     });
 
-    if (fullDescription.length < MIN_USEFUL_DESCRIPTION_LENGTH) {
-      return job;
-    }
-
-    const sectionSource =
-      visibleText.length >= MIN_USEFUL_DESCRIPTION_LENGTH
-        ? visibleText
-        : fullDescription;
-    const derivedSections = deriveSectionsFromDetailText(sectionSource);
-    const schemaResponsibilities = toStringArray(schema?.responsibilities, 12);
-    const schemaRequirements = [
-      ...toStringArray(schema?.qualifications, 14),
-      ...toStringArray(schema?.skills, 14),
-    ];
-    const schemaBenefits = [
-      ...toStringArray(schema?.jobBenefits, 10),
-      ...toStringArray(schema?.benefits, 10),
-    ];
-
-    const schemaSalary = salaryFromSchema(schema?.baseSalary);
-    const textSalary = salaryFromText(visibleText);
-    const postedAt = validIsoDate(schema?.datePosted);
-    const employmentType =
-      typeof schema?.employmentType === "string"
-        ? normalizeEmploymentType(schema.employmentType)
-        : Array.isArray(schema?.employmentType)
-          ? normalizeEmploymentType(schema.employmentType.join(" "))
-          : job.employmentType;
+    if (!detail) return job;
 
     return {
       ...job,
-      description: safeDescription({
-        description: fullDescription,
-        title: job.title,
-        companyName: job.companyName,
-      }),
-      employmentType: job.employmentType || employmentType,
-      salaryMin:
-        job.salaryMin ?? schemaSalary.salaryMin ?? textSalary.salaryMin,
-      salaryMax:
-        job.salaryMax ?? schemaSalary.salaryMax ?? textSalary.salaryMax,
+      description:
+        detail.descriptionHtml ||
+        safeDescription({
+          description: detail.description,
+          title: job.title,
+          companyName: job.companyName,
+        }),
+      employmentType:
+        job.employmentType || detail.employmentType || "Full-time",
+      salaryMin: job.salaryMin ?? detail.salaryMin,
+      salaryMax: job.salaryMax ?? detail.salaryMax,
       responsibilities:
         job.responsibilities.length > 0
           ? job.responsibilities
-          : schemaResponsibilities.length > 0
-            ? schemaResponsibilities
-            : derivedSections.responsibilities,
+          : detail.responsibilities,
       requirements:
-        job.requirements.length > 0
-          ? job.requirements
-          : schemaRequirements.length > 0
-            ? uniqueItems(schemaRequirements, 14)
-            : derivedSections.requirements,
-      benefits:
-        job.benefits.length > 0
-          ? job.benefits
-          : schemaBenefits.length > 0
-            ? uniqueItems(schemaBenefits, 10)
-            : derivedSections.benefits,
-      skills:
-        job.skills.length > 0
-          ? job.skills
-          : uniqueItems(derivedSections.skills, 14),
-      postedAt: job.postedAt || postedAt || new Date().toISOString(),
+        job.requirements.length > 0 ? job.requirements : detail.requirements,
+      benefits: job.benefits.length > 0 ? job.benefits : detail.benefits,
+      skills: job.skills.length > 0 ? job.skills : detail.skills,
+      postedAt: job.postedAt || detail.postedAt || new Date().toISOString(),
     };
   } catch {
     return job;

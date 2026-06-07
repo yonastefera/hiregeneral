@@ -112,7 +112,7 @@ async function cleanJob(job: JobRow): Promise<JobDetailPayload> {
   return {
     ...rest,
     title: htmlToText(rest.title),
-    description: htmlToText(rest.description),
+    description: rest.description,
     company_tagline: rest.company_tagline
       ? htmlToText(rest.company_tagline)
       : rest.company_tagline,
