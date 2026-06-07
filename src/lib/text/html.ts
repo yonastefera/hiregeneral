@@ -33,39 +33,101 @@ function escapeHtml(value: string) {
 }
 
 function normalizeAllowedJobHtml(input: string) {
-  return input
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, " ")
-    .replace(/<!--[\s\S]*?-->/g, " ")
-    .replace(/<\s*(h2|h3|p|ul|ol|li|br|strong|b)\b[^>]*>/gi, "<$1>")
-    .replace(/<\s*\/\s*(h2|h3|p|ul|ol|li|strong|b)\s*>/gi, "</$1>")
-    .replace(/<br\s*\/?>/gi, "<br>")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/<b>/gi, "<strong>")
-    .replace(/<\/b>/gi, "</strong>")
-    .replace(
-      /<(h2|h3|p|ul|ol|li|br|strong)>/gi,
-      (_, tag: string) => `<${tag.toLowerCase()}>`,
-    )
-    .replace(
-      /<\/(h2|h3|p|ul|ol|li|strong)>/gi,
-      (_, tag: string) => `</${tag.toLowerCase()}>`,
-    )
-    .replace(/[ \t]+/g, " ")
-    .replace(/\s+\n/g, "\n")
-    .replace(/\n\s+/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  return cleanupStructuredJobHtml(
+    input
+      .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, " ")
+      .replace(/<!--[\s\S]*?-->/g, " ")
+      .replace(/<\s*(h2|h3|p|ul|ol|li|br|strong|b)\b[^>]*>/gi, "<$1>")
+      .replace(/<\s*\/\s*(h2|h3|p|ul|ol|li|strong|b)\s*>/gi, "</$1>")
+      .replace(/<br\s*\/?>/gi, "<br>")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/<b>/gi, "<strong>")
+      .replace(/<\/b>/gi, "</strong>")
+      .replace(
+        /<(h2|h3|p|ul|ol|li|br|strong)>/gi,
+        (_, tag: string) => `<${tag.toLowerCase()}>`,
+      )
+      .replace(
+        /<\/(h2|h3|p|ul|ol|li|strong)>/gi,
+        (_, tag: string) => `</${tag.toLowerCase()}>`,
+      )
+      .replace(/[ \t]+/g, " ")
+      .replace(/\s+\n/g, "\n")
+      .replace(/\n\s+/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim(),
+  );
+}
+
+function cleanupStructuredJobHtml(input: string) {
+  return input.replace(
+    /<h2>(Benefits|Pay Range|Qualifications|Requirements|Responsibilities|Skills)<\/h2>\s*<p>([^<]*)<\/p>/gi,
+    (match: string, heading: string, body: string) => {
+      const text = htmlToText(body).trim();
+
+      if (/^(?:,|[a-z]\b|are\b|for\b|including\b|is\b|that\b)/i.test(text)) {
+        return `<p>${body}</p>`;
+      }
+
+      return match;
+    },
+  );
 }
 
 const INLINE_JOB_HEADING_PATTERN =
-  /\b(About (?:the )?(?:role|team|position)|Job Description|Pay Range|Benefits|What You(?:'|’)ll Do|What You'll Do|Responsibilities|Candidate Profile|Required Qualifications|Minimum Qualifications|Basic Qualifications|Preferred Qualifications|Desired Qualifications|Qualifications|Requirements|Desired Skills|Skills|Join the Journey|EEO Statement|Equal Opportunity|Posting End Date)\b:?/gi;
+  /\b(About (?:the )?(?:role|team|position)|Job Description|Pay Range|Benefits|What You(?:'|’)ll Do|What You'll Do|Responsibilities|Candidate Profile|Required Qualifications|Minimum Qualifications|Basic Qualifications|Preferred Qualifications|Desired Qualifications|Qualifications|Requirements|Desired Skills|Skills|Join the Journey|EEO Statement|Equal Opportunity|Posting End Date)\b(:?)/gi;
+
+const GENERIC_INLINE_HEADING_LABELS = new Set([
+  "benefits",
+  "pay range",
+  "qualifications",
+  "requirements",
+  "responsibilities",
+  "skills",
+]);
+
+function isMostlyUppercase(value: string) {
+  const letters = value.replace(/[^a-z]/gi, "");
+
+  return letters.length > 1 && letters === letters.toUpperCase();
+}
+
+function shouldPromoteInlineHeading(
+  label: string,
+  colon: string,
+  offset: number,
+  fullText: string,
+) {
+  const normalized = label.toLowerCase();
+
+  if (!GENERIC_INLINE_HEADING_LABELS.has(normalized)) {
+    return true;
+  }
+
+  const previousNewline = fullText.lastIndexOf("\n", offset - 1);
+  const linePrefix = fullText.slice(previousNewline + 1, offset).trim();
+
+  return Boolean(colon) || linePrefix.length === 0 || isMostlyUppercase(label);
+}
 
 function normalizeJobPostingText(input: string) {
   return htmlToText(input)
     .replace(/\r/g, "\n")
     .replace(/\s*•\s*/g, "\n• ")
-    .replace(INLINE_JOB_HEADING_PATTERN, "\n\n$1\n")
+    .replace(
+      INLINE_JOB_HEADING_PATTERN,
+      (
+        match: string,
+        label: string,
+        colon: string,
+        offset: number,
+        fullText: string,
+      ) =>
+        shouldPromoteInlineHeading(label, colon, offset, fullText)
+          ? `\n\n${label}\n`
+          : match,
+    )
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }

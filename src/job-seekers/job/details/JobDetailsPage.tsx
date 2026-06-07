@@ -383,11 +383,8 @@ export default async function JobDetailsPage({ jobId }: JobDetailsPageProps) {
                   aria-hidden="true"
                   className="absolute left-0 top-8 h-12 w-1 rounded-r bg-gradient-to-b from-teal-500 to-emerald-600"
                 />
-                <div className="text-[11px] uppercase tracking-[0.18em] text-emerald-700">
+                <h2 className="text-2xl font-semibold tracking-tight">
                   About the role
-                </div>
-                <h2 className="mt-1 text-2xl font-semibold tracking-tight">
-                  Job description
                 </h2>
                 <div
                   className="source-job-posting mt-5 text-[14.5px] leading-[1.75] text-neutral-700 [&_h2:first-child]:mt-0 [&_h2]:mb-2 [&_h2]:mt-6 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:uppercase [&_h2]:tracking-[0.08em] [&_h2]:text-neutral-950 [&_h3:first-child]:mt-0 [&_h3]:mb-2 [&_h3]:mt-5 [&_h3]:text-[15px] [&_h3]:font-semibold [&_h3]:text-neutral-950 [&_li]:mb-2 [&_li]:pl-1 [&_ol]:my-4 [&_ol]:list-decimal [&_ol]:space-y-2 [&_ol]:pl-6 [&_p:first-child]:mt-0 [&_p]:my-3 [&_strong]:font-semibold [&_strong]:text-neutral-950 [&_ul]:my-4 [&_ul]:list-disc [&_ul]:space-y-2 [&_ul]:pl-6"
@@ -412,7 +409,7 @@ export default async function JobDetailsPage({ jobId }: JobDetailsPageProps) {
               </SectionCard>
             ) : null}
 
-            {sections.responsibilities.length > 0 && (
+            {!sourceHtml && sections.responsibilities.length > 0 && (
               <SectionCard>
                 <div className="flex items-center gap-2">
                   <span className="grid size-6 place-items-center rounded-lg bg-teal-100 text-teal-700">
@@ -442,7 +439,7 @@ export default async function JobDetailsPage({ jobId }: JobDetailsPageProps) {
               </SectionCard>
             )}
 
-            {sections.requirements.length > 0 && (
+            {!sourceHtml && sections.requirements.length > 0 && (
               <SectionCard className="bg-gradient-to-br from-neutral-950 to-neutral-800 text-white ring-black/10">
                 <div className="flex items-center gap-2">
                   <span className="grid size-6 place-items-center rounded-lg bg-white/10 text-teal-300">
