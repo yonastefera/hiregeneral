@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 
 import EmployerLandingPage from "@/employer/landing/EmployerLandingPage";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "For Employers | HireGeneral",
   description:
