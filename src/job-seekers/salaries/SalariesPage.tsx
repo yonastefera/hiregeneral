@@ -452,7 +452,7 @@ export default function SalariesPage() {
               </h3>
 
               <p className="mt-10 flex flex-wrap items-baseline gap-3">
-                <span className="font-display text-[clamp(4rem,7vw,5rem)] leading-none tracking-tight">
+                <span className="font-display text-[clamp(3.25rem,5vw,3.75rem)] leading-none tracking-tight">
                   <span className="text-gradient-warm">
                     {formatMoney(activeResult.range.median, unit)}
                   </span>
