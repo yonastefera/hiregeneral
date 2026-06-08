@@ -7,6 +7,7 @@ import {
   type ImportedJob,
 } from "./normalize";
 import { isEngineeringText, isInternshipText, isUsText } from "./filters";
+import { sanitizeJobPostingHtml } from "@/lib/text/html";
 import type { JobSource } from "./job-sources";
 import type { JobSourceAdapter } from "./source";
 
@@ -14,8 +15,11 @@ const PAGE_SIZE = 50;
 const MAX_PAGES = 10;
 
 type OracleRequisition = {
+  Category?: string | null;
+  CorporateDescriptionStr?: string | null;
   Id?: string | number;
   Title?: string;
+  ExternalDescriptionStr?: string | null;
   PostedDate?: string;
   PostingEndDate?: string | null;
   PrimaryLocation?: string;
@@ -25,6 +29,7 @@ type OracleRequisition = {
   ExternalResponsibilitiesStr?: string | null;
   JobFamily?: string | null;
   JobFunction?: string | null;
+  OrganizationDescriptionStr?: string | null;
   WorkerType?: string | null;
   ContractType?: string | null;
   JobSchedule?: string | null;
@@ -45,6 +50,10 @@ type OracleSearchItem = {
 
 type OracleSearchResponse = {
   items?: OracleSearchItem[];
+};
+
+type OracleDetailResponse = {
+  items?: OracleRequisition[];
 };
 
 type OracleHcmConfig = {
@@ -258,6 +267,48 @@ function detailsUrl(config: OracleHcmConfig, requisition: OracleRequisition) {
   return `${config.publicBase}/job/${encodeURIComponent(String(requisition.Id))}`;
 }
 
+function detailUrl(config: OracleHcmConfig, requisitionId: string | number) {
+  const url = new URL(`${config.apiBase}/recruitingCEJobRequisitionDetails`);
+  url.searchParams.set("expand", "all");
+  url.searchParams.set("onlyData", "true");
+  url.searchParams.set(
+    "finder",
+    `ById;Id="${finderValue(String(requisitionId))}",siteNumber=${finderValue(
+      config.siteNumber,
+    )}`,
+  );
+
+  return url;
+}
+
+async function fetchOracleDetail(
+  config: OracleHcmConfig,
+  requisition: OracleRequisition,
+  signal?: AbortSignal,
+) {
+  if (!requisition.Id) return requisition;
+
+  const response = await fetch(detailUrl(config, requisition.Id), {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": "HireGeneralJobBoard/1.0",
+    },
+    cache: "no-store",
+    signal,
+  });
+
+  if (!response.ok) return requisition;
+
+  try {
+    const body = (await response.json()) as OracleDetailResponse;
+    const detail = body.items?.[0];
+
+    return detail ? { ...requisition, ...detail } : requisition;
+  } catch {
+    return requisition;
+  }
+}
+
 async function fetchOracleRequisitions(
   config: OracleHcmConfig,
   signal?: AbortSignal,
@@ -289,6 +340,44 @@ async function fetchOracleRequisitions(
   return [...requisitionsById.values()];
 }
 
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>,
+) {
+  const results: R[] = [];
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await mapper(items[currentIndex]);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, () => worker()),
+  );
+
+  return results;
+}
+
+function oracleDescriptionHtml(requisition: OracleRequisition) {
+  return sanitizeJobPostingHtml(
+    [
+      requisition.ExternalDescriptionStr,
+      requisition.ExternalResponsibilitiesStr,
+      requisition.ExternalQualificationsStr,
+      requisition.OrganizationDescriptionStr,
+      requisition.CorporateDescriptionStr,
+      requisition.ShortDescriptionStr,
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
+  );
+}
+
 export async function fetchOracleHcmJobs(
   source: JobSource,
   context?: {
@@ -303,23 +392,21 @@ export async function fetchOracleHcmJobs(
 
   const config = oracleHcmConfig(source);
   const requisitions = await fetchOracleRequisitions(config, context?.signal);
+  const detailedRequisitions = await mapWithConcurrency(
+    requisitions,
+    4,
+    (requisition) => fetchOracleDetail(config, requisition, context?.signal),
+  );
 
-  return requisitions
+  return detailedRequisitions
     .filter((requisition) => requisition.Id && requisition.Title)
     .filter(isUsRequisition)
     .filter((requisition) => isEngineeringText(searchableText(requisition)))
     .filter((requisition) => !isInternshipText(searchableText(requisition)))
     .map((requisition) => {
       const title = String(requisition.Title).replace(/\s+/g, " ").trim();
-      const description = htmlToText(
-        [
-          requisition.ShortDescriptionStr,
-          requisition.ExternalResponsibilitiesStr,
-          requisition.ExternalQualificationsStr,
-        ]
-          .filter(Boolean)
-          .join("\n\n"),
-      );
+      const descriptionHtml = oracleDescriptionHtml(requisition);
+      const description = htmlToText(descriptionHtml);
       const location = requisitionLocations(requisition).join(", ");
 
       return {
@@ -329,11 +416,13 @@ export async function fetchOracleHcmJobs(
         companyLogoUrl: source.companyLogoUrl ?? null,
 
         title,
-        description: safeDescription({
-          description,
-          title,
-          companyName: source.companyName,
-        }),
+        description:
+          descriptionHtml ||
+          safeDescription({
+            description,
+            title,
+            companyName: source.companyName,
+          }),
         location: location || "United States",
 
         latitude: null,
@@ -372,7 +461,11 @@ export async function fetchOracleHcmJobs(
         applyUrl: detailsUrl(config, requisition),
 
         experienceLevel: null,
-        category: requisition.JobFamily ?? requisition.JobFunction ?? null,
+        category:
+          requisition.Category ??
+          requisition.JobFamily ??
+          requisition.JobFunction ??
+          null,
 
         companyTagline: null,
         companySize: null,

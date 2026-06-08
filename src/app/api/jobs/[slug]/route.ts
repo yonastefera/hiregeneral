@@ -14,7 +14,10 @@ const supabaseAdmin = createClient(
 );
 
 const JOB_DETAIL_CACHE_TTL_SECONDS = 60 * 10; // 10 minutes
-const JOB_DETAIL_CACHE_VERSION = process.env.JOB_DETAIL_CACHE_VERSION ?? "1";
+const JOB_DETAIL_CACHE_VERSION = process.env.JOB_DETAIL_CACHE_VERSION ?? "2";
+const SHOULD_CACHE_JOB_DETAILS =
+  process.env.NODE_ENV === "production" &&
+  process.env.JOB_DETAIL_CACHE_DISABLED !== "1";
 
 type JobApplicantCountRow = {
   applicant_count: number | null;
@@ -139,14 +142,16 @@ export async function GET(
 
     const cacheKey = getJobDetailCacheKey(normalizedSlug);
 
-    try {
-      const cached = await redis.get<JobDetailPayload>(cacheKey);
+    if (SHOULD_CACHE_JOB_DETAILS) {
+      try {
+        const cached = await redis.get<JobDetailPayload>(cacheKey);
 
-      if (cached) {
-        return jsonResponse(cached);
+        if (cached) {
+          return jsonResponse(cached);
+        }
+      } catch (error) {
+        console.error("[GET /api/jobs/[slug]] Redis read failed:", error);
       }
-    } catch (error) {
-      console.error("[GET /api/jobs/[slug]] Redis read failed:", error);
     }
 
     let query = supabaseAdmin
@@ -219,12 +224,14 @@ export async function GET(
 
     const payload = await cleanJob(data as JobRow);
 
-    try {
-      await redis.set(cacheKey, payload, {
-        ex: JOB_DETAIL_CACHE_TTL_SECONDS,
-      });
-    } catch (error) {
-      console.error("[GET /api/jobs/[slug]] Redis write failed:", error);
+    if (SHOULD_CACHE_JOB_DETAILS) {
+      try {
+        await redis.set(cacheKey, payload, {
+          ex: JOB_DETAIL_CACHE_TTL_SECONDS,
+        });
+      } catch (error) {
+        console.error("[GET /api/jobs/[slug]] Redis write failed:", error);
+      }
     }
 
     return jsonResponse(payload);

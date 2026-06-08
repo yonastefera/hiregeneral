@@ -134,6 +134,11 @@ function toStringArray(value: unknown, maxItems: number) {
 function stripNoise(text: string) {
   return text
     .replace(/\bApply Now\b/gi, " ")
+    .replace(/\bApply for this position\b/gi, " ")
+    .replace(/\bApplication form\b/gi, " ")
+    .replace(/\bAutofill from resume\b/gi, " ")
+    .replace(/\bReturn to jobs list\b/gi, " ")
+    .replace(/\bSearch Jobs\b/gi, " ")
     .replace(/\bSave Job\b/gi, " ")
     .replace(/\bShare Job\b/gi, " ")
     .replace(/\bBack to Search Results\b/gi, " ")
@@ -144,6 +149,39 @@ function stripNoise(text: string) {
     .replace(/\n\s+/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function extractAttributeContainerHtml(html: string, attributePattern: RegExp) {
+  const openTagMatch = html.match(attributePattern);
+
+  if (!openTagMatch || openTagMatch.index === undefined) return null;
+
+  const openTag = openTagMatch[0];
+  const tagMatch = openTag.match(/^<([a-z0-9]+)/i);
+  const tag = tagMatch?.[1]?.toLowerCase();
+
+  if (!tag) return null;
+
+  const openEnd = html.indexOf(">", openTagMatch.index);
+  if (openEnd === -1) return null;
+
+  const tagPattern = new RegExp(`<\\/?${tag}\\b[^>]*>`, "gi");
+  tagPattern.lastIndex = openTagMatch.index;
+
+  let depth = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = tagPattern.exec(html))) {
+    const isClosing = /^<\//.test(match[0]);
+
+    depth += isClosing ? -1 : 1;
+
+    if (depth === 0) {
+      return html.slice(openEnd + 1, match.index);
+    }
+  }
+
+  return null;
 }
 
 function extractJsonObjectsFromScriptContent(raw: string) {
@@ -223,27 +261,64 @@ function extractJobPostingSchema(html: string) {
 }
 
 function extractMainHtml(html: string) {
-  const candidates = [
-    /<main\b[^>]*>([\s\S]*?)<\/main>/i,
-    /<article\b[^>]*>([\s\S]*?)<\/article>/i,
-    /<section\b[^>]*(?:class|id)=["'][^"']*(?:job|posting|description|content|details)[^"']*["'][^>]*>([\s\S]*?)<\/section>/i,
-    /<div\b[^>]*(?:class|id)=["'][^"']*(?:job|posting|description|content|details)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
-    /<body\b[^>]*>([\s\S]*?)<\/body>/i,
-  ];
+  const exactCandidates = [
+    extractAttributeContainerHtml(
+      html,
+      /<[^>]+\bitemprop=["']description["'][^>]*>/i,
+    ),
+    extractAttributeContainerHtml(
+      html,
+      /<[^>]+\bclass=["'][^"']*\bats-description\b[^"']*["'][^>]*>/i,
+    ),
+    extractAttributeContainerHtml(
+      html,
+      /<[^>]+\bclass=["'][^"']*\brich-text-wrapper\b[^"']*["'][^>]*>/i,
+    ),
+    html.match(
+      /<div\b[^>]*>\s*<span>\s*<h[23]\b[\s\S]*?<\/span>\s*<\/div>/i,
+    )?.[0],
+  ].filter((candidate): candidate is string => Boolean(candidate));
 
-  for (const pattern of candidates) {
-    const match = html.match(pattern);
-
-    if (!match?.[1]) continue;
-
-    const text = stripNoise(cleanInlineText(match[1]));
+  for (const candidate of exactCandidates) {
+    const text = stripNoise(cleanInlineText(candidate));
 
     if (text.length >= MIN_USEFUL_DESCRIPTION_LENGTH) {
-      return match[1];
+      return candidate;
     }
   }
 
-  return html;
+  const patternCandidates = [
+    ...[
+      /<main\b[^>]*>([\s\S]*?)<\/main>/gi,
+      /<article\b[^>]*>([\s\S]*?)<\/article>/gi,
+      /<section\b[^>]*(?:class|id)=["'][^"']*(?:job|posting|description|content|details)[^"']*["'][^>]*>([\s\S]*?)<\/section>/gi,
+      /<div\b[^>]*(?:class|id)=["'][^"']*(?:job|posting|description|content|details)[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi,
+      /<body\b[^>]*>([\s\S]*?)<\/body>/gi,
+    ].flatMap((pattern) =>
+      [...html.matchAll(pattern)].map((match) => match[1]).filter(Boolean),
+    ),
+  ]
+    .map((candidate) => ({
+      html: candidate,
+      text: stripNoise(cleanInlineText(candidate)),
+    }))
+    .filter(
+      (candidate) => candidate.text.length >= MIN_USEFUL_DESCRIPTION_LENGTH,
+    )
+    .sort((a, b) => {
+      const aPenalty =
+        /search jobs|sign up for job alerts|made with|upload file/i.test(a.text)
+          ? 5000
+          : 0;
+      const bPenalty =
+        /search jobs|sign up for job alerts|made with|upload file/i.test(b.text)
+          ? 5000
+          : 0;
+
+      return b.text.length - bPenalty - (a.text.length - aPenalty);
+    });
+
+  return patternCandidates[0]?.html ?? html;
 }
 
 function extractVisibleDetailText(html: string) {

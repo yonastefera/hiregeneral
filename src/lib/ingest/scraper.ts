@@ -326,6 +326,7 @@ type KulaJob = {
       };
     };
     employment_type?: string;
+    job_description?: string | null;
     offices?: Array<{
       city?: string;
       country?: string;
@@ -5091,6 +5092,14 @@ function kulaApplyUrl(source: JobSource, job: KulaJob) {
   return source.sourceUrl ?? new URL(`/${accountName}`, publicBase).toString();
 }
 
+function kulaJobDescription(job: KulaJob) {
+  const description = job.ats_job?.job_description?.trim();
+
+  if (!description || /^\$[0-9a-f]+$/i.test(description)) return "";
+
+  return description;
+}
+
 async function fetchKulaJobs(
   source: JobSource,
   context?: {
@@ -5153,10 +5162,13 @@ async function fetchKulaJobs(
     const salary = job.ats_job?.compensation?.base_salary;
     const minSalary = salary ? recordNumber(salary, ["min_amount"]) : null;
     const maxSalary = salary ? recordNumber(salary, ["max_amount"]) : null;
+    const detailDescription = kulaJobDescription(job);
     const description = safeDescription({
       title,
       companyName: source.companyName,
-      description: `${title} role on ${source.companyName}'s ${department} team. Visit the company careers site for the complete description and application details.`,
+      description:
+        detailDescription ||
+        `${title} role on ${source.companyName}'s ${department} team. Visit the company careers site for the complete description and application details.`,
     });
 
     jobs.push({

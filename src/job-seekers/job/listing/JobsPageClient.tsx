@@ -17,7 +17,6 @@ import {
 
 import type { LocationSuggestion } from "@/components/location/location-types";
 import type { KeywordSuggestion } from "@/components/search/keyword-types";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import {
@@ -69,6 +68,42 @@ function getLocationLabel(suggestion: LocationSuggestion) {
     suggestion.label ||
     [suggestion.city, suggestion.state].filter(Boolean).join(", ")
   ).trim();
+}
+
+function BigStat({
+  n,
+  l,
+  tone,
+  small,
+}: {
+  n: string;
+  l: string;
+  tone: "electric" | "coral" | "violet";
+  small?: boolean;
+}) {
+  const accent =
+    tone === "electric"
+      ? "text-electric"
+      : tone === "coral"
+        ? "text-accent"
+        : "text-violet-pop";
+
+  return (
+    <div className="flex flex-col">
+      <span
+        className={cn(
+          "font-display leading-none tracking-tight",
+          accent,
+          small ? "text-3xl" : "text-5xl",
+        )}
+      >
+        {n}
+      </span>
+      <span className="mt-2 font-mono-tag text-[10px] text-background/60">
+        {l}
+      </span>
+    </div>
+  );
 }
 
 export default function JobsPageClient({
@@ -259,37 +294,64 @@ export default function JobsPageClient({
   return (
     <main className="min-h-screen overflow-x-hidden bg-background">
       <section
-        className="relative overflow-visible bg-hero-gradient px-4 py-12"
+        className="relative z-20 overflow-visible bg-ink text-background"
         aria-labelledby="jobs-page-title"
       >
-        <div className="pointer-events-none absolute -top-24 right-[-10%] size-72 rounded-full bg-accent/15 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-24 left-[-10%] size-72 rounded-full bg-primary/15 blur-3xl" />
+        <div className="pointer-events-none absolute inset-0 bg-salary-hero-gradient opacity-90" />
+        <div className="pointer-events-none absolute -left-32 top-10 size-[520px] rounded-full bg-primary/40 blur-[160px]" />
+        <div className="pointer-events-none absolute -right-32 top-40 size-[480px] rounded-full bg-accent/40 blur-[160px]" />
+        <div className="pointer-events-none absolute bottom-0 left-1/3 size-[420px] rounded-full bg-violet-pop/40 blur-[160px]" />
+        <div className="pointer-events-none absolute inset-0 noise-dark opacity-50" />
 
-        <div className="relative mx-auto w-full max-w-368 px-4 md:px-6 xl:px-8">
+        <div className="relative mx-auto w-full max-w-7xl px-4 pb-24 pt-24 md:px-6 md:pb-32 md:pt-32">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="inline-flex items-center gap-2 rounded-full border border-electric/40 bg-electric/10 px-3 py-1 font-mono-tag text-[10px] font-semibold text-electric">
+              <span className="size-1.5 rounded-full bg-electric" />
+              Live roles · refreshed hourly
+            </div>
+            <div className="hidden items-center gap-2 font-mono-tag text-[10px] text-background/60 md:inline-flex">
+              <span>Search engine</span>
+              <span className="h-px w-8 bg-background/30" />
+              <span className="text-electric">v.04</span>
+            </div>
+          </div>
+
           <h1
             id="jobs-page-title"
-            className="mt-4 text-balance text-4xl font-bold tracking-tight md:text-5xl"
+            className="font-display mt-10 max-w-[1100px] text-balance text-[56px] leading-[0.88] tracking-[-0.045em] md:text-[140px]"
           >
-            Find the role that moves your{" "}
-            <span className="bg-linear-to-r from-primary to-[hsl(var(--hero-glow))] bg-clip-text text-transparent">
-              career forward
-            </span>
-            .
+            Find work
+            <br />
+            <span className="text-gradient-electric italic">that fits</span>
+            <br />
+            <span className="text-gradient-warm">your next move.</span>
           </h1>
+
+          <div className="mt-10 grid items-end gap-8 md:grid-cols-[1fr_auto]">
+            <p className="max-w-xl text-base leading-7 text-background/70 md:text-lg">
+              Every active role across the network — sharper filters, no noise,
+              no dead listings, no recruiter spam.
+            </p>
+            <div className="hidden gap-6 md:flex">
+              <BigStat n="620" l="New today" tone="electric" />
+              <BigStat n="148" l="Hiring fast" tone="coral" />
+              <BigStat n="412" l="Remote" tone="violet" />
+            </div>
+          </div>
 
           <form
             role="search"
             aria-label="Search jobs"
-            className="relative z-30 mt-7 grid gap-2 rounded-2xl border border-border/70 bg-surface/95 p-2 shadow-lift backdrop-blur md:grid-cols-[1fr_1fr_auto]"
+            className="relative z-50 mt-12 grid gap-2 overflow-visible rounded-2xl border border-background/15 bg-background/[0.04] p-2 shadow-lift backdrop-blur-2xl md:grid-cols-[1.2fr_1fr_auto]"
             onSubmit={(event) => {
               event.preventDefault();
               submitSearch();
             }}
           >
-            <div className="relative rounded-xl border border-input bg-background transition-colors focus-within:border-primary/50">
+            <div className="relative rounded-xl bg-background px-4 text-foreground transition-colors focus-within:ring-2 focus-within:ring-primary/20">
               <Search
                 aria-hidden="true"
-                className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-muted-foreground"
+                className="pointer-events-none absolute left-4 top-1/2 z-10 size-5 -translate-y-1/2 text-primary"
               />
 
               <label htmlFor="job-query" className="sr-only">
@@ -301,7 +363,7 @@ export default function JobsPageClient({
                 value={query}
                 placeholder="Job title, skill, company, or keyword"
                 showClearButton={false}
-                className="h-12 border-0 bg-transparent pl-9 pr-3 shadow-none focus-visible:ring-0"
+                className="h-14 border-0 bg-transparent pl-8 pr-0 text-[15px] shadow-none focus-visible:ring-0"
                 onValueChange={setQuery}
                 onKeywordSelect={(suggestion: KeywordSuggestion) => {
                   setQuery(suggestion.term);
@@ -309,10 +371,10 @@ export default function JobsPageClient({
               />
             </div>
 
-            <div className="relative rounded-xl border border-input bg-background transition-colors focus-within:border-primary/50">
+            <div className="relative rounded-xl bg-background px-4 text-foreground transition-colors focus-within:ring-2 focus-within:ring-accent/20">
               <MapPin
                 aria-hidden="true"
-                className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-muted-foreground"
+                className="pointer-events-none absolute left-4 top-1/2 z-10 size-5 -translate-y-1/2 text-accent"
               />
 
               <label htmlFor="job-location" className="sr-only">
@@ -324,7 +386,7 @@ export default function JobsPageClient({
                 value={location}
                 placeholder="City, state, or ZIP"
                 showClearButton={false}
-                className="h-12 border-0 bg-transparent pl-9 pr-3 shadow-none focus-visible:ring-0"
+                className="h-14 border-0 bg-transparent pl-8 pr-0 text-[15px] shadow-none focus-visible:ring-0"
                 onValueChange={setLocation}
                 onLocationSelect={(suggestion: LocationSuggestion) => {
                   setLocation(getLocationLabel(suggestion));
@@ -332,15 +394,55 @@ export default function JobsPageClient({
               />
             </div>
 
-            <Button type="submit" variant="hero" size="xl" disabled={isPending}>
-              {isPending ? "Searching..." : "Search jobs"}
-            </Button>
+            <button
+              type="submit"
+              disabled={isPending}
+              className="group inline-flex h-14 items-center justify-center gap-2 rounded-xl bg-electric px-7 font-display text-[15px] font-semibold tracking-tight text-ink transition-all hover:shadow-pop active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60"
+            >
+              {isPending ? "Searching..." : "Search"}
+              <Search className="size-4 transition-transform group-hover:scale-110" />
+            </button>
           </form>
+
+          <div className="mt-8 grid grid-cols-3 gap-3 md:hidden">
+            <BigStat n="620" l="New today" tone="electric" small />
+            <BigStat n="148" l="Hiring fast" tone="coral" small />
+            <BigStat n="412" l="Remote" tone="violet" small />
+          </div>
+        </div>
+
+        <div className="marquee-mask relative border-t border-background/10 bg-background/[0.02] py-4">
+          <div className="flex items-center gap-8 whitespace-nowrap font-mono-tag text-[11px] text-background/50">
+            {[
+              "Engineering",
+              "Design",
+              "Product",
+              "Data",
+              "Marketing",
+              "Sales",
+              "Operations",
+              "Finance",
+              "Healthcare",
+              "Engineering",
+              "Design",
+              "Product",
+              "Data",
+              "Marketing",
+            ].map((category, index) => (
+              <span
+                key={`${category}-${index}`}
+                className="inline-flex items-center gap-8"
+              >
+                <span className="size-1 rounded-full bg-electric" />
+                {category}
+              </span>
+            ))}
+          </div>
         </div>
       </section>
 
       <section
-        className="mx-auto mb-20 grid w-full max-w-368 gap-8 px-4 py-8 md:px-6 lg:grid-cols-[340px_minmax(0,1fr)] xl:px-8"
+        className="relative z-0 mx-auto mb-20 grid w-full max-w-368 gap-8 px-4 py-8 md:px-6 lg:grid-cols-[340px_minmax(0,1fr)] xl:px-8"
         aria-label="Job search results and filters"
       >
         <aside
