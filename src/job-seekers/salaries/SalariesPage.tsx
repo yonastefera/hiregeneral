@@ -280,11 +280,11 @@ export default function SalariesPage() {
     <main className="min-h-screen overflow-x-hidden bg-background">
       <section className="relative overflow-hidden bg-ink text-background">
         <div className="pointer-events-none absolute inset-0 bg-salary-hero-gradient opacity-90" />
-        <div className="pointer-events-none absolute -left-32 top-10 size-[520px] rounded-full bg-primary/40 blur-[160px]" />
-        <div className="pointer-events-none absolute -right-24 top-24 size-[480px] rounded-full bg-accent/40 blur-[160px]" />
+        <div className="pointer-events-none absolute -left-32 top-10 size-130 rounded-full bg-primary/40 blur-[160px]" />
+        <div className="pointer-events-none absolute -right-24 top-24 size-120 rounded-full bg-accent/40 blur-[160px]" />
         <div className="pointer-events-none absolute inset-0 noise-dark opacity-50" />
 
-        <div className="relative mx-auto max-w-7xl px-4 pb-24 pt-24 md:px-6 md:pb-32 md:pt-32">
+        <div className="relative mx-auto max-w-7xl px-4 pb-24 pt-24 md:px-6 md:pb-32 md:pt-24">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="inline-flex items-center gap-2 rounded-full border border-electric/40 bg-electric/10 px-3 py-1 font-mono-tag text-[10px] font-semibold text-electric">
               <span className="size-1.5 rounded-full bg-electric" />
@@ -297,7 +297,7 @@ export default function SalariesPage() {
             </div>
           </div>
 
-          <h1 className="font-display mt-10 max-w-[1100px] text-balance text-[56px] leading-[0.88] tracking-[-0.045em] md:text-[140px]">
+          <h1 className="font-display mt-10 max-w-280 text-balance text-[clamp(3.25rem,8vw,6.25rem)] leading-[0.92] tracking-[-0.04em]">
             Know your
             <br />
             <span className="text-gradient-electric italic">number</span>{" "}
@@ -341,7 +341,7 @@ export default function SalariesPage() {
         </div>
       </section>
 
-      <section className="px-4 pb-16 pt-[60px] md:px-6 md:pb-20">
+      <section className="px-4 pb-16 pt-15 md:px-6 md:pb-20">
         <div className="mx-auto grid max-w-7xl gap-5 lg:grid-cols-[1fr_1fr]">
           <form
             onSubmit={onSubmit}
@@ -439,8 +439,8 @@ export default function SalariesPage() {
           </form>
 
           <div className="relative overflow-hidden rounded-3xl bg-foreground p-8 text-background shadow-lift md:p-10">
-            <div className="pointer-events-none absolute -right-24 -top-24 size-[360px] rounded-full bg-primary/40 blur-[120px]" />
-            <div className="pointer-events-none absolute -bottom-32 -left-20 size-[360px] rounded-full bg-accent/30 blur-[120px]" />
+            <div className="pointer-events-none absolute -right-24 -top-24 size-90 rounded-full bg-primary/40 blur-[120px]" />
+            <div className="pointer-events-none absolute -bottom-32 -left-20 size-90 rounded-full bg-accent/30 blur-[120px]" />
             <div className="pointer-events-none absolute inset-0 grain opacity-[0.25]" />
 
             <div className="relative">
@@ -452,7 +452,7 @@ export default function SalariesPage() {
               </h3>
 
               <p className="mt-10 flex flex-wrap items-baseline gap-3">
-                <span className="font-display text-7xl leading-none tracking-tight md:text-[112px]">
+                <span className="font-display text-[clamp(4rem,7vw,5rem)] leading-none tracking-tight">
                   <span className="text-gradient-warm">
                     {formatMoney(activeResult.range.median, unit)}
                   </span>

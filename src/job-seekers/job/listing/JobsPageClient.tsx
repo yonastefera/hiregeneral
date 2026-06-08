@@ -298,12 +298,12 @@ export default function JobsPageClient({
         aria-labelledby="jobs-page-title"
       >
         <div className="pointer-events-none absolute inset-0 bg-salary-hero-gradient opacity-90" />
-        <div className="pointer-events-none absolute -left-32 top-10 size-[520px] rounded-full bg-primary/40 blur-[160px]" />
-        <div className="pointer-events-none absolute -right-32 top-40 size-[480px] rounded-full bg-accent/40 blur-[160px]" />
-        <div className="pointer-events-none absolute bottom-0 left-1/3 size-[420px] rounded-full bg-violet-pop/40 blur-[160px]" />
+        <div className="pointer-events-none absolute -left-32 top-10 size-130 rounded-full bg-primary/40 blur-[160px]" />
+        <div className="pointer-events-none absolute -right-32 top-40 size-120 rounded-full bg-accent/40 blur-[160px]" />
+        <div className="pointer-events-none absolute bottom-0 left-1/3 size-105 rounded-full bg-violet-pop/40 blur-[160px]" />
         <div className="pointer-events-none absolute inset-0 noise-dark opacity-50" />
 
-        <div className="relative mx-auto w-full max-w-7xl px-4 pb-24 pt-24 md:px-6 md:pb-32 md:pt-32">
+        <div className="relative mx-auto w-full max-w-7xl px-4 pb-24 pt-24 md:px-6 md:pb-28 md:pt-24">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="inline-flex items-center gap-2 rounded-full border border-electric/40 bg-electric/10 px-3 py-1 font-mono-tag text-[10px] font-semibold text-electric">
               <span className="size-1.5 rounded-full bg-electric" />
@@ -318,7 +318,7 @@ export default function JobsPageClient({
 
           <h1
             id="jobs-page-title"
-            className="font-display mt-10 max-w-[1100px] text-balance text-[56px] leading-[0.88] tracking-[-0.045em] md:text-[140px]"
+            className="font-display mt-10 max-w-[70rem] text-balance text-[clamp(3.25rem,8vw,6.25rem)] leading-[0.92] tracking-[-0.04em]"
           >
             Find work
             <br />

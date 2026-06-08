@@ -122,11 +122,11 @@ export function PublicContactPage({ initialTopic }: PublicContactPageProps) {
     <main className="min-h-screen overflow-x-hidden bg-background">
       <section className="relative overflow-hidden bg-ink text-background">
         <div className="pointer-events-none absolute inset-0 bg-salary-hero-gradient opacity-90" />
-        <div className="pointer-events-none absolute -right-40 top-0 size-[560px] rounded-full bg-accent/40 blur-[160px]" />
-        <div className="pointer-events-none absolute -left-32 top-40 size-[480px] rounded-full bg-primary/40 blur-[160px]" />
+        <div className="pointer-events-none absolute -right-40 top-0 size-140 rounded-full bg-accent/40 blur-[160px]" />
+        <div className="pointer-events-none absolute -left-32 top-40 size-120 rounded-full bg-primary/40 blur-[160px]" />
         <div className="pointer-events-none absolute inset-0 noise-dark opacity-50" />
 
-        <div className="relative mx-auto max-w-7xl px-4 pb-24 pt-24 md:px-6 md:pb-32 md:pt-32">
+        <div className="relative mx-auto max-w-7xl px-4 pb-24 pt-24 md:px-6 md:pb-32 md:pt-24">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="inline-flex items-center gap-2 rounded-full border border-electric/40 bg-electric/10 px-3 py-1 font-mono-tag text-[10px] font-semibold text-electric">
               <span className="size-1.5 rounded-full bg-electric" />
@@ -139,7 +139,7 @@ export function PublicContactPage({ initialTopic }: PublicContactPageProps) {
             </div>
           </div>
 
-          <h1 className="font-display mt-10 max-w-[1100px] text-balance text-[56px] leading-[0.88] tracking-[-0.045em] md:text-[140px]">
+          <h1 className="font-display mt-10 max-w-280 text-balance text-[clamp(3.25rem,8vw,6.25rem)] leading-[0.92] tracking-[-0.04em]">
             Talk to a
             <br />
             <span className="text-gradient-electric italic">human.</span>{" "}
@@ -369,9 +369,9 @@ export function PublicContactPage({ initialTopic }: PublicContactPageProps) {
       </section>
 
       <section className="px-4 pb-24 md:px-6">
-        <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-foreground p-10 text-background shadow-lift md:p-16">
-          <div className="pointer-events-none absolute -left-20 -top-20 size-[420px] rounded-full bg-primary/35 blur-[120px]" />
-          <div className="pointer-events-none absolute -bottom-24 -right-10 size-[460px] rounded-full bg-accent/35 blur-[120px]" />
+        <div className="relative mx-auto max-w-7xl overflow-hidden rounded-4xl bg-foreground p-10 text-background shadow-lift md:p-16">
+          <div className="pointer-events-none absolute -left-20 -top-20 size-105 rounded-full bg-primary/35 blur-[120px]" />
+          <div className="pointer-events-none absolute -bottom-24 -right-10 size-115 rounded-full bg-accent/35 blur-[120px]" />
           <div className="pointer-events-none absolute inset-0 grain opacity-[0.25]" />
           <div className="relative grid items-end gap-10 md:grid-cols-[1.2fr_auto]">
             <div>
