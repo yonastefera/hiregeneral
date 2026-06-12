@@ -52,7 +52,7 @@ export function EmployerHero({ companies }: EmployerHeroProps) {
             Employer marketplace · 2026
           </div>
 
-          <h1 className="mt-6 text-[clamp(2.75rem,6vw,5rem)] font-semibold leading-[1.02] tracking-tight">
+          <h1 className="mt-6 font-display text-[clamp(3.25rem,6vw,5.5rem)] font-normal leading-[0.98] tracking-[-0.04em]">
             Hire the{" "}
             <span className="font-serif italic text-teal-600">right</span>{" "}
             people.

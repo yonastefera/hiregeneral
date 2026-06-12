@@ -39,7 +39,7 @@ const Index = ({
           <div className="min-w-0 lg:col-span-7">
             <h1
               id="home-hero-heading"
-              className="text-[clamp(2.75rem,6vw,5rem)] font-semibold leading-[1.02] tracking-tight"
+              className="font-display text-[clamp(3.25rem,6vw,5.5rem)] font-normal leading-[0.98] tracking-[-0.04em]"
             >
               Search <span className="italic text-teal-600">smarter.</span>
               <br />
@@ -48,7 +48,7 @@ const Index = ({
               with HireGeneral.
             </h1>
 
-            <p className="mt-6 max-w-xl text-[17px] leading-relaxed text-neutral-600">
+            <p className="mt-6 max-w-xl text-lg leading-relaxed text-neutral-600">
               Find better-fit roles, save opportunities, and connect with
               recruiters through focused job search and rich profiles.
             </p>

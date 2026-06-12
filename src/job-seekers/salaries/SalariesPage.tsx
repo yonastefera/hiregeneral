@@ -6,8 +6,6 @@ import { useMemo, useState } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
-  BarChart3,
-  Briefcase,
   Database,
   Loader2,
   MapPin,
@@ -284,10 +282,10 @@ export default function SalariesPage() {
         <div className="pointer-events-none absolute -right-24 top-24 size-120 rounded-full bg-accent/40 blur-[160px]" />
         <div className="pointer-events-none absolute inset-0 noise-dark opacity-50" />
 
-        <div className="relative mx-auto max-w-7xl px-4 pb-24 pt-24 md:px-6 md:pb-32 md:pt-24">
+        <div className="hg-hero-inner relative">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-electric/40 bg-electric/10 px-3 py-1 font-mono-tag text-[10px] font-semibold text-electric">
-              <span className="size-1.5 rounded-full bg-electric" />
+            <div className="hg-eyebrow">
+              <span className="hg-eyebrow-dot" />
               BLS-anchored · Updated quarterly
             </div>
             <div className="hidden items-center gap-2 font-mono-tag text-[10px] text-background/60 md:inline-flex">
@@ -297,7 +295,7 @@ export default function SalariesPage() {
             </div>
           </div>
 
-          <h1 className="font-display mt-10 max-w-280 text-balance text-[clamp(3.25rem,8vw,6.25rem)] leading-[0.92] tracking-[-0.04em]">
+          <h1 className="hg-hero-title">
             Know your
             <br />
             <span className="text-gradient-electric italic">number</span>{" "}
@@ -307,34 +305,24 @@ export default function SalariesPage() {
           </h1>
 
           <div className="mt-10 grid items-end gap-8 md:grid-cols-[1fr_auto]">
-            <p className="max-w-xl text-base leading-7 text-background/70 md:text-lg">
+            <p className="hg-hero-copy">
               Compare official BLS wage benchmarks with the salary ranges in
               active job postings — by occupation and U.S. metro.
             </p>
             <div className="hidden gap-8 md:flex">
               <div className="flex flex-col">
-                <span className="font-display text-5xl leading-none tracking-tight text-electric">
-                  830+
-                </span>
-                <span className="mt-2 font-mono-tag text-[10px] text-background/60">
-                  Occupations
-                </span>
+                <span className="hg-metric-value text-electric">830+</span>
+                <span className="hg-metric-label">Occupations</span>
               </div>
               <div className="flex flex-col">
-                <span className="font-display text-5xl leading-none tracking-tight text-accent">
-                  395
-                </span>
-                <span className="mt-2 font-mono-tag text-[10px] text-background/60">
-                  U.S. metros
-                </span>
+                <span className="hg-metric-value text-accent">395</span>
+                <span className="hg-metric-label">U.S. metros</span>
               </div>
               <div className="flex flex-col">
-                <span className="font-display text-5xl leading-none tracking-tight text-violet-pop">
+                <span className="hg-metric-value text-violet-pop">
                   Q2&apos;26
                 </span>
-                <span className="mt-2 font-mono-tag text-[10px] text-background/60">
-                  Latest data
-                </span>
+                <span className="hg-metric-label">Latest data</span>
               </div>
             </div>
           </div>
@@ -348,12 +336,8 @@ export default function SalariesPage() {
             className="relative overflow-visible rounded-3xl border border-border bg-card p-8 shadow-soft md:p-10"
           >
             <div className="pointer-events-none absolute -right-20 -top-20 size-64 rounded-full bg-primary/10 blur-3xl" />
-            <p className="font-mono-tag text-[10px] font-semibold text-primary">
-              01 / Calculate
-            </p>
-            <h2 className="font-display mt-2 text-3xl md:text-4xl">
-              Get a salary read
-            </h2>
+            <p className="hg-section-kicker text-primary">01 / Calculate</p>
+            <h2 className="hg-panel-title">Get a salary read</h2>
 
             <div className="relative mt-8 space-y-5">
               <Field label="Career">
@@ -444,9 +428,7 @@ export default function SalariesPage() {
             <div className="pointer-events-none absolute inset-0 grain opacity-[0.25]" />
 
             <div className="relative">
-              <p className="font-mono-tag text-[10px] font-semibold text-primary-glow">
-                02 / Median
-              </p>
+              <p className="hg-section-kicker text-primary-glow">02 / Median</p>
               <h3 className="font-display mt-2 text-xl text-background/80">
                 {activeResult.career} · {activeResult.location}
               </h3>
@@ -511,10 +493,10 @@ export default function SalariesPage() {
           <div className="rounded-3xl border border-border bg-card p-8 shadow-soft md:p-10">
             <div className="flex items-end justify-between gap-3 border-b border-border pb-6">
               <div>
-                <p className="font-mono-tag text-[10px] font-semibold text-primary">
+                <p className="hg-section-kicker text-primary">
                   03 / Live postings
                 </p>
-                <h3 className="font-display mt-2 text-2xl md:text-3xl">
+                <h3 className="hg-panel-title">
                   Disclosed ranges from real jobs
                 </h3>
               </div>
@@ -553,9 +535,7 @@ export default function SalariesPage() {
                 <div className="grid size-10 place-items-center rounded-xl bg-primary-gradient text-primary-foreground shadow-pop">
                   <Database className="size-4" />
                 </div>
-                <p className="font-mono-tag text-[10px] font-semibold text-primary">
-                  Source
-                </p>
+                <p className="hg-section-kicker text-primary">Source</p>
               </div>
               <dl className="mt-5 space-y-3 text-sm">
                 <DlRow
@@ -590,100 +570,6 @@ export default function SalariesPage() {
                 </p>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="border-t border-border/60 px-4 py-24 md:px-6">
-        <div className="mx-auto max-w-7xl">
-          <div className="grid items-end gap-6 md:grid-cols-[1fr_auto]">
-            <h2 className="font-display max-w-2xl text-balance text-4xl leading-[1.05] md:text-6xl">
-              Three steps from{" "}
-              <span className="text-gradient-primary">search to signal.</span>
-            </h2>
-            <Button asChild variant="hero" size="lg">
-              <Link href="/jobs">
-                Browse roles <ArrowRight className="size-4" />
-              </Link>
-            </Button>
-          </div>
-
-          <div className="mt-12 grid gap-5 md:grid-cols-3">
-            {[
-              {
-                n: "01",
-                icon: <Database className="size-4" />,
-                t: "Official BLS benchmarks",
-                d: "Every estimate anchors to U.S. Bureau of Labor Statistics wage data.",
-                tone: "primary" as const,
-              },
-              {
-                n: "02",
-                icon: <BarChart3 className="size-4" />,
-                t: "Yearly or hourly, instantly",
-                d: "Flip between the two without leaving the page.",
-                tone: "accent" as const,
-              },
-              {
-                n: "03",
-                icon: <Briefcase className="size-4" />,
-                t: "Real posting ranges",
-                d: "We surface disclosed pay from active job postings when companies share.",
-                tone: "dark" as const,
-              },
-            ].map((step) => {
-              const wrap =
-                step.tone === "dark"
-                  ? "border-transparent bg-foreground text-background"
-                  : step.tone === "accent"
-                    ? "border-accent/20 bg-gradient-to-br from-accent/10 to-background"
-                    : "border-primary/20 bg-gradient-to-br from-primary/10 to-background";
-              const iconBox =
-                step.tone === "dark"
-                  ? "bg-background/15 text-primary-glow"
-                  : step.tone === "accent"
-                    ? "bg-warm-gradient text-accent-foreground shadow-warm"
-                    : "bg-primary-gradient text-primary-foreground shadow-pop";
-              const desc =
-                step.tone === "dark"
-                  ? "text-background/70"
-                  : "text-muted-foreground";
-
-              return (
-                <article
-                  key={step.n}
-                  className={cn(
-                    "group rounded-3xl border p-7 shadow-xs transition-all hover:-translate-y-1 hover:shadow-lift",
-                    wrap,
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <div
-                      className={cn(
-                        "grid size-11 place-items-center rounded-2xl",
-                        iconBox,
-                      )}
-                    >
-                      {step.icon}
-                    </div>
-                    <span
-                      className={cn(
-                        "font-mono-tag text-[10px] font-semibold",
-                        step.tone === "dark"
-                          ? "text-background/50"
-                          : "text-muted-foreground",
-                      )}
-                    >
-                      {step.n}
-                    </span>
-                  </div>
-                  <h3 className="font-display mt-6 text-2xl leading-tight">
-                    {step.t}
-                  </h3>
-                  <p className={cn("mt-3 text-sm leading-6", desc)}>{step.d}</p>
-                </article>
-              );
-            })}
           </div>
         </div>
       </section>

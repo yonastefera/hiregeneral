@@ -94,14 +94,12 @@ function BigStat({
         className={cn(
           "font-display leading-none tracking-tight",
           accent,
-          small ? "text-3xl" : "text-5xl",
+          small ? "text-3xl" : "hg-metric-value",
         )}
       >
         {n}
       </span>
-      <span className="mt-2 font-mono-tag text-[10px] text-background/60">
-        {l}
-      </span>
+      <span className="hg-metric-label">{l}</span>
     </div>
   );
 }
@@ -303,10 +301,10 @@ export default function JobsPageClient({
         <div className="pointer-events-none absolute bottom-0 left-1/3 size-105 rounded-full bg-violet-pop/40 blur-[160px]" />
         <div className="pointer-events-none absolute inset-0 noise-dark opacity-50" />
 
-        <div className="relative mx-auto w-full max-w-7xl px-4 pb-24 pt-24 md:px-6 md:pb-28 md:pt-24">
+        <div className="hg-hero-inner relative">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-electric/40 bg-electric/10 px-3 py-1 font-mono-tag text-[10px] font-semibold text-electric">
-              <span className="size-1.5 rounded-full bg-electric" />
+            <div className="hg-eyebrow">
+              <span className="hg-eyebrow-dot" />
               Live roles · refreshed hourly
             </div>
             <div className="hidden items-center gap-2 font-mono-tag text-[10px] text-background/60 md:inline-flex">
@@ -316,10 +314,7 @@ export default function JobsPageClient({
             </div>
           </div>
 
-          <h1
-            id="jobs-page-title"
-            className="font-display mt-10 max-w-[70rem] text-balance text-[clamp(3.25rem,8vw,6.25rem)] leading-[0.92] tracking-[-0.04em]"
-          >
+          <h1 id="jobs-page-title" className="hg-hero-title">
             Find work
             <br />
             <span className="text-gradient-electric italic">that fits</span>
@@ -328,7 +323,7 @@ export default function JobsPageClient({
           </h1>
 
           <div className="mt-10 grid items-end gap-8 md:grid-cols-[1fr_auto]">
-            <p className="max-w-xl text-base leading-7 text-background/70 md:text-lg">
+            <p className="hg-hero-copy">
               Every active role across the network — sharper filters, no noise,
               no dead listings, no recruiter spam.
             </p>

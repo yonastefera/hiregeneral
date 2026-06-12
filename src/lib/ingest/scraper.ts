@@ -423,6 +423,9 @@ const NLX_SOLR_DEFAULT_PAGE_SIZE = 10;
 const NLX_SOLR_DEFAULT_MAX_PAGES = 4;
 const COVEO_DEFAULT_PAGE_SIZE = 25;
 const COVEO_DEFAULT_MAX_PAGES = 4;
+const ROKU_DEFAULT_MAX_PAGES = 5;
+const SOUTHERN_GLAZERS_DEFAULT_MAX_PAGES = 3;
+const ATOM_FEED_DEFAULT_MAX_JOBS = 80;
 
 function metadataString(source: JobSource, key: string) {
   const value = source.metadata[key];
@@ -467,6 +470,23 @@ function normalizeLine(value: string) {
     .replace(/^[•·\-\u2013\u2014\s]+/, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function decodeBasicHtml(value: string) {
+  return value
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) =>
+      String.fromCharCode(parseInt(hex, 16)),
+    )
+    .replace(/&#(\d+);/g, (_, code: string) =>
+      String.fromCharCode(parseInt(code, 10)),
+    )
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
 }
 
 function splitListItems(value: string | null | undefined, maxItems: number) {
@@ -5853,6 +5873,883 @@ async function fetchCoveoJobs(
   return jobs;
 }
 
+type IcimsJobImpression = {
+  idRaw?: number | string;
+  title?: string;
+  description?: string;
+  category?: string;
+  positionType?: string;
+  postedDate?: string;
+  location?: {
+    city?: string;
+    state?: string;
+    country?: string;
+  };
+  company?: string;
+  applyUrl?: string;
+};
+
+function extractIcimsImpressions(html: string) {
+  const match = html.match(/var\s+jobImpressions\s*=\s*(\[[\s\S]*?\]);/);
+
+  if (!match) return [];
+
+  try {
+    const parsed = JSON.parse(match[1]) as unknown;
+    return Array.isArray(parsed) ? (parsed as IcimsJobImpression[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function extractIcimsJobLinks(html: string) {
+  const links = new Map<string, string>();
+
+  for (const match of html.matchAll(
+    /<a\b[^>]*href=["']([^"']*\/jobs\/(\d+)\/[^"']*\/job[^"']*)["'][^>]*>/gi,
+  )) {
+    links.set(match[2], decodeBasicHtml(match[1]));
+  }
+
+  return links;
+}
+
+function normalizeIcimsLocationText(value: string) {
+  const text = htmlToText(decodeBasicHtml(value)).replace(/\s+/g, " ").trim();
+
+  if (!text) return "";
+
+  const usCityState = text.match(/\bUS-([A-Z]{2})-([^|,\n]+?)(?:\s+-|$)/i);
+
+  if (usCityState) {
+    const state = usCityState[1].toUpperCase();
+    const city = usCityState[2]
+      .replace(/\s*-\s*.*/, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    return city ? `${city}, ${state}, US` : `${state}, US`;
+  }
+
+  const stateCity = text.match(/\b([A-Z]{2}),\s*([^|\n-]+?)(?:\s+-|$)/);
+
+  if (stateCity) {
+    const state = stateCity[1].toUpperCase();
+    const city = stateCity[2].replace(/\s+/g, " ").trim();
+
+    return city ? `${city}, ${state}, US` : `${state}, US`;
+  }
+
+  if (/\bUnited States\b/i.test(text)) return "United States";
+  if (/\bUS-[A-Z]{2}\b/i.test(text)) return "United States";
+
+  return text;
+}
+
+function extractIcimsCardJobs(
+  html: string,
+  publicBase: string,
+  category: string,
+) {
+  const jobs: IcimsJobImpression[] = [];
+
+  for (const match of html.matchAll(
+    /<li\b[^>]*class=["'][^"']*iCIMS_JobCardItem[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi,
+  )) {
+    const blockHtml = match[1];
+    const titleLink = blockHtml.match(
+      /<a\b[^>]*href=["']([^"']+)["'][^>]*>[\s\S]*?<h3\b[^>]*>([\s\S]*?)<\/h3>/i,
+    );
+
+    if (!titleLink) continue;
+
+    const applyUrl = new URL(
+      decodeBasicHtml(titleLink[1]),
+      publicBase,
+    ).toString();
+    const id = applyUrl.match(/\/jobs\/(\d+)\//)?.[1];
+    const title = htmlToText(decodeBasicHtml(titleLink[2])).trim();
+
+    if (!title) continue;
+
+    const descriptionMatch = blockHtml.match(
+      /<div\b[^>]*class=["'][^"']*description[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
+    );
+    const description = descriptionMatch
+      ? htmlToText(decodeBasicHtml(descriptionMatch[1])).trim()
+      : "";
+
+    const blockText = htmlToText(decodeBasicHtml(blockHtml));
+    const location = normalizeIcimsLocationText(blockText);
+
+    jobs.push({
+      idRaw: id ?? normalizedJobTitleKey(title),
+      title,
+      description,
+      category,
+      location: {
+        city: location,
+        country: "USA",
+      },
+      applyUrl,
+    });
+  }
+
+  return jobs;
+}
+
+function icimsLocation(job: IcimsJobImpression) {
+  const city = job.location?.city?.trim();
+  const state = job.location?.state?.trim();
+  const country = job.location?.country?.trim();
+  const location = [city, state].filter(Boolean).join(", ");
+
+  if (location) return location;
+  if (job.company?.trim()) return job.company.trim();
+  if (country === "USA") return "United States";
+
+  return "";
+}
+
+function icimsPostedAt(value: string | undefined) {
+  if (!value) return new Date().toISOString();
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime())
+    ? new Date().toISOString()
+    : parsed.toISOString();
+}
+
+async function fetchIcimsJobs(
+  source: JobSource,
+  context?: {
+    signal?: AbortSignal;
+  },
+): Promise<ImportedJob[]> {
+  const recruiterId = process.env.SYSTEM_RECRUITER_ID;
+
+  if (!recruiterId) {
+    throw new Error("Missing SYSTEM_RECRUITER_ID");
+  }
+
+  const publicBase =
+    metadataString(source, "publicBase") ??
+    `https://${source.companyDomain ?? ""}`;
+  const sourceUrl =
+    source.sourceUrl ??
+    metadataString(source, "searchUrl") ??
+    new URL("/jobs/search", publicBase).toString();
+  const pageUrl = new URL(sourceUrl);
+  pageUrl.searchParams.set("in_iframe", "1");
+
+  const response = await fetch(pageUrl, {
+    headers: {
+      Accept: "text/html",
+      "User-Agent": "HireGeneralJobBoard/1.0",
+    },
+    cache: "no-store",
+    signal: context?.signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `iCIMS fetch failed for ${source.companyName}: ${response.status}`,
+    );
+  }
+
+  const html = await response.text();
+  const linkById = extractIcimsJobLinks(html);
+  const category = metadataString(source, "category") ?? "Technology";
+  const requiredTerms = metadataStringArray(source, "requiredTerms") ?? [];
+  const impressionJobs = extractIcimsImpressions(html);
+  const sourceJobs =
+    impressionJobs.length > 0
+      ? impressionJobs
+      : extractIcimsCardJobs(html, publicBase, category);
+  const jobs = sourceJobs
+    .filter((job) => {
+      const locationText = [
+        icimsLocation(job),
+        job.location?.country,
+        job.company,
+      ].join(" ");
+      const searchText = [
+        job.title,
+        job.category,
+        job.description,
+        icimsLocation(job),
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      return (
+        isUsText(locationText) &&
+        isEngineeringText(searchText) &&
+        !isInternshipText(searchText) &&
+        requiredTerms.every((term) =>
+          searchText.toLowerCase().includes(term.toLowerCase()),
+        )
+      );
+    })
+    .slice(0, metadataNumber(source, "maxJobs") ?? 50);
+
+  const imported: ImportedJob[] = [];
+
+  for (const job of jobs) {
+    const title = htmlToText(job.title).trim();
+    const id = String(job.idRaw ?? normalizedJobTitleKey(title));
+    const href = job.applyUrl ?? linkById.get(id);
+    const applyUrl = href
+      ? new URL(href, publicBase).toString()
+      : new URL(`/jobs/${id}/job`, publicBase).toString();
+    const location = icimsLocation(job) || "United States";
+    const description = safeDescription({
+      description: [job.description, title, job.category]
+        .filter(Boolean)
+        .join(" "),
+      title,
+      companyName: source.companyName,
+    });
+
+    const baseJob: ImportedJob = {
+      recruiterId,
+      companyId: null,
+      companyName: source.companyName,
+      companyLogoUrl: source.companyLogoUrl ?? null,
+      title,
+      description,
+      location,
+
+      latitude: null,
+      longitude: null,
+
+      employmentType: normalizeEmploymentType(job.positionType),
+      workMode: detectWorkMode(title, location),
+
+      salaryMin: null,
+      salaryMax: null,
+      salaryCurrency: "USD",
+
+      skills: [],
+      responsibilities: [],
+      requirements: [],
+      benefits: [],
+
+      status: "published",
+
+      postedAt: icimsPostedAt(job.postedDate),
+      expiresAt: defaultExpiryDate(30),
+
+      sourceName: "scraper",
+      sourceId: `${source.sourceSlug}:${id}`,
+      applyUrl,
+
+      experienceLevel: null,
+      category,
+
+      companyTagline: null,
+      companySize: null,
+      companyWebsite: source.companyDomain
+        ? `https://${source.companyDomain}`
+        : null,
+    };
+
+    imported.push(
+      await enhanceImportedJobFromDetailPage({
+        job: baseJob,
+        detailUrl: applyUrl,
+        signal: context?.signal,
+      }),
+    );
+  }
+
+  return imported;
+}
+
+type SouthernGlazersListJob = {
+  id: string;
+  title: string;
+  href: string;
+  location: string;
+  category: string;
+};
+
+function extractSouthernGlazersJobs(html: string) {
+  const jobs: SouthernGlazersListJob[] = [];
+
+  for (const match of html.matchAll(
+    /<a\s+href=["']([^"']*\/posting\/[^"']+)["'][^>]*>\s*<strong>([\s\S]*?)<\/strong>\s*<\/a>/gi,
+  )) {
+    const href = decodeBasicHtml(match[1]);
+    const title = htmlToText(match[2]);
+    const after = html.slice(match.index ?? 0, (match.index ?? 0) + 1400);
+    const id =
+      after.match(/Job ID:\s*<\/?[^>]*>\s*([0-9]+)/i)?.[1] ??
+      href.match(/\/([0-9]+)-[^/]+$/)?.[1] ??
+      normalizedJobTitleKey(title).replace(/\s+/g, "-");
+    const location =
+      htmlToText(
+        after.match(/<label>Location<\/label>\s*<p[^>]*>([\s\S]*?)<\/p>/i)?.[1],
+      ) || "United States";
+    const category =
+      htmlToText(
+        after.match(/<label>Category<\/label>\s*<p[^>]*>([\s\S]*?)<\/p>/i)?.[1],
+      ) || "IT";
+
+    jobs.push({
+      id,
+      title,
+      href,
+      location,
+      category,
+    });
+  }
+
+  return jobs;
+}
+
+async function fetchSouthernGlazersJobs(
+  source: JobSource,
+  context?: {
+    signal?: AbortSignal;
+  },
+): Promise<ImportedJob[]> {
+  const recruiterId = process.env.SYSTEM_RECRUITER_ID;
+
+  if (!recruiterId) {
+    throw new Error("Missing SYSTEM_RECRUITER_ID");
+  }
+
+  const publicBase =
+    metadataString(source, "publicBase") ?? "https://jobs.southernglazers.com";
+  const sourceUrl =
+    source.sourceUrl ??
+    metadataString(source, "searchUrl") ??
+    new URL("/", publicBase).toString();
+  const maxPages =
+    metadataNumber(source, "maxPages") ?? SOUTHERN_GLAZERS_DEFAULT_MAX_PAGES;
+  const category =
+    metadataString(source, "category") ?? "Information Technology";
+  const seen = new Set<string>();
+  const jobs: ImportedJob[] = [];
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const pageUrl = new URL(sourceUrl);
+    pageUrl.searchParams.set("country", "US");
+    pageUrl.searchParams.set("category", "IT");
+    pageUrl.searchParams.set("spage", String(page));
+
+    const response = await fetch(pageUrl, {
+      headers: {
+        Accept: "text/html",
+        "User-Agent": "HireGeneralJobBoard/1.0",
+      },
+      cache: "no-store",
+      signal: context?.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Southern Glazer's fetch failed for page ${page}: ${response.status}`,
+      );
+    }
+
+    const pageJobs = extractSouthernGlazersJobs(await response.text()).filter(
+      (job) => {
+        const searchText = [job.title, job.category, job.location].join(" ");
+
+        return (
+          isUsText(job.location) &&
+          isEngineeringText(searchText) &&
+          !isInternshipText(searchText)
+        );
+      },
+    );
+
+    if (pageJobs.length === 0) break;
+
+    for (const job of pageJobs) {
+      const sourceId = `${source.sourceSlug}:${job.id}`;
+
+      if (seen.has(sourceId)) continue;
+      seen.add(sourceId);
+
+      const applyUrl = new URL(job.href, publicBase).toString();
+      const baseJob: ImportedJob = {
+        recruiterId,
+        companyId: null,
+        companyName: source.companyName,
+        companyLogoUrl: source.companyLogoUrl ?? null,
+        title: job.title,
+        description: safeDescription({
+          description: `${job.title} role at ${source.companyName}.`,
+          title: job.title,
+          companyName: source.companyName,
+        }),
+        location: job.location,
+
+        latitude: null,
+        longitude: null,
+
+        employmentType: normalizeEmploymentType(null),
+        workMode: detectWorkMode(job.title, job.location),
+
+        salaryMin: null,
+        salaryMax: null,
+        salaryCurrency: "USD",
+
+        skills: [],
+        responsibilities: [],
+        requirements: [],
+        benefits: [],
+
+        status: "published",
+
+        postedAt: new Date().toISOString(),
+        expiresAt: defaultExpiryDate(30),
+
+        sourceName: "scraper",
+        sourceId,
+        applyUrl,
+
+        experienceLevel: null,
+        category,
+
+        companyTagline: null,
+        companySize: null,
+        companyWebsite: source.companyDomain
+          ? `https://${source.companyDomain}`
+          : null,
+      };
+
+      jobs.push(
+        await enhanceImportedJobFromDetailPage({
+          job: baseJob,
+          detailUrl: applyUrl,
+          signal: context?.signal,
+        }),
+      );
+    }
+  }
+
+  return jobs;
+}
+
+type RokuListJob = {
+  id: string;
+  title: string;
+  href: string;
+  location: string;
+  category: string | null;
+  searchText: string;
+};
+
+type AtomFeedJob = {
+  id: string;
+  title: string;
+  href: string;
+  location: string;
+  description: string;
+  postedAt: string | null;
+  searchText: string;
+};
+
+function extractRokuJobs(html: string) {
+  const matches = [
+    ...html.matchAll(
+      /<a\b[^>]*href=["']([^"']*\/jobs\/(?!search\b|saved\b|favorites\b)[^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi,
+    ),
+  ];
+  const jobs: RokuListJob[] = [];
+
+  for (let index = 0; index < matches.length; index += 1) {
+    const match = matches[index];
+    const href = decodeBasicHtml(match[1]);
+
+    if (!href || /\/jobs\/search\b/i.test(href)) continue;
+
+    const title = htmlToText(match[2]);
+    if (!title || title.length < 4 || /^view\b/i.test(title)) continue;
+
+    const start = match.index ?? 0;
+    const nextStart = matches[index + 1]?.index ?? start + 2500;
+    const blockHtml = html.slice(start, Math.min(nextStart, start + 2500));
+    const blockText = htmlToText(blockHtml);
+    const location =
+      htmlToText(
+        blockHtml.match(
+          /(?:job-location|location|locations)[^>]*>([\s\S]{0,300}?)(?:<\/span>|<\/div>|<\/li>)/i,
+        )?.[1],
+      ) ||
+      blockText.match(
+        /\b(?:Remote|United States|California|New York|Texas|Georgia|Washington|Massachusetts|Colorado|Illinois|Florida|Oregon|Nevada|Arizona|New Jersey|New Jersey|New Mexico|Pennsylvania|North Carolina|Virginia|Maryland|District of Columbia|DC|CA|NY|TX|GA|WA|MA|CO|IL|FL|OR|NV|AZ|NJ|PA|NC|VA|MD)\b(?:[^·|\n]{0,80})/i,
+      )?.[0] ||
+      "United States";
+    const category =
+      htmlToText(
+        blockHtml.match(
+          /(?:job-category|department|team)[^>]*>([\s\S]{0,300}?)(?:<\/span>|<\/div>|<\/li>)/i,
+        )?.[1],
+      ) || null;
+    const id =
+      href.split("?")[0].split("#")[0].split("/").filter(Boolean).at(-1) ??
+      normalizedJobTitleKey(title).replace(/\s+/g, "-");
+
+    jobs.push({
+      id,
+      title,
+      href,
+      location,
+      category,
+      searchText: blockText,
+    });
+  }
+
+  return jobs;
+}
+
+async function fetchRokuJobs(
+  source: JobSource,
+  context?: {
+    signal?: AbortSignal;
+  },
+): Promise<ImportedJob[]> {
+  const recruiterId = process.env.SYSTEM_RECRUITER_ID;
+
+  if (!recruiterId) {
+    throw new Error("Missing SYSTEM_RECRUITER_ID");
+  }
+
+  const publicBase =
+    metadataString(source, "publicBase") ?? "https://www.weareroku.com";
+  const sourceUrl =
+    source.sourceUrl ??
+    metadataString(source, "searchUrl") ??
+    new URL("/jobs/search", publicBase).toString();
+  const maxPages = metadataNumber(source, "maxPages") ?? ROKU_DEFAULT_MAX_PAGES;
+  const category = metadataString(source, "category") ?? "Technology";
+  const seen = new Set<string>();
+  const jobs: ImportedJob[] = [];
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const pageUrl = new URL(sourceUrl);
+    pageUrl.searchParams.set("page", String(page));
+    pageUrl.searchParams.set("country_codes[]", "US");
+
+    const response = await fetch(pageUrl, {
+      headers: {
+        Accept: "text/html",
+        "User-Agent": "HireGeneralJobBoard/1.0",
+      },
+      cache: "no-store",
+      signal: context?.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Roku fetch failed for page ${page}: ${response.status}`);
+    }
+
+    const pageJobs = extractRokuJobs(await response.text()).filter((job) => {
+      const searchText = [job.title, job.category, job.location, job.searchText]
+        .filter(Boolean)
+        .join(" ");
+
+      return (
+        isUsText(searchText) &&
+        isEngineeringText(searchText) &&
+        !isInternshipText(searchText)
+      );
+    });
+
+    if (pageJobs.length === 0) break;
+
+    for (const job of pageJobs) {
+      const sourceId = `${source.sourceSlug}:${job.id}`;
+
+      if (seen.has(sourceId)) continue;
+      seen.add(sourceId);
+
+      const applyUrl = new URL(job.href, publicBase).toString();
+      const baseJob: ImportedJob = {
+        recruiterId,
+        companyId: null,
+        companyName: source.companyName,
+        companyLogoUrl: source.companyLogoUrl ?? null,
+        title: job.title,
+        description: safeDescription({
+          description: `${job.title} role at ${source.companyName}.`,
+          title: job.title,
+          companyName: source.companyName,
+        }),
+        location: job.location || "United States",
+
+        latitude: null,
+        longitude: null,
+
+        employmentType: normalizeEmploymentType(null),
+        workMode: detectWorkMode(job.title, job.location),
+
+        salaryMin: null,
+        salaryMax: null,
+        salaryCurrency: "USD",
+
+        skills: [],
+        responsibilities: [],
+        requirements: [],
+        benefits: [],
+
+        status: "published",
+
+        postedAt: new Date().toISOString(),
+        expiresAt: defaultExpiryDate(30),
+
+        sourceName: "scraper",
+        sourceId,
+        applyUrl,
+
+        experienceLevel: null,
+        category: job.category || category,
+
+        companyTagline: null,
+        companySize: null,
+        companyWebsite: source.companyDomain
+          ? `https://${source.companyDomain}`
+          : null,
+      };
+
+      jobs.push(
+        await enhanceImportedJobFromDetailPage({
+          job: baseJob,
+          detailUrl: applyUrl,
+          signal: context?.signal,
+        }),
+      );
+    }
+  }
+
+  return jobs;
+}
+
+function textBetween(value: string, tagName: string) {
+  const match = value.match(
+    new RegExp(`<${tagName}\\b[^>]*>([\\s\\S]*?)<\\/${tagName}>`, "i"),
+  );
+
+  return match ? decodeBasicHtml(htmlToText(match[1])).trim() : "";
+}
+
+function firstXmlAttribute(value: string, tagName: string, attribute: string) {
+  const tagMatch = value.match(new RegExp(`<${tagName}\\b[^>]*>`, "i"));
+  if (!tagMatch) return "";
+
+  const attrMatch = tagMatch[0].match(
+    new RegExp(`${attribute}=["']([^"']+)["']`, "i"),
+  );
+
+  return attrMatch ? decodeBasicHtml(attrMatch[1]).trim() : "";
+}
+
+function extractFeedBlocks(xml: string) {
+  const atomEntries = [
+    ...xml.matchAll(/<entry\b[^>]*>[\s\S]*?<\/entry>/gi),
+  ].map((match) => match[0]);
+
+  if (atomEntries.length > 0) return atomEntries;
+
+  return [...xml.matchAll(/<item\b[^>]*>[\s\S]*?<\/item>/gi)].map(
+    (match) => match[0],
+  );
+}
+
+function extractFeedLink(block: string) {
+  const alternate =
+    block.match(
+      /<link\b(?=[^>]*\brel=["']alternate["'])(?=[^>]*\bhref=["']([^"']+)["'])[^>]*>/i,
+    )?.[1] ??
+    block.match(/<link\b(?=[^>]*\bhref=["']([^"']+)["'])[^>]*>/i)?.[1] ??
+    textBetween(block, "link");
+
+  return decodeBasicHtml(alternate ?? "").trim();
+}
+
+function inferLocationFromFeedText(value: string, fallback: string) {
+  const parenthetical = value.match(/\(([^)]{2,80})\)/)?.[1]?.trim();
+  if (parenthetical && isUsText(parenthetical)) return parenthetical;
+
+  const cityState = value.match(
+    /\b([A-Z][A-Za-z .'-]+,\s*(?:AL|AK|AZ|AR|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY))\b/,
+  )?.[1];
+
+  if (cityState) return cityState;
+
+  if (/\bnew york\b/i.test(value)) return "New York, NY, United States";
+  if (/\bhouston\b/i.test(value)) return "Houston, TX, United States";
+  if (/\bchicago\b/i.test(value)) return "Chicago, IL, United States";
+  if (/\batlanta\b/i.test(value)) return "Atlanta, GA, United States";
+
+  return fallback;
+}
+
+function extractAtomFeedJobs(xml: string, fallbackLocation: string) {
+  return extractFeedBlocks(xml)
+    .map((block): AtomFeedJob | null => {
+      const title = textBetween(block, "title");
+      const href = extractFeedLink(block);
+      const content =
+        textBetween(block, "content") ||
+        textBetween(block, "summary") ||
+        textBetween(block, "description");
+      const id =
+        textBetween(block, "id") ||
+        textBetween(block, "guid") ||
+        href ||
+        normalizedJobTitleKey(title).replace(/\s+/g, "-");
+      const postedAt =
+        textBetween(block, "published") ||
+        textBetween(block, "updated") ||
+        textBetween(block, "pubDate");
+      const location =
+        firstXmlAttribute(block, "location", "name") ||
+        inferLocationFromFeedText(
+          `${title} ${content} ${href}`,
+          fallbackLocation,
+        );
+
+      if (!title || !href) return null;
+
+      return {
+        id,
+        title,
+        href,
+        location,
+        description: content,
+        postedAt:
+          postedAt && !Number.isNaN(Date.parse(postedAt)) ? postedAt : null,
+        searchText: [title, location, content, href].join(" "),
+      };
+    })
+    .filter((job): job is AtomFeedJob => Boolean(job));
+}
+
+async function fetchAtomFeedJobs(
+  source: JobSource,
+  context?: {
+    signal?: AbortSignal;
+  },
+): Promise<ImportedJob[]> {
+  const recruiterId = process.env.SYSTEM_RECRUITER_ID;
+
+  if (!recruiterId) {
+    throw new Error("Missing SYSTEM_RECRUITER_ID");
+  }
+
+  const feedUrl = metadataString(source, "feedUrl") ?? source.sourceUrl;
+
+  if (!feedUrl) {
+    throw new Error(`Missing feedUrl for ${source.sourceSlug}`);
+  }
+
+  const publicBase =
+    metadataString(source, "publicBase") ?? new URL(feedUrl).origin;
+  const fallbackLocation =
+    metadataString(source, "locationFallback") ?? "United States";
+  const maxJobs =
+    metadataNumber(source, "maxJobs") ?? ATOM_FEED_DEFAULT_MAX_JOBS;
+  const category = metadataString(source, "category") ?? "Technology";
+  const companyWebsite =
+    metadataString(source, "companyWebsite") ??
+    (source.companyDomain ? `https://${source.companyDomain}` : null);
+
+  const response = await fetch(feedUrl, {
+    headers: {
+      Accept:
+        "application/atom+xml, application/rss+xml, application/xml, text/xml",
+      "User-Agent": "HireGeneralJobBoard/1.0",
+    },
+    cache: "no-store",
+    signal: context?.signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Atom feed fetch failed: ${response.status}`);
+  }
+
+  const seen = new Set<string>();
+  const jobs: ImportedJob[] = [];
+  const feedJobs = extractAtomFeedJobs(await response.text(), fallbackLocation)
+    .filter((job) => {
+      return (
+        isUsText(job.searchText) &&
+        isEngineeringText(job.searchText) &&
+        !isInternshipText(job.searchText)
+      );
+    })
+    .slice(0, maxJobs);
+
+  for (const job of feedJobs) {
+    const sourceId = `${source.sourceSlug}:${job.id}`;
+
+    if (seen.has(sourceId)) continue;
+    seen.add(sourceId);
+
+    const applyUrl = new URL(job.href, publicBase).toString();
+    const baseJob: ImportedJob = {
+      recruiterId,
+      companyId: null,
+      companyName: source.companyName,
+      companyLogoUrl: source.companyLogoUrl ?? null,
+      title: job.title,
+      description: safeDescription({
+        description: job.description,
+        title: job.title,
+        companyName: source.companyName,
+      }),
+      location: job.location || fallbackLocation,
+
+      latitude: null,
+      longitude: null,
+
+      employmentType: normalizeEmploymentType(null),
+      workMode: detectWorkMode(job.title, job.location),
+
+      salaryMin: null,
+      salaryMax: null,
+      salaryCurrency: "USD",
+
+      skills: [],
+      responsibilities: [],
+      requirements: [],
+      benefits: [],
+
+      status: "published",
+
+      postedAt: job.postedAt ?? new Date().toISOString(),
+      expiresAt: defaultExpiryDate(30),
+
+      sourceName: "scraper",
+      sourceId,
+      applyUrl,
+
+      experienceLevel: null,
+      category,
+
+      companyTagline: null,
+      companySize: null,
+      companyWebsite,
+    };
+
+    jobs.push(
+      await enhanceImportedJobFromDetailPage({
+        job: baseJob,
+        detailUrl: applyUrl,
+        signal: context?.signal,
+      }),
+    );
+  }
+
+  return jobs;
+}
+
 export const scraperAdapter: JobSourceAdapter = {
   type: "scraper",
   fetchJobs: (source, context) => {
@@ -5941,6 +6838,22 @@ export const scraperAdapter: JobSourceAdapter = {
 
     if (adapter === "coveo") {
       return fetchCoveoJobs(source, context);
+    }
+
+    if (adapter === "icims") {
+      return fetchIcimsJobs(source, context);
+    }
+
+    if (adapter === "southern-glazers") {
+      return fetchSouthernGlazersJobs(source, context);
+    }
+
+    if (adapter === "roku-careers") {
+      return fetchRokuJobs(source, context);
+    }
+
+    if (adapter === "atom-feed") {
+      return fetchAtomFeedJobs(source, context);
     }
 
     throw new Error(

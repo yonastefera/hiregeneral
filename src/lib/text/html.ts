@@ -63,6 +63,15 @@ function normalizeAllowedJobHtml(input: string) {
 function cleanupStructuredJobHtml(input: string) {
   return input
     .replace(
+      /<p>\s*<strong>\s*([^<]{3,90}?)\s*<\/strong>\s*<\/p>/gi,
+      (_match: string, heading: string) => `<h2>${heading.trim()}</h2>`,
+    )
+    .replace(
+      /<p>\s*<strong>\s*([^<]{3,90}?)\s*<\/strong>\s*<br>\s*([\s\S]*?)<\/p>/gi,
+      (_match: string, heading: string, body: string) =>
+        `<h2>${heading.trim()}</h2><p>${body.trim()}</p>`,
+    )
+    .replace(
       /<(h2|h3)>([^<]+)<\/\1>\s*<p>\s*<strong>\s*([^<]+)\s*<\/strong>\s*<\/p>/gi,
       (match: string, tag: string, heading: string, label: string) =>
         heading.trim().toLowerCase() === label.trim().toLowerCase()
@@ -216,7 +225,7 @@ function splitLongParagraphs(input: string) {
 }
 
 const INLINE_JOB_HEADING_PATTERN =
-  /\b(About (?:the )?(?:role|job|team|position)|About Job|Job Description|Pay Range|Benefits|What You(?:'|’)ll Do|What You'll Do|How You(?:'|’)ll Make an Impact|How You'll Make an Impact|Responsibilities|Candidate Profile|Required Qualifications|Minimum Qualifications|Basic Qualifications|Preferred Qualifications|Desired Qualifications|Qualifications|Requirements|Desired Skills|Skills|Technical Mastery|Communication Excellence|Equal Opportunity|Join the Journey|EEO Statement|Posting End Date)\b(:?)/gi;
+  /\b(About (?:the )?(?:role|job|team|position)|About Job|Job Description|Be part of something groundbreaking|Who we are|Pay Range|Benefits|Enjoy benefits that take care of what matters|What You(?:'|’)ll Do|What You'll Do|How You(?:'|’)ll Make an Impact|How You'll Make an Impact|How you will create impact|Your responsibilities include|Responsibilities|Candidate Profile|What is needed to be successful|Required Qualifications|Minimum Qualifications|Basic Qualifications|Preferred Qualifications|Desired Qualifications|Qualifications|Requirements|Desired Skills|Skills|Technical Mastery|Communication Excellence|Welcome to a culture of inclusion|Equal Opportunity|Join the Journey|EEO Statement|Posting End Date)\b(:?)/gi;
 
 const GENERIC_INLINE_HEADING_LABELS = new Set([
   "benefits",
@@ -290,7 +299,7 @@ function flushList(items: string[], blocks: string[]) {
 
 function splitHeadingAndBody(value: string) {
   const match = value.match(
-    /^(About (?:the )?(?:role|job|team|position)|About Job|Job Description|Pay Range|Benefits|What You(?:'|’)ll Do|What You'll Do|How You(?:'|’)ll Make an Impact|How You'll Make an Impact|Responsibilities|Candidate Profile|Required Qualifications|Minimum Qualifications|Basic Qualifications|Preferred Qualifications|Desired Qualifications|Qualifications|Requirements|Desired Skills|Skills|Technical Mastery|Communication Excellence|Equal Opportunity|Join the Journey|EEO Statement|Posting End Date)\s*:?\s*([\s\S]*)$/i,
+    /^(About (?:the )?(?:role|job|team|position)|About Job|Job Description|Be part of something groundbreaking|Who we are|Pay Range|Benefits|Enjoy benefits that take care of what matters|What You(?:'|’)ll Do|What You'll Do|How You(?:'|’)ll Make an Impact|How You'll Make an Impact|How you will create impact|Your responsibilities include|Responsibilities|Candidate Profile|What is needed to be successful|Required Qualifications|Minimum Qualifications|Basic Qualifications|Preferred Qualifications|Desired Qualifications|Qualifications|Requirements|Desired Skills|Skills|Technical Mastery|Communication Excellence|Welcome to a culture of inclusion|Equal Opportunity|Join the Journey|EEO Statement|Posting End Date)\s*:?\s*([\s\S]*)$/i,
   );
 
   if (!match) {

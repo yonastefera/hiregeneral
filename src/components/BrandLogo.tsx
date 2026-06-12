@@ -3,7 +3,6 @@ import { cn } from "@/lib/utils";
 type BrandLogoProps = {
   className?: string;
   variant?: "full" | "mark";
-  /** Tailwind text color class for the wordmark; ignored for "mark". */
   wordClassName?: string;
 };
 

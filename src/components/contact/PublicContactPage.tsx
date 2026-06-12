@@ -126,10 +126,10 @@ export function PublicContactPage({ initialTopic }: PublicContactPageProps) {
         <div className="pointer-events-none absolute -left-32 top-40 size-120 rounded-full bg-primary/40 blur-[160px]" />
         <div className="pointer-events-none absolute inset-0 noise-dark opacity-50" />
 
-        <div className="relative mx-auto max-w-7xl px-4 pb-24 pt-24 md:px-6 md:pb-32 md:pt-24">
+        <div className="hg-hero-inner relative">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-electric/40 bg-electric/10 px-3 py-1 font-mono-tag text-[10px] font-semibold text-electric">
-              <span className="size-1.5 rounded-full bg-electric" />
+            <div className="hg-eyebrow">
+              <span className="hg-eyebrow-dot" />
               Support online · ~6 hr reply
             </div>
             <div className="hidden items-center gap-2 font-mono-tag text-[10px] text-background/60 md:inline-flex">
@@ -139,7 +139,7 @@ export function PublicContactPage({ initialTopic }: PublicContactPageProps) {
             </div>
           </div>
 
-          <h1 className="font-display mt-10 max-w-280 text-balance text-[clamp(3.25rem,8vw,6.25rem)] leading-[0.92] tracking-[-0.04em]">
+          <h1 className="hg-hero-title">
             Talk to a
             <br />
             <span className="text-gradient-electric italic">human.</span>{" "}
@@ -149,34 +149,22 @@ export function PublicContactPage({ initialTopic }: PublicContactPageProps) {
           </h1>
 
           <div className="mt-10 grid items-end gap-8 md:grid-cols-[1fr_auto]">
-            <p className="max-w-xl text-base leading-7 text-background/70 md:text-lg">
+            <p className="hg-hero-copy">
               Job seekers, hiring teams, privacy, accessibility — your message
               gets routed to the right person within one business day.
             </p>
             <div className="hidden gap-8 md:flex">
               <div className="flex flex-col">
-                <span className="font-display text-5xl leading-none tracking-tight text-electric">
-                  6h
-                </span>
-                <span className="mt-2 font-mono-tag text-[10px] text-background/60">
-                  Avg reply
-                </span>
+                <span className="hg-metric-value text-electric">6h</span>
+                <span className="hg-metric-label">Avg reply</span>
               </div>
               <div className="flex flex-col">
-                <span className="font-display text-5xl leading-none tracking-tight text-accent">
-                  100%
-                </span>
-                <span className="mt-2 font-mono-tag text-[10px] text-background/60">
-                  Routed by human
-                </span>
+                <span className="hg-metric-value text-accent">100%</span>
+                <span className="hg-metric-label">Routed by human</span>
               </div>
               <div className="flex flex-col">
-                <span className="font-display text-5xl leading-none tracking-tight text-violet-pop">
-                  24/7
-                </span>
-                <span className="mt-2 font-mono-tag text-[10px] text-background/60">
-                  Inbox open
-                </span>
+                <span className="hg-metric-value text-violet-pop">24/7</span>
+                <span className="hg-metric-label">Inbox open</span>
               </div>
             </div>
           </div>
@@ -192,12 +180,8 @@ export function PublicContactPage({ initialTopic }: PublicContactPageProps) {
             <div className="pointer-events-none absolute -right-20 -top-20 size-64 rounded-full bg-primary/10 blur-3xl" />
             <div className="relative flex items-end justify-between gap-3 border-b border-border pb-6">
               <div>
-                <p className="font-mono-tag text-[10px] font-semibold text-primary">
-                  01 / Message
-                </p>
-                <h2 className="font-display mt-2 text-3xl md:text-4xl">
-                  Send us a note
-                </h2>
+                <p className="hg-section-kicker text-primary">01 / Message</p>
+                <h2 className="hg-panel-title">Send us a note</h2>
               </div>
               <span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:inline-flex">
                 <Clock className="size-3.5 text-primary" />
@@ -347,9 +331,7 @@ export function PublicContactPage({ initialTopic }: PublicContactPageProps) {
             />
 
             <div className="rounded-3xl border border-border bg-card p-6 shadow-xs">
-              <p className="font-mono-tag text-[10px] font-semibold text-primary">
-                Direct
-              </p>
+              <p className="hg-section-kicker text-primary">Direct</p>
               <div className="mt-4 space-y-3">
                 <ContactRow title="Support" email="support@hiregeneral.com" />
                 <ContactRow
@@ -375,10 +357,10 @@ export function PublicContactPage({ initialTopic }: PublicContactPageProps) {
           <div className="pointer-events-none absolute inset-0 grain opacity-[0.25]" />
           <div className="relative grid items-end gap-10 md:grid-cols-[1.2fr_auto]">
             <div>
-              <p className="font-mono-tag text-[10px] font-semibold text-primary-glow">
+              <p className="hg-section-kicker text-primary-glow">
                 For employers
               </p>
-              <h3 className="font-display mt-4 text-balance text-4xl leading-[1.05] md:text-6xl">
+              <h3 className="mt-4 max-w-3xl text-balance font-display text-[clamp(2.75rem,5vw,4.5rem)] leading-[1.02] tracking-[-0.04em]">
                 Hire faster,{" "}
                 <span className="text-gradient-warm">with less noise.</span>
               </h3>

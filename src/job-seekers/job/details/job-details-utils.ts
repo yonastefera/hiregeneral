@@ -134,7 +134,8 @@ function sanitizeSectionItems(items: string[], maxLength = 260) {
 function sanitizeBenefitItems(items: string[]) {
   const fragments = [
     /^[,.;:]/,
-    /^(?:actual|and|are|base|for|range|site|plan|here|though)\b/i,
+    /^(?:actual|and|are|base|focused|for|package|range|site|plan|that|here|though)\b/i,
+    /\b(welcome to a culture|total rewards program|take care of what matters)\b/i,
     /\b(eligible employees|eligibility for specific|defined benefit pension|available upon request)\b/i,
     /\b(restricted stock units|advance through the hiring process)\b/i,
     /\b(compensation range listed|base salary offer|hiring process|recruiter can share)\b/i,
@@ -239,7 +240,7 @@ export function deriveDescriptionSections(job: Job): DerivedSections {
   const existingBenefits = sanitizeBenefitItems(cleanTextArray(job.benefits));
 
   const sectionPattern =
-    /(Who we are|About the role|About Stripe|About Accenture|About the team|About this role|In this role, you will|As an? [^.\n]{3,160}?, you will|What you’ll do|What you'll do|Responsibilities|Other Duties|Job Qualifications|Education and Experience|Here(?:'|’)s what you need|What you need|Nice to have|What we’re looking for|What we're looking for|Who you are|Required qualifications|Desired qualifications|Minimum requirements|Preferred qualifications|Other Knowledge, Skills, Abilities or Certifications|Job expectations|Requirements|Qualifications|Travel requirements|Physical Demands|Benefits|Additional Information|Pay range|Pay and benefits|Compensation|Salary|Our Interview Practices|Posting end date|We value equal opportunity|Applicants with disabilities|Drug and alcohol policy|Recruitment and hiring requirements)/gi;
+    /(Who we are|About the role|About Stripe|About Accenture|About the team|About this role|Be part of something groundbreaking|In this role, you will|As an? [^.\n]{3,160}?, you will|What you’ll do|What you'll do|How you(?:'|’)ll make an impact|How you'll make an impact|How you will create impact|Your responsibilities include|Responsibilities|Other Duties|Job Qualifications|Education and Experience|Here(?:'|’)s what you need|What you need|What is needed to be successful|Nice to have|What we’re looking for|What we're looking for|Who you are|Required qualifications|Desired qualifications|Minimum requirements|Preferred qualifications|Other Knowledge, Skills, Abilities or Certifications|Job expectations|Requirements|Qualifications|Travel requirements|Physical Demands|Benefits|Enjoy benefits that take care of what matters|Additional Information|Pay range|Pay and benefits|Compensation|Salary|Our Interview Practices|Posting end date|We value equal opportunity|Welcome to a culture of inclusion|Applicants with disabilities|Drug and alcohol policy|Recruitment and hiring requirements)/gi;
 
   const markers = [...fullText.matchAll(sectionPattern)].map((match) => ({
     label: match[0],
@@ -288,6 +289,7 @@ export function deriveDescriptionSections(job: Job): DerivedSections {
           "About Accenture",
           "About the team",
           "About this role",
+          "Be part of something groundbreaking",
         ]),
       );
       continue;
@@ -298,6 +300,7 @@ export function deriveDescriptionSections(job: Job): DerivedSections {
       label.includes("nice to have") ||
       label.includes("looking for") ||
       label.includes("who you are") ||
+      label.includes("what is needed") ||
       label.includes("job qualifications") ||
       label.includes("education and experience") ||
       label.includes("other knowledge") ||
@@ -310,6 +313,7 @@ export function deriveDescriptionSections(job: Job): DerivedSections {
           "What we’re looking for",
           "What we're looking for",
           "Who you are",
+          "What is needed to be successful",
           "Required qualifications",
           "Desired qualifications",
           "Minimum requirements",
@@ -327,8 +331,10 @@ export function deriveDescriptionSections(job: Job): DerivedSections {
 
     if (
       label.includes("in this role") ||
+      label.includes("impact") ||
       label.includes("you will") ||
       label.includes("what you") ||
+      label.includes("responsibilities include") ||
       label.includes("responsibilities") ||
       label.includes("other duties")
     ) {
@@ -337,6 +343,10 @@ export function deriveDescriptionSections(job: Job): DerivedSections {
           "In this role, you will",
           "What you’ll do",
           "What you'll do",
+          "How you’ll make an impact",
+          "How you'll make an impact",
+          "How you will create impact",
+          "Your responsibilities include",
           "Responsibilities",
           "Other Duties",
         ]),
@@ -346,6 +356,7 @@ export function deriveDescriptionSections(job: Job): DerivedSections {
 
     if (
       label.includes("benefits") ||
+      label.includes("take care of what matters") ||
       label.includes("additional information") ||
       label.includes("compensation") ||
       label.includes("salary")
@@ -353,6 +364,7 @@ export function deriveDescriptionSections(job: Job): DerivedSections {
       benefitChunks.push(
         removeSectionHeading(chunk.text, [
           "Benefits",
+          "Enjoy benefits that take care of what matters",
           "Pay and benefits",
           "Additional Information",
           "Compensation",
@@ -366,6 +378,7 @@ export function deriveDescriptionSections(job: Job): DerivedSections {
       label.includes("our interview practices") ||
       label.includes("posting end date") ||
       label.includes("equal opportunity") ||
+      label.includes("welcome to a culture") ||
       label.includes("disabilities") ||
       label.includes("drug and alcohol") ||
       label.includes("recruitment and hiring")

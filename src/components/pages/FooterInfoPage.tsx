@@ -17,7 +17,6 @@ type FooterInfoPageProps = {
   type:
     | "saved-jobs"
     | "salary-guide"
-    | "career-advice"
     | "post-job"
     | "candidates"
     | "recruiter-dashboard"
@@ -123,20 +122,6 @@ const pageContent: Record<FooterInfoPageProps["type"], PageContent> = {
       "Filter roles with salary ranges",
       "Compare remote and local markets",
       "Plan your next negotiation",
-    ],
-  },
-  "career-advice": {
-    label: "Career growth",
-    title: "Career advice",
-    description:
-      "Practical guidance for resumes, interviews, offer evaluation, and building a stronger professional profile.",
-    action: "Build your profile",
-    to: "/profile",
-    audience: "job_seeker",
-    points: [
-      "Resume and skills positioning",
-      "Interview preparation",
-      "Offer and career move checklists",
     ],
   },
   "post-job": {
@@ -319,7 +304,7 @@ export default async function FooterInfoPage({ type }: FooterInfoPageProps) {
     <main className="min-h-screen bg-background">
       <section className="bg-hero-gradient px-4 py-14">
         <div className="mx-auto max-w-7xl">
-          <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-tight text-balance md:text-6xl">
+          <h1 className="mt-4 max-w-3xl text-balance font-display text-[clamp(2.75rem,6vw,5rem)] font-normal leading-[1.02] tracking-[-0.04em]">
             {content.title}
           </h1>
 

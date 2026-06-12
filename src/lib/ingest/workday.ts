@@ -511,12 +511,12 @@ function parsedDescriptionSections(descriptionHtml: string | undefined) {
     .trim();
 
   const normalizedSectionText = text.replace(
-    /\s+(Basic Qualifications|Preferred Qualifications|Responsibilities|Benefits|Candidate Profile|The minimum and maximum full-time annual salaries for this role are listed below, by location|This role is eligible to earn performance based incentive compensation|Capital One offers a comprehensive, competitive, and inclusive set of health, financial and other benefits):?\s+/gi,
+    /\s+(Be part of something groundbreaking|Who we are|How you(?:'|’)ll make an impact|How you'll make an impact|How you will create impact|Your responsibilities include|What is needed to be successful|Basic Qualifications|Preferred Qualifications|Responsibilities|Benefits|Enjoy benefits that take care of what matters|Candidate Profile|The minimum and maximum full-time annual salaries for this role are listed below, by location|This role is eligible to earn performance based incentive compensation|Capital One offers a comprehensive, competitive, and inclusive set of health, financial and other benefits):?\s+/gi,
     "\n\n$1\n",
   );
 
   const markerPattern =
-    /^(About this role|About the role|About Accenture|In this role, you will|As an? [^.\n]{3,160}?, you will|What you(?:'|’)ll do|Responsibilities|Candidate Profile|Here(?:'|’)s What You Need|What You Need|Nice to Have|Required Qualifications|Minimum Qualifications|Basic Qualifications|Desired Qualifications|Preferred Qualifications|Qualifications|Requirements|Job Expectations|Pay Range|The minimum and maximum full-time annual salaries for this role are listed below, by location|This role is eligible to earn performance based incentive compensation|Benefits|Capital One offers a comprehensive, competitive, and inclusive set of health, financial and other benefits|Posting End Date|We Value Equal Opportunity|Applicants with Disabilities|Drug and Alcohol Policy|Wells Fargo Recruitment and Hiring Requirements):?$/gim;
+    /^(About this role|About the role|About Accenture|Be part of something groundbreaking|Who we are|In this role, you will|As an? [^.\n]{3,160}?, you will|What you(?:'|’)ll do|How you(?:'|’)ll make an impact|How you'll make an impact|How you will create impact|Your responsibilities include|Responsibilities|Candidate Profile|Here(?:'|’)s What You Need|What You Need|What is needed to be successful|Nice to Have|Required Qualifications|Minimum Qualifications|Basic Qualifications|Desired Qualifications|Preferred Qualifications|Qualifications|Requirements|Job Expectations|Pay Range|The minimum and maximum full-time annual salaries for this role are listed below, by location|This role is eligible to earn performance based incentive compensation|Benefits|Enjoy benefits that take care of what matters|Capital One offers a comprehensive, competitive, and inclusive set of health, financial and other benefits|Posting End Date|We Value Equal Opportunity|Applicants with Disabilities|Drug and Alcohol Policy|Wells Fargo Recruitment and Hiring Requirements):?$/gim;
 
   const markers = [...normalizedSectionText.matchAll(markerPattern)].map(
     (match) => ({
@@ -543,16 +543,24 @@ function parsedDescriptionSections(descriptionHtml: string | undefined) {
     return chunks.join("\n");
   };
 
-  const about = section(["about this role", "about the role"]);
+  const about = section([
+    "about this role",
+    "about the role",
+    "be part of something groundbreaking",
+    "who we are",
+  ]);
   const responsibilities = section([
     "in this role",
     "you will",
     "what you'll do",
     "what you’ll do",
+    "impact",
+    "responsibilities include",
     "responsibilities",
   ]);
   const qualifications = section([
     "what you need",
+    "what is needed",
     "nice to have",
     "required qualifications",
     "minimum qualifications",
@@ -563,7 +571,7 @@ function parsedDescriptionSections(descriptionHtml: string | undefined) {
     "requirements",
     "job expectations",
   ]);
-  const benefits = section(["benefits"]);
+  const benefits = section(["benefits", "take care of what matters"]);
   const salary = parseSalaryRange(text);
 
   return {

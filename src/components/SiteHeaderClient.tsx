@@ -67,6 +67,9 @@ const recruiterNavLinks: HeaderNavLink[] = [
   { label: "Dashboard", href: "/employers/dashboard" },
 ];
 
+const postJobSignInHref =
+  "/signin?next=/employers/dashboard/post-job&role=employer";
+
 function isHeaderNavLinkActive(pathname: string, link: HeaderNavLink) {
   if (link.exact) {
     return pathname === link.href;
@@ -536,7 +539,7 @@ export function SiteHeaderClient({
                 </Button>
 
                 <Button asChild>
-                  <Link href="/employers">Post a job</Link>
+                  <Link href={postJobSignInHref}>Post a job</Link>
                 </Button>
               </div>
             )}
