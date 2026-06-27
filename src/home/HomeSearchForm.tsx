@@ -1,38 +1,11 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { Crosshair, Loader2, MapPin, Search } from "lucide-react";
 
+import LocationAutocomplete from "@/components/location/LocationAutocomplete";
 import type { LocationSuggestion } from "@/components/location/location-types";
+import KeywordAutocomplete from "@/components/search/KeywordAutocomplete";
 import type { KeywordSuggestion } from "@/components/search/keyword-types";
-
-const KeywordAutocomplete = dynamic(
-  () => import("@/components/search/KeywordAutocomplete"),
-  {
-    ssr: false,
-    loading: () => (
-      <input
-        disabled
-        placeholder="Title, company, skill, keyword"
-        className="h-12 w-full border-0 bg-transparent py-3 pl-10 pr-4 text-sm text-neutral-400 shadow-none outline-none placeholder:text-neutral-400"
-      />
-    ),
-  },
-);
-
-const LocationAutocomplete = dynamic(
-  () => import("@/components/location/LocationAutocomplete"),
-  {
-    ssr: false,
-    loading: () => (
-      <input
-        disabled
-        placeholder="Location"
-        className="h-12 w-full border-0 bg-transparent py-3 pl-10 pr-12 text-sm text-neutral-400 shadow-none outline-none placeholder:text-neutral-400"
-      />
-    ),
-  },
-);
 
 export type SelectedKeyword = {
   term: string;
@@ -106,7 +79,7 @@ export default function HomeSearchForm({
       <div className="relative z-30 grid w-full max-w-2xl min-w-0 grid-cols-1 gap-2 overflow-visible rounded-2xl border border-black/5 bg-white/80 p-2 shadow-sm backdrop-blur sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
         <div className="relative z-30 min-w-0 overflow-visible rounded-xl transition focus-within:bg-white/70">
           <Search
-            className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-neutral-400"
+            className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-neutral-500"
             aria-hidden="true"
           />
 
@@ -120,7 +93,7 @@ export default function HomeSearchForm({
             placeholder="Title, company, skill, keyword"
             showClearButton={false}
             containerClassName="relative w-full"
-            className="h-12 w-full border-0 bg-transparent py-3 pl-10 pr-4 text-sm shadow-none outline-none placeholder:text-neutral-400 focus-visible:ring-0"
+            className="h-12 w-full border-0 bg-transparent py-3 pl-10 pr-4 text-sm text-neutral-900 shadow-none outline-none placeholder:text-neutral-600 focus-visible:ring-0"
             onValueChange={(value) => {
               onQueryChange(value);
 
@@ -139,7 +112,7 @@ export default function HomeSearchForm({
 
         <div className="relative z-30 min-w-0 overflow-visible rounded-xl transition focus-within:bg-white/70">
           <MapPin
-            className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-neutral-400"
+            className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-neutral-500"
             aria-hidden="true"
           />
 
@@ -153,7 +126,7 @@ export default function HomeSearchForm({
             placeholder="Location"
             showClearButton={false}
             containerClassName="relative w-full"
-            className="h-12 w-full border-0 bg-transparent py-3 pl-10 pr-12 text-sm shadow-none outline-none placeholder:text-neutral-400 focus-visible:ring-0"
+            className="h-12 w-full border-0 bg-transparent py-3 pl-10 pr-12 text-sm text-neutral-900 shadow-none outline-none placeholder:text-neutral-600 focus-visible:ring-0"
             onValueChange={(value) => {
               onLocationQueryChange(value);
 
@@ -176,10 +149,10 @@ export default function HomeSearchForm({
                 ? "Finding your current location"
                 : "Use my current location"
             }
-            aria-busy={isLocating}
+            aria-busy={isLocating || undefined}
             onClick={onUseMyLocation}
             disabled={isLocating}
-            className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-teal-600 transition hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+            className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-teal-700 transition hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
           >
             {isLocating ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -191,7 +164,7 @@ export default function HomeSearchForm({
 
         <button
           type="submit"
-          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-teal-500 px-6 py-3 text-sm font-medium text-white transition hover:bg-teal-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
+          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-teal-700 px-6 py-3 text-sm font-medium text-white transition hover:bg-teal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2"
         >
           Search
         </button>
@@ -199,7 +172,7 @@ export default function HomeSearchForm({
 
       {locationError ? (
         <p
-          className="mt-3 px-3 text-sm text-neutral-500"
+          className="mt-3 px-3 text-sm text-neutral-600"
           role="status"
           aria-live="polite"
         >

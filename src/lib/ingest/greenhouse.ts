@@ -37,6 +37,47 @@ type GreenhouseResponse = {
   jobs: GreenhouseJob[];
 };
 
+function metadataString(
+  source: { metadata: Record<string, unknown> },
+  key: string,
+) {
+  const value = source.metadata[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function metadataBoolean(
+  source: { metadata: Record<string, unknown> },
+  key: string,
+) {
+  const value = source.metadata[key];
+
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return null;
+
+  if (/^(true|1|yes)$/i.test(value.trim())) return true;
+  if (/^(false|0|no)$/i.test(value.trim())) return false;
+
+  return null;
+}
+
+function metadataStringArray(
+  source: { metadata: Record<string, unknown> },
+  key: string,
+) {
+  const value = source.metadata[key];
+
+  if (!Array.isArray(value)) return null;
+
+  return value
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter(Boolean);
+}
+
+function includesAnyTerm(value: string, terms: string[]) {
+  const lower = value.toLowerCase();
+  return terms.some((term) => lower.includes(term.toLowerCase()));
+}
+
 function searchableJobLocationText(job: GreenhouseJob) {
   return [
     job.location?.name,
@@ -58,17 +99,25 @@ function searchableJobText(job: GreenhouseJob) {
     .join(" ");
 }
 
-function isUsJob(job: GreenhouseJob) {
-  return isUsText(searchableJobLocationText(job));
+function isUsJob(
+  job: GreenhouseJob,
+  locationTerms: string[],
+  requireUs: boolean,
+) {
+  if (!requireUs) return true;
+
+  const locationText = searchableJobLocationText(job);
+  return isUsText(locationText) || includesAnyTerm(locationText, locationTerms);
 }
 
-function isEngineeringJob(job: GreenhouseJob) {
+function isEngineeringJob(job: GreenhouseJob, departmentTerms: string[]) {
   const departmentText = (job.departments ?? [])
     .map((department) => department.name ?? "")
     .join(" ")
     .toLowerCase();
 
   if (departmentText.includes("engineering")) return true;
+  if (includesAnyTerm(departmentText, departmentTerms)) return true;
 
   return isEngineeringText(job.title);
 }
@@ -158,10 +207,23 @@ function mergeDuplicateGreenhouseRoles(
 export async function fetchGreenhouseJobs(params: {
   companyName: string;
   companyLogoUrl?: string;
+  companyWebsite?: string | null;
+  departmentTerms?: string[];
+  locationTerms?: string[];
+  requireUs?: boolean;
   sourceSlug: string;
   signal?: AbortSignal;
 }): Promise<ImportedJob[]> {
-  const { companyLogoUrl, companyName, signal, sourceSlug } = params;
+  const {
+    companyLogoUrl,
+    companyName,
+    companyWebsite,
+    departmentTerms = [],
+    locationTerms = [],
+    requireUs = true,
+    signal,
+    sourceSlug,
+  } = params;
 
   const recruiterId = process.env.SYSTEM_RECRUITER_ID;
 
@@ -196,7 +258,10 @@ export async function fetchGreenhouseJobs(params: {
     sourceSlug,
     data.jobs
       .filter(
-        (job) => isUsJob(job) && isEngineeringJob(job) && !isInternshipJob(job),
+        (job) =>
+          isUsJob(job, locationTerms, requireUs) &&
+          isEngineeringJob(job, departmentTerms) &&
+          !isInternshipJob(job),
       )
       .slice(0, MAX_GREENHOUSE_JOBS_PER_SOURCE),
   );
@@ -246,7 +311,7 @@ export async function fetchGreenhouseJobs(params: {
 
       companyTagline: null,
       companySize: null,
-      companyWebsite: null,
+      companyWebsite: companyWebsite ?? null,
     };
   });
 }
@@ -257,6 +322,12 @@ export const greenhouseAdapter: JobSourceAdapter = {
     fetchGreenhouseJobs({
       companyName: source.companyName,
       companyLogoUrl: source.companyLogoUrl,
+      companyWebsite:
+        metadataString(source, "companyWebsite") ??
+        (source.companyDomain ? `https://${source.companyDomain}` : null),
+      departmentTerms: metadataStringArray(source, "departmentTerms") ?? [],
+      locationTerms: metadataStringArray(source, "locationTerms") ?? [],
+      requireUs: metadataBoolean(source, "requireUs") ?? true,
       sourceSlug: source.sourceSlug,
       signal: context?.signal,
     }),

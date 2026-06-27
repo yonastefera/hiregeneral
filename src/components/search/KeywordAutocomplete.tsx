@@ -81,6 +81,7 @@ export default function KeywordAutocomplete({
   const [suggestions, setSuggestions] = useState<KeywordSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
 
   const cacheRef = useRef<Record<string, KeywordSuggestion[]>>({});
   const inputRef = useRef<HTMLInputElement>(null);
@@ -88,6 +89,8 @@ export default function KeywordAutocomplete({
   useEffect(() => {
     const query = value.trim();
     const cacheKey = query.toLowerCase();
+
+    setActiveIndex(-1);
 
     if (query.length < minQueryLength) {
       setSuggestions((current) => (current.length > 0 ? [] : current));
@@ -177,10 +180,14 @@ export default function KeywordAutocomplete({
     value.trim().length >= minQueryLength &&
     (suggestions.length > 0 || loadingSuggestions);
 
+  const activeOptionId =
+    activeIndex >= 0 ? `${id}-option-${activeIndex}` : undefined;
+
   const clear = () => {
     onValueChange("");
     setSuggestions([]);
     setShowSuggestions(false);
+    setActiveIndex(-1);
     onClear?.();
     inputRef.current?.focus();
   };
@@ -189,7 +196,48 @@ export default function KeywordAutocomplete({
     onValueChange(suggestion.term);
     onKeywordSelect(suggestion);
     setShowSuggestions(false);
+    setActiveIndex(-1);
     inputRef.current?.focus();
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Escape") {
+      setShowSuggestions(false);
+      setActiveIndex(-1);
+      return;
+    }
+
+    if (suggestions.length === 0) {
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setShowSuggestions(true);
+      setActiveIndex((current) =>
+        current < suggestions.length - 1 ? current + 1 : 0,
+      );
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setShowSuggestions(true);
+      setActiveIndex((current) =>
+        current > 0 ? current - 1 : suggestions.length - 1,
+      );
+      return;
+    }
+
+    if (event.key === "Enter" && activeIndex >= 0) {
+      event.preventDefault();
+
+      const selectedSuggestion = suggestions[activeIndex];
+
+      if (selectedSuggestion) {
+        selectKeyword(selectedSuggestion);
+      }
+    }
   };
 
   return (
@@ -208,61 +256,89 @@ export default function KeywordAutocomplete({
         onBlur={() => {
           window.setTimeout(() => {
             setShowSuggestions(false);
+            setActiveIndex(-1);
           }, 180);
         }}
         onChange={(event) => {
           onValueChange(event.target.value);
           setShowSuggestions(true);
+          setActiveIndex(-1);
         }}
+        onKeyDown={handleKeyDown}
         autoComplete="off"
+        role="combobox"
         aria-autocomplete="list"
+        aria-haspopup="listbox"
         aria-expanded={shouldShowDropdown}
-        aria-controls={`${id}-suggestions`}
+        aria-controls={shouldShowDropdown ? `${id}-suggestions` : undefined}
+        aria-activedescendant={activeOptionId}
         className={["h-12 w-full pr-10", className].filter(Boolean).join(" ")}
       />
 
-      {showClearButton && value && !disabled && (
+      {showClearButton && value && !disabled ? (
         <button
           type="button"
           onClick={clear}
-          className="absolute right-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          className="absolute right-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
           aria-label="Clear keyword"
         >
           <X aria-hidden="true" className="size-4" />
         </button>
-      )}
+      ) : null}
 
-      {shouldShowDropdown && (
+      {shouldShowDropdown ? (
         <div className="absolute left-0 right-0 top-full z-[9999] mt-2 w-full overflow-hidden rounded-xl border border-[#f2f2f2] bg-white text-sm font-normal leading-5 tracking-normal text-foreground shadow-lg">
-          <ul
-            id={`${id}-suggestions`}
-            className="max-h-64 w-full overflow-y-auto p-1"
-            role="listbox"
-          >
-            {suggestions.map((suggestion) => (
-              <li key={suggestion.id} role="option" aria-selected={false}>
-                <button
-                  type="button"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => selectKeyword(suggestion)}
-                  className="block w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium leading-5 tracking-normal text-foreground hover:bg-neutral-200 focus:bg-neutral-200 focus:outline-none"
-                >
-                  <span className="block truncate whitespace-nowrap">
-                    {suggestion.label}
-                  </span>
-                </button>
-              </li>
-            ))}
+          {suggestions.length > 0 ? (
+            <ul
+              id={`${id}-suggestions`}
+              className="max-h-64 w-full overflow-y-auto p-1"
+              role="listbox"
+              aria-label="Keyword suggestions"
+            >
+              {suggestions.map((suggestion, index) => {
+                const isActive = activeIndex === index;
 
-            {loadingSuggestions && suggestions.length === 0 && (
-              <li className="flex items-center gap-2 px-3 py-2.5 text-sm text-muted-foreground">
-                <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
-                Searching suggestions...
-              </li>
-            )}
-          </ul>
+                return (
+                  <li
+                    id={`${id}-option-${index}`}
+                    key={suggestion.id}
+                    role="option"
+                    aria-selected={isActive}
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                    }}
+                    onMouseEnter={() => {
+                      setActiveIndex(index);
+                    }}
+                    onClick={() => {
+                      selectKeyword(suggestion);
+                    }}
+                    className={[
+                      "cursor-pointer rounded-lg px-3 py-2.5 text-left text-sm font-medium leading-5 tracking-normal text-foreground outline-none",
+                      isActive ? "bg-neutral-200" : "hover:bg-neutral-200",
+                    ].join(" ")}
+                  >
+                    <span className="block truncate whitespace-nowrap">
+                      {suggestion.label}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+
+          {loadingSuggestions && suggestions.length === 0 ? (
+            <div
+              className="flex items-center gap-2 px-3 py-2.5 text-sm text-muted-foreground"
+              role="status"
+              aria-live="polite"
+            >
+              <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
+              Searching suggestions...
+            </div>
+          ) : null}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

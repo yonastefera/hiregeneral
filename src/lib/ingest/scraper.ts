@@ -442,6 +442,18 @@ function metadataNumber(source: JobSource, key: string) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function metadataBoolean(source: JobSource, key: string) {
+  const value = source.metadata[key];
+
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return null;
+
+  if (/^(true|1|yes)$/i.test(value.trim())) return true;
+  if (/^(false|0|no)$/i.test(value.trim())) return false;
+
+  return null;
+}
+
 function metadataStringArray(source: JobSource, key: string) {
   const value = source.metadata[key];
 
@@ -450,6 +462,11 @@ function metadataStringArray(source: JobSource, key: string) {
   return value
     .map((item) => (typeof item === "string" ? item.trim() : ""))
     .filter(Boolean);
+}
+
+function includesAnyConfiguredTerm(value: string, terms: string[]) {
+  const lower = value.toLowerCase();
+  return terms.some((term) => lower.includes(term.toLowerCase()));
 }
 
 function uniqueItems(items: string[]) {
@@ -2441,12 +2458,117 @@ async function fetchEightfoldJobs(
   const titleTerms = metadataStringArray(source, "titleTerms") ?? [];
   const excludedTitleTerms =
     metadataStringArray(source, "excludedTitleTerms") ?? [];
+  const fetchDetails = source.metadata?.fetchDetails !== false;
   const companyWebsite =
     metadataString(source, "companyWebsite") ??
     (source.companyDomain ? `https://${source.companyDomain}` : null);
   const jobs: ImportedJob[] = [];
   const seenSourceIds = new Set<string>();
   const session = await eightfoldSessionHeaders(source, context);
+
+  const appendFallbackJobsFromHtml = () => {
+    const fallbackJobs = eightfoldJobsFromHtml(session.html);
+
+    if (fallbackJobs.length === 0) return false;
+
+    for (const job of fallbackJobs) {
+      const title = recordString(job, ["title", "name", "position_name"]);
+      if (!title) continue;
+
+      const sourceId = eightfoldSourceId(source, job);
+      if (seenSourceIds.has(sourceId)) continue;
+      seenSourceIds.add(sourceId);
+
+      const location = eightfoldLocation(job);
+      const description = safeDescription({
+        description: eightfoldDescription(job),
+        title,
+        companyName: source.companyName,
+      });
+      const searchText = [
+        title,
+        description,
+        category,
+        recordString(job, [
+          "department",
+          "team",
+          "job_category",
+          "job_function",
+          "businessarea",
+        ]),
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      if (!isUsText(eightfoldLocationSearchText(job))) continue;
+      if (!isEngineeringText(searchText)) continue;
+      if (
+        requiredTerms.length > 0 &&
+        !includesAnyTerm(searchText, requiredTerms)
+      )
+        continue;
+      if (titleTerms.length > 0 && !includesAnyTerm(title, titleTerms))
+        continue;
+      if (
+        excludedTitleTerms.length > 0 &&
+        includesAnyTerm(title, excludedTitleTerms)
+      )
+        continue;
+      if (isInternshipText(searchText)) continue;
+
+      jobs.push({
+        recruiterId,
+        companyId: null,
+        companyName: source.companyName,
+        companyLogoUrl: source.companyLogoUrl ?? null,
+
+        title,
+        description,
+        location,
+
+        latitude: null,
+        longitude: null,
+
+        employmentType: normalizeEmploymentType(
+          recordString(job, [
+            "employment_type",
+            "employmentType",
+            "job_type",
+            "efcustom_text_text_time_type",
+            "efcustomTextTextTimeType",
+          ]),
+        ),
+        workMode: detectWorkMode(title, location),
+
+        salaryMin: null,
+        salaryMax: null,
+        salaryCurrency: "USD",
+
+        skills: [],
+        responsibilities: splitListItems(description, 12),
+        requirements: splitListItems(description, 14),
+        benefits: [],
+
+        status: "published",
+
+        postedAt: eightfoldPostedAt(job),
+        expiresAt: defaultExpiryDate(30),
+
+        sourceName: "scraper",
+        sourceId,
+        applyUrl: eightfoldApplyUrl(source, job),
+
+        experienceLevel: null,
+        category,
+
+        companyTagline: null,
+        companySize: null,
+        companyWebsite,
+      });
+    }
+
+    return true;
+  };
 
   for (const query of searchTexts) {
     for (let page = 0; page < maxPages; page += 1) {
@@ -2459,111 +2581,7 @@ async function fetchEightfoldJobs(
 
       if (!response.ok) {
         if (page === 0 && jobs.length === 0) {
-          const fallbackJobs = eightfoldJobsFromHtml(session.html);
-
-          if (fallbackJobs.length > 0) {
-            for (const job of fallbackJobs) {
-              const title = recordString(job, [
-                "title",
-                "name",
-                "position_name",
-              ]);
-              if (!title) continue;
-
-              const sourceId = eightfoldSourceId(source, job);
-              if (seenSourceIds.has(sourceId)) continue;
-              seenSourceIds.add(sourceId);
-
-              const location = eightfoldLocation(job);
-              const description = safeDescription({
-                description: eightfoldDescription(job),
-                title,
-                companyName: source.companyName,
-              });
-              const searchText = [
-                title,
-                description,
-                category,
-                recordString(job, [
-                  "department",
-                  "team",
-                  "job_category",
-                  "job_function",
-                  "businessarea",
-                ]),
-              ]
-                .filter(Boolean)
-                .join(" ");
-
-              if (!isUsText(eightfoldLocationSearchText(job))) continue;
-              if (!isEngineeringText(searchText)) continue;
-              if (
-                requiredTerms.length > 0 &&
-                !includesAnyTerm(searchText, requiredTerms)
-              )
-                continue;
-              if (titleTerms.length > 0 && !includesAnyTerm(title, titleTerms))
-                continue;
-              if (
-                excludedTitleTerms.length > 0 &&
-                includesAnyTerm(title, excludedTitleTerms)
-              )
-                continue;
-              if (isInternshipText(searchText)) continue;
-
-              jobs.push({
-                recruiterId,
-                companyId: null,
-                companyName: source.companyName,
-                companyLogoUrl: source.companyLogoUrl ?? null,
-
-                title,
-                description,
-                location,
-
-                latitude: null,
-                longitude: null,
-
-                employmentType: normalizeEmploymentType(
-                  recordString(job, [
-                    "employment_type",
-                    "employmentType",
-                    "job_type",
-                    "efcustom_text_text_time_type",
-                    "efcustomTextTextTimeType",
-                  ]),
-                ),
-                workMode: detectWorkMode(title, location),
-
-                salaryMin: null,
-                salaryMax: null,
-                salaryCurrency: "USD",
-
-                skills: [],
-                responsibilities: splitListItems(description, 12),
-                requirements: splitListItems(description, 14),
-                benefits: [],
-
-                status: "published",
-
-                postedAt: eightfoldPostedAt(job),
-                expiresAt: defaultExpiryDate(30),
-
-                sourceName: "scraper",
-                sourceId,
-                applyUrl: eightfoldApplyUrl(source, job),
-
-                experienceLevel: null,
-                category,
-
-                companyTagline: null,
-                companySize: null,
-                companyWebsite,
-              });
-            }
-
-            return jobs;
-          }
+          if (appendFallbackJobsFromHtml()) return jobs;
         }
 
         throw new Error(`Eightfold fetch failed: ${response.status}`);
@@ -2572,7 +2590,13 @@ async function fetchEightfoldJobs(
       const data = (await response.json()) as EightfoldResponse;
       const pageJobs = eightfoldJobsFromResponse(data);
 
-      if (pageJobs.length === 0) break;
+      if (pageJobs.length === 0) {
+        if (page === 0 && jobs.length === 0 && appendFallbackJobsFromHtml()) {
+          return jobs;
+        }
+
+        break;
+      }
 
       for (const job of pageJobs) {
         const title = recordString(job, ["title", "name", "position_name"]);
@@ -2619,12 +2643,14 @@ async function fetchEightfoldJobs(
           continue;
         if (isInternshipText(searchText)) continue;
 
-        const detailedJob = await fetchEightfoldJobDetails(
-          source,
-          job,
-          session.headers,
-          context,
-        );
+        const detailedJob = fetchDetails
+          ? await fetchEightfoldJobDetails(
+              source,
+              job,
+              session.headers,
+              context,
+            )
+          : job;
         const detailedDescription = safeDescription({
           description: eightfoldDescription(detailedJob),
           title,
@@ -6656,6 +6682,11 @@ async function fetchAtomFeedJobs(
   const maxJobs =
     metadataNumber(source, "maxJobs") ?? ATOM_FEED_DEFAULT_MAX_JOBS;
   const category = metadataString(source, "category") ?? "Technology";
+  const requireUs = metadataBoolean(source, "requireUs") ?? true;
+  const requireEngineering =
+    metadataBoolean(source, "requireEngineering") ?? true;
+  const excludedTerms = metadataStringArray(source, "excludedTerms") ?? [];
+  const enhanceDetails = source.metadata?.enhanceDetails !== false;
   const companyWebsite =
     metadataString(source, "companyWebsite") ??
     (source.companyDomain ? `https://${source.companyDomain}` : null);
@@ -6679,8 +6710,9 @@ async function fetchAtomFeedJobs(
   const feedJobs = extractAtomFeedJobs(await response.text(), fallbackLocation)
     .filter((job) => {
       return (
-        isUsText(job.searchText) &&
-        isEngineeringText(job.searchText) &&
+        !includesAnyConfiguredTerm(job.searchText, excludedTerms) &&
+        (!requireUs || isUsText(job.searchText)) &&
+        (!requireEngineering || isEngineeringText(job.searchText)) &&
         !isInternshipText(job.searchText)
       );
     })
@@ -6737,6 +6769,11 @@ async function fetchAtomFeedJobs(
       companySize: null,
       companyWebsite,
     };
+
+    if (!enhanceDetails) {
+      jobs.push(baseJob);
+      continue;
+    }
 
     jobs.push(
       await enhanceImportedJobFromDetailPage({

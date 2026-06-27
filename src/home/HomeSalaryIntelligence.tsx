@@ -93,6 +93,7 @@ export default function HomeSalaryIntelligence({
                       </div>
 
                       <div
+                        role="img"
                         className="col-span-3 flex h-8 items-end justify-end gap-0.5 sm:col-span-2"
                         aria-label={`${salaryBand.role} salary trend`}
                       >

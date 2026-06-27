@@ -36,6 +36,39 @@ const JOB_DETAIL_SELECT = `
   benefits
 `;
 
+const JOB_LISTING_SELECT = `
+  id,
+  recruiter_id,
+  company_id,
+  company_name,
+  company_logo_url,
+  title,
+  description,
+  location,
+  latitude,
+  longitude,
+  employment_type,
+  work_mode,
+  salary_min,
+  salary_max,
+  salary_currency,
+  skills,
+  status,
+  posted_at,
+  expires_at,
+  created_at,
+  updated_at,
+  slug,
+  source_name,
+  source_id,
+  apply_url,
+  experience_level,
+  category,
+  company_tagline,
+  company_size,
+  company_website
+`;
+
 type JobRow = {
   id: string;
   recruiter_id: string;
@@ -101,6 +134,12 @@ type JobsApiPayload = {
   page: number;
   pageSize: number;
   totalPages: number;
+};
+
+type DirectJobsResult = {
+  rows: JobsPublicRpcRow[];
+  total: number;
+  newJobs: number;
 };
 
 function toCount(value: number | string | null | undefined): number {
@@ -360,6 +399,29 @@ function isNewJob(row: JobsPublicRpcRow) {
   return Date.now() - postedAt <= NEW_JOBS_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 }
 
+function isStatementTimeout(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+
+  const maybeError = error as {
+    code?: unknown;
+    message?: unknown;
+  };
+
+  return (
+    maybeError.code === "57014" ||
+    (typeof maybeError.message === "string" &&
+      maybeError.message.toLowerCase().includes("statement timeout"))
+  );
+}
+
+function escapePostgrestPattern(value: string) {
+  return value.replace(/[%_*]/g, "\\$&");
+}
+
+function toIlikePattern(value: string) {
+  return `%${escapePostgrestPattern(value.trim())}%`;
+}
+
 async function searchJobsPublic(params: {
   query: string;
   daysAgo: number;
@@ -392,6 +454,98 @@ async function searchJobsPublic(params: {
   }
 
   return (data ?? []) as JobsPublicRpcRow[];
+}
+
+async function searchJobsDirect(params: {
+  query: string;
+  daysAgo: number;
+  location: string;
+  workMode: string;
+  employmentType: string;
+  category: string;
+  company: string;
+  excludeId: string;
+  page: number;
+  pageSize: number;
+  easyApply: boolean;
+}): Promise<DirectJobsResult> {
+  const postedAfter = new Date(
+    Date.now() - params.daysAgo * 24 * 60 * 60 * 1000,
+  ).toISOString();
+  const start = (params.page - 1) * params.pageSize;
+  const end = start + params.pageSize - 1;
+
+  let request = supabaseAdmin
+    .from("jobs")
+    .select(JOB_LISTING_SELECT, { count: "exact" })
+    .eq("status", "published")
+    .gte("posted_at", postedAfter);
+
+  const query = params.query.trim();
+  const location = params.location.trim();
+  const company = params.company.trim();
+
+  if (query) {
+    const pattern = toIlikePattern(query);
+    request = request.or(
+      [
+        `title.ilike.${pattern}`,
+        `company_name.ilike.${pattern}`,
+        `description.ilike.${pattern}`,
+        `category.ilike.${pattern}`,
+      ].join(","),
+    );
+  }
+
+  if (location) {
+    request = request.ilike("location", toIlikePattern(location));
+  }
+
+  if (params.workMode) {
+    request = request.eq("work_mode", params.workMode);
+  }
+
+  if (params.employmentType) {
+    request = request.eq("employment_type", params.employmentType);
+  }
+
+  if (params.category) {
+    request = request.eq("category", params.category);
+  }
+
+  if (company) {
+    request = request.ilike("company_name", toIlikePattern(company));
+  }
+
+  if (params.excludeId) {
+    request = request.neq("id", params.excludeId);
+  }
+
+  if (params.easyApply) {
+    request = request.or("apply_url.is.null,apply_url.eq.");
+  }
+
+  const { data, error, count } = await request
+    .order("posted_at", { ascending: false })
+    .range(start, end);
+
+  if (error) {
+    throw error;
+  }
+
+  const total = count ?? data?.length ?? 0;
+  const rows = ((data ?? []) as JobCandidateRow[]).map((job) => ({
+    ...job,
+    applicant_count: 0,
+    total_count: total,
+    new_jobs_count: 0,
+  }));
+
+  return {
+    rows,
+    total,
+    newJobs: rows.filter(isNewJob).length,
+  };
 }
 
 async function getEasyApplyRows(params: {
@@ -505,7 +659,25 @@ export async function GET(req: NextRequest) {
     let newJobs: number;
 
     try {
-      if (easyApply) {
+      if (!query.trim() && !easyApply) {
+        const directResult = await searchJobsDirect({
+          query,
+          daysAgo,
+          location,
+          workMode,
+          employmentType,
+          category,
+          company,
+          excludeId,
+          page,
+          pageSize,
+          easyApply,
+        });
+
+        rows = directResult.rows;
+        total = directResult.total;
+        newJobs = directResult.newJobs;
+      } else if (easyApply) {
         const easyApplyResult = await getEasyApplyRows({
           query,
           daysAgo,
@@ -544,13 +716,48 @@ export async function GET(req: NextRequest) {
     } catch (rpcError) {
       console.error("[GET /api/jobs] search_jobs_public failed:", rpcError);
 
-      return NextResponse.json(
-        {
-          error: "Failed to load jobs.",
-          details: rpcError,
-        },
-        { status: 500 },
-      );
+      if (!isStatementTimeout(rpcError)) {
+        return NextResponse.json(
+          {
+            error: "Failed to load jobs.",
+            details: rpcError,
+          },
+          { status: 500 },
+        );
+      }
+
+      try {
+        const fallbackResult = await searchJobsDirect({
+          query,
+          daysAgo,
+          location,
+          workMode,
+          employmentType,
+          category,
+          company,
+          excludeId,
+          page,
+          pageSize,
+          easyApply,
+        });
+
+        rows = fallbackResult.rows;
+        total = fallbackResult.total;
+        newJobs = fallbackResult.newJobs;
+      } catch (fallbackError) {
+        console.error(
+          "[GET /api/jobs] Direct jobs fallback failed:",
+          fallbackError,
+        );
+
+        return NextResponse.json(
+          {
+            error: "Failed to load jobs.",
+            details: fallbackError,
+          },
+          { status: 500 },
+        );
+      }
     }
 
     const pageCandidates = toJobCandidateRows(rows);

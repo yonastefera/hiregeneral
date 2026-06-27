@@ -14,9 +14,47 @@ import { SiteHeaderController } from "@/components/SiteHeaderController";
 
 import "./globals.css";
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.hiregeneral.com";
+
 export const metadata: Metadata = {
-  title: "HireGeneral",
-  description: "A job board for candidates and employers.",
+  metadataBase: new URL(siteUrl),
+
+  title: {
+    default: "HireGeneral | Search Smarter. Hire Faster.",
+    template: "%s | HireGeneral",
+  },
+
+  description:
+    "Find better-fit roles, compare salary intelligence, and connect with employers through HireGeneral.",
+
+  alternates: {
+    canonical: "/",
+  },
+
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+    shortcut: "/favicon.ico",
+  },
+
+  openGraph: {
+    type: "website",
+    url: "/",
+    siteName: "HireGeneral",
+    title: "HireGeneral | Search Smarter. Hire Faster.",
+    description:
+      "Find better-fit roles, compare salary intelligence, and connect with employers through HireGeneral.",
+  },
+
+  twitter: {
+    card: "summary_large_image",
+    title: "HireGeneral | Search Smarter. Hire Faster.",
+    description:
+      "Find better-fit roles, compare salary intelligence, and connect with employers through HireGeneral.",
+  },
 };
 
 export default function RootLayout({
@@ -50,11 +88,11 @@ export default function RootLayout({
 
         {enableAnalytics && <Analytics />}
 
-        {enableAnalytics && clarityProjectId && (
+        {enableAnalytics && clarityProjectId ? (
           <MicrosoftClarity projectId={clarityProjectId} />
-        )}
+        ) : null}
 
-        {enableAnalytics && gaId && <GoogleAnalytics gaId={gaId} />}
+        {enableAnalytics && gaId ? <GoogleAnalytics gaId={gaId} /> : null}
       </body>
     </html>
   );
