@@ -22,8 +22,10 @@ const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 25;
 const EASY_APPLY_SCAN_PAGE_SIZE = 25;
 const EASY_APPLY_MAX_SCAN_PAGES = 40;
+const DIRECT_BALANCE_MULTIPLIER = 6;
+const DIRECT_BALANCE_MAX_CANDIDATES = 500;
 
-const JOBS_API_CACHE_VERSION = process.env.JOBS_API_CACHE_VERSION ?? "1";
+const JOBS_API_CACHE_VERSION = process.env.JOBS_API_CACHE_VERSION ?? "2";
 const JOBS_BROWSE_CACHE_TTL_SECONDS = 60 * 3; // 3 minutes
 const JOBS_SEARCH_CACHE_TTL_SECONDS = 60; // 1 minute
 const JOBS_FILTER_CACHE_TTL_SECONDS = 60 * 2; // 2 minutes
@@ -399,6 +401,63 @@ function isNewJob(row: JobsPublicRpcRow) {
   return Date.now() - postedAt <= NEW_JOBS_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 }
 
+function companyBalanceKey(row: JobCandidateRow) {
+  return (
+    row.company_id?.trim().toLowerCase() ||
+    row.company_name?.trim().toLowerCase() ||
+    row.source_name?.trim().toLowerCase() ||
+    "unknown"
+  );
+}
+
+function sortCompanyBucketsByFreshness(
+  entries: Array<[string, JobCandidateRow[]]>,
+) {
+  return entries.sort(([companyA, rowsA], [companyB, rowsB]) => {
+    const postedA = Date.parse(rowsA[0]?.posted_at ?? "") || 0;
+    const postedB = Date.parse(rowsB[0]?.posted_at ?? "") || 0;
+
+    if (postedA !== postedB) return postedB - postedA;
+
+    return companyA.localeCompare(companyB);
+  });
+}
+
+function companyBalanceRows(rows: JobCandidateRow[]) {
+  const buckets = new Map<string, JobCandidateRow[]>();
+
+  for (const row of rows) {
+    const key = companyBalanceKey(row);
+    const bucket = buckets.get(key);
+
+    if (bucket) {
+      bucket.push(row);
+    } else {
+      buckets.set(key, [row]);
+    }
+  }
+
+  const balancedRows: JobCandidateRow[] = [];
+
+  while (buckets.size > 0) {
+    const entries = sortCompanyBucketsByFreshness([...buckets.entries()]);
+
+    for (const [key, bucket] of entries) {
+      const row = bucket.shift();
+
+      if (row) {
+        balancedRows.push(row);
+      }
+
+      if (bucket.length === 0) {
+        buckets.delete(key);
+      }
+    }
+  }
+
+  return balancedRows;
+}
+
 function isStatementTimeout(error: unknown) {
   if (!error || typeof error !== "object") return false;
 
@@ -468,12 +527,13 @@ async function searchJobsDirect(params: {
   page: number;
   pageSize: number;
   easyApply: boolean;
+  balance: string;
 }): Promise<DirectJobsResult> {
   const postedAfter = new Date(
     Date.now() - params.daysAgo * 24 * 60 * 60 * 1000,
   ).toISOString();
   const start = (params.page - 1) * params.pageSize;
-  const end = start + params.pageSize - 1;
+  const end = start + params.pageSize;
 
   let request = supabaseAdmin
     .from("jobs")
@@ -484,6 +544,8 @@ async function searchJobsDirect(params: {
   const query = params.query.trim();
   const location = params.location.trim();
   const company = params.company.trim();
+  const shouldCompanyBalance =
+    params.balance === "company" && !query && !company && !params.easyApply;
 
   if (query) {
     const pattern = toIlikePattern(query);
@@ -525,16 +587,31 @@ async function searchJobsDirect(params: {
     request = request.or("apply_url.is.null,apply_url.eq.");
   }
 
+  const candidateLimit = shouldCompanyBalance
+    ? Math.min(
+        DIRECT_BALANCE_MAX_CANDIDATES,
+        Math.max(params.pageSize, end * DIRECT_BALANCE_MULTIPLIER),
+      )
+    : params.pageSize;
+
+  const rangeStart = shouldCompanyBalance ? 0 : start;
+  const rangeEnd = rangeStart + candidateLimit - 1;
+
   const { data, error, count } = await request
     .order("posted_at", { ascending: false })
-    .range(start, end);
+    .range(rangeStart, rangeEnd);
 
   if (error) {
     throw error;
   }
 
   const total = count ?? data?.length ?? 0;
-  const rows = ((data ?? []) as JobCandidateRow[]).map((job) => ({
+  const candidateRows = (data ?? []) as JobCandidateRow[];
+  const pageRows = shouldCompanyBalance
+    ? companyBalanceRows(candidateRows).slice(start, end)
+    : candidateRows;
+
+  const rows = pageRows.map((job) => ({
     ...job,
     applicant_count: 0,
     total_count: total,
@@ -672,6 +749,7 @@ export async function GET(req: NextRequest) {
           page,
           pageSize,
           easyApply,
+          balance,
         });
 
         rows = directResult.rows;
@@ -739,6 +817,7 @@ export async function GET(req: NextRequest) {
           page,
           pageSize,
           easyApply,
+          balance,
         });
 
         rows = fallbackResult.rows;
