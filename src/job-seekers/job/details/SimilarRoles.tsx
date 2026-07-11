@@ -48,7 +48,7 @@ function accentFor(value: string) {
 function SimilarRoleCard({ job }: { job: Job }) {
   const { isSaved, toggleSaved, pendingId } = useSavedJobs();
 
-  const href = `/job/${job.slug ?? job.id}`;
+  const href = `/jobs/${job.slug ?? job.id}`;
   const logoInitials = job.company_name.slice(0, 2).toUpperCase();
   const displayTitle = getDisplayTitle(job);
   const postedDays = daysAgoLabel(job.posted_at);

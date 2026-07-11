@@ -18,6 +18,42 @@ const JOB_DETAIL_CACHE_VERSION = process.env.JOB_DETAIL_CACHE_VERSION ?? "2";
 const SHOULD_CACHE_JOB_DETAILS =
   process.env.NODE_ENV === "production" &&
   process.env.JOB_DETAIL_CACHE_DISABLED !== "1";
+const JOB_DETAIL_SELECT = `
+  id,
+  recruiter_id,
+  company_id,
+  company_name,
+  company_logo_url,
+  company_tagline,
+  company_size,
+  company_website,
+  title,
+  description,
+  responsibilities,
+  requirements,
+  benefits,
+  location,
+  latitude,
+  longitude,
+  employment_type,
+  work_mode,
+  experience_level,
+  category,
+  salary_min,
+  salary_max,
+  salary_currency,
+  skills,
+  status,
+  slug,
+  apply_url,
+  source_name,
+  source_id,
+  posted_at,
+  expires_at,
+  created_at,
+  updated_at,
+  job_applicant_counts ( applicant_count )
+`;
 
 type JobApplicantCountRow = {
   applicant_count: number | null;
@@ -80,6 +116,54 @@ function isUuid(value: string) {
 
 function getJobDetailCacheKey(slug: string) {
   return `job-detail:${JOB_DETAIL_CACHE_VERSION}:${slug.toLowerCase()}`;
+}
+
+function getPublishedJobDetailQuery(now = new Date().toISOString()) {
+  return supabaseAdmin
+    .from("jobs")
+    .select(JOB_DETAIL_SELECT)
+    .eq("status", "published")
+    .or(`expires_at.is.null,expires_at.gt.${now}`);
+}
+
+function getLegacySourceId(slug: string) {
+  return slug.match(/-(\d{3,})$/)?.[1] ?? null;
+}
+
+async function findJobBySlugOrId(normalizedSlug: string) {
+  let query = getPublishedJobDetailQuery();
+
+  query = isUuid(normalizedSlug)
+    ? query.or(`slug.eq.${normalizedSlug},id.eq.${normalizedSlug}`)
+    : query.eq("slug", normalizedSlug);
+
+  return query.maybeSingle();
+}
+
+async function findJobByLegacySourceId(normalizedSlug: string) {
+  if (isUuid(normalizedSlug)) {
+    return { data: null, error: null };
+  }
+
+  const legacySourceId = getLegacySourceId(normalizedSlug);
+
+  if (!legacySourceId) {
+    return { data: null, error: null };
+  }
+
+  const { data, error } = await getPublishedJobDetailQuery()
+    .or(
+      [
+        `source_id.eq.${legacySourceId}`,
+        `source_id.ilike.*:${legacySourceId}`,
+        `source_id.ilike.*-${legacySourceId}`,
+        `source_id.ilike.*/${legacySourceId}`,
+      ].join(","),
+    )
+    .order("updated_at", { ascending: false })
+    .limit(1);
+
+  return { data: data?.[0] ?? null, error };
 }
 
 function jsonResponse(payload: JobDetailPayload, status = 200) {
@@ -154,59 +238,25 @@ export async function GET(
       }
     }
 
-    let query = supabaseAdmin
-      .from("jobs")
-      .select(
-        `
-        id,
-        recruiter_id,
-        company_id,
-        company_name,
-        company_logo_url,
-        company_tagline,
-        company_size,
-        company_website,
-        title,
-        description,
-        responsibilities,
-        requirements,
-        benefits,
-        location,
-        latitude,
-        longitude,
-        employment_type,
-        work_mode,
-        experience_level,
-        category,
-        salary_min,
-        salary_max,
-        salary_currency,
-        skills,
-        status,
-        slug,
-        apply_url,
-        source_name,
-        source_id,
-        posted_at,
-        expires_at,
-        created_at,
-        updated_at,
-        job_applicant_counts ( applicant_count )
-      `,
-      )
-      .eq("status", "published")
-      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
-
-    query = isUuid(normalizedSlug)
-      ? query.or(`slug.eq.${normalizedSlug},id.eq.${normalizedSlug}`)
-      : query.eq("slug", normalizedSlug);
-
-    const { data, error } = await query.maybeSingle();
+    let { data, error } = await findJobBySlugOrId(normalizedSlug);
 
     if (error) {
       console.error("[GET /api/jobs/[slug]] Supabase error:", error);
 
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (!data) {
+      const legacyResult = await findJobByLegacySourceId(normalizedSlug);
+
+      data = legacyResult.data;
+      error = legacyResult.error;
+
+      if (error) {
+        console.error("[GET /api/jobs/[slug]] Legacy lookup error:", error);
+
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
     }
 
     if (!data) {

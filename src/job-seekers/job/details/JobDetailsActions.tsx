@@ -37,7 +37,7 @@ export default function JobDetailsActions({
   const saved = isSaved(jobId);
   const saving = pendingId === jobId;
   const isExternal = Boolean(applyUrl);
-  const detailsPath = `/job/${slug ?? jobId}`;
+  const detailsPath = `/jobs/${slug ?? jobId}`;
 
   const onApply = () => {
     if (isExternal && applyUrl) {

@@ -1,5 +1,5 @@
 import type { Job } from "@/lib/db/types";
-import { listingLocation } from "@/lib/jobs/display";
+import { listingLocation, listingLocationParts } from "@/lib/jobs/display";
 import { isSupportedLogoUrl, logoSrcFromUrl } from "@/lib/logos";
 import {
   cleanTextArray,
@@ -63,6 +63,22 @@ export function compactText(value: string) {
     .replace(/\s+/g, " ")
     .replace(/\s+([,.;:])/g, "$1")
     .trim();
+}
+
+export function getDetailLocation(job: Job) {
+  const locations = listingLocationParts(job.location);
+
+  if (locations.length > 1) {
+    return {
+      display: locations.join(", "),
+      locations,
+    };
+  }
+
+  return {
+    display: job.enrichment?.display_location ?? listingLocation(job.location),
+    locations,
+  };
 }
 
 function splitSentences(value: string, maxItems = 8) {

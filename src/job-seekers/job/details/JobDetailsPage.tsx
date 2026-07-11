@@ -26,7 +26,7 @@ import {
   daysAgoLabel,
   deriveDescriptionSections,
   formatSalary,
-  getDisplayLocation,
+  getDetailLocation,
   getDisplayTitle,
   sourcePostingHtml,
   supportedLogoUrl,
@@ -101,6 +101,50 @@ function HeroPill({
     >
       {children}
     </span>
+  );
+}
+
+function LocationMetadata({
+  display,
+  locations,
+  title,
+}: {
+  display: string;
+  locations: string[];
+  title: string;
+}) {
+  if (locations.length <= 2) {
+    return (
+      <span className="line-clamp-2" title={title}>
+        {display}
+      </span>
+    );
+  }
+
+  const preview = `${locations.slice(0, 2).join(", ")}, +${locations.length - 2} more`;
+
+  return (
+    <details className="group relative min-w-0">
+      <summary
+        className="flex cursor-pointer list-none items-center gap-1.5 rounded-full outline-none transition hover:text-neutral-950 focus-visible:ring-2 focus-visible:ring-teal-500/30 [&::-webkit-details-marker]:hidden"
+        title={title}
+      >
+        <span className="line-clamp-2">{preview}</span>
+        <span className="shrink-0 text-[11px] font-semibold text-teal-700">
+          Details
+        </span>
+      </summary>
+      <div className="absolute left-0 z-30 mt-2 w-max max-w-[min(24rem,calc(100vw-3rem))] rounded-2xl border border-black/10 bg-white p-3 text-[12px] leading-5 text-neutral-700 shadow-xl">
+        <ul className="space-y-1.5">
+          {locations.map((location) => (
+            <li key={location} className="flex gap-2">
+              <span className="mt-2 size-1 shrink-0 rounded-full bg-teal-500" />
+              <span>{location}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </details>
   );
 }
 
@@ -185,7 +229,7 @@ export default async function JobDetailsPage({ jobId }: JobDetailsPageProps) {
   );
   const postedDays = daysAgoLabel(job.posted_at);
   const displayTitle = getDisplayTitle(job);
-  const heroLocation = getDisplayLocation(job);
+  const detailLocation = getDetailLocation(job);
   const applicantCount = job.applicant_count ?? 0;
   const heroPills = [
     {
@@ -270,9 +314,11 @@ export default async function JobDetailsPage({ jobId }: JobDetailsPageProps) {
                       aria-hidden="true"
                       className="size-3.5 shrink-0 text-teal-600"
                     />
-                    <span className="line-clamp-2" title={job.location}>
-                      {heroLocation}
-                    </span>
+                    <LocationMetadata
+                      display={detailLocation.display}
+                      locations={detailLocation.locations}
+                      title={job.location}
+                    />
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <Briefcase
@@ -530,7 +576,10 @@ export default async function JobDetailsPage({ jobId }: JobDetailsPageProps) {
 
           <aside className="min-w-0">
             <div className="sticky top-24 space-y-4">
-              <CompanyRailCard job={job} displayLocation={heroLocation} />
+              <CompanyRailCard
+                job={job}
+                displayLocation={detailLocation.display}
+              />
               <SimilarRoles jobs={related} />
             </div>
           </aside>

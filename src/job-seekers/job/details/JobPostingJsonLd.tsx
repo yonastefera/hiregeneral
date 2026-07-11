@@ -58,7 +58,7 @@ export default function JobPostingJsonLd({ job }: JobPostingJsonLdProps) {
           }
         : undefined,
     directApply: !job.apply_url,
-    url: `/job/${job.slug ?? job.id}`,
+    url: `/jobs/${job.slug ?? job.id}`,
     salaryCurrency: job.salary_currency ?? (salary ? "USD" : undefined),
   };
 

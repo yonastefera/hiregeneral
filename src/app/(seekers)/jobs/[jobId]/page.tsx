@@ -21,7 +21,7 @@ export async function generateMetadata({
       title: "Job Not Found | Your Site Name",
       description: "This job listing is no longer available.",
       alternates: {
-        canonical: `/job/${jobId}`,
+        canonical: `/jobs/${jobId}`,
       },
     };
   }
@@ -36,7 +36,7 @@ export async function generateMetadata({
         ? `${description.slice(0, 157).trim()}...`
         : description,
     alternates: {
-      canonical: `/job/${job.slug ?? job.id}`,
+      canonical: `/jobs/${job.slug ?? job.id}`,
     },
     openGraph: {
       title: `${title} at ${job.company_name}`,
@@ -44,7 +44,7 @@ export async function generateMetadata({
         description.length > 160
           ? `${description.slice(0, 157).trim()}...`
           : description,
-      url: `/job/${job.slug ?? job.id}`,
+      url: `/jobs/${job.slug ?? job.id}`,
       type: "article",
     },
   };

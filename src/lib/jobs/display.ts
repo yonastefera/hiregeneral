@@ -36,6 +36,38 @@ function firstReadableLocation(parts: string[]) {
   return first.trim();
 }
 
+function dedupeLocationParts(parts: string[]) {
+  const seen = new Set<string>();
+
+  return parts.filter((part) => {
+    const key = part.toLowerCase();
+
+    if (seen.has(key)) return false;
+
+    seen.add(key);
+    return true;
+  });
+}
+
+export function listingLocationParts(location: string) {
+  const cleaned = location.replace(/\s+/g, " ").trim();
+
+  if (!cleaned) return [];
+
+  const hasLocationCount = /\b\d+\s+locations?\b/i.test(cleaned);
+  const splitPattern = hasLocationCount
+    ? /\s*(?:;|\||\n|,)\s*/
+    : /\s*(?:;|\||\n)\s*/;
+  const parts = cleaned
+    .split(splitPattern)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .filter((part) => !/^\d+\s+locations?$/i.test(part))
+    .filter(isLocationPart);
+
+  return dedupeLocationParts(parts);
+}
+
 export function listingLocation(location: string) {
   const cleaned = location.replace(/\s+/g, " ").trim();
 
