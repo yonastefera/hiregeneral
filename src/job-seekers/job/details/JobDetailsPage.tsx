@@ -34,6 +34,7 @@ import {
 
 type JobDetailsPageProps = {
   jobId: string;
+  backHref?: string;
 };
 
 function LogoMark({
@@ -213,7 +214,10 @@ function CompanyRailCard({
   );
 }
 
-export default async function JobDetailsPage({ jobId }: JobDetailsPageProps) {
+export default async function JobDetailsPage({
+  jobId,
+  backHref = "/jobs",
+}: JobDetailsPageProps) {
   const { job, related } = await getJobDetailsPageData(jobId);
 
   if (!job) {
@@ -268,7 +272,7 @@ export default async function JobDetailsPage({ jobId }: JobDetailsPageProps) {
 
         <div className="relative mx-auto max-w-7xl px-4 pt-8 md:px-6">
           <Link
-            href="/jobs"
+            href={backHref}
             className="inline-flex items-center gap-1.5 text-[13px] text-neutral-600 transition hover:text-neutral-900"
           >
             <ArrowLeft aria-hidden="true" className="size-3.5" />

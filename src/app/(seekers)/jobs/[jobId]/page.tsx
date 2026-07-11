@@ -8,6 +8,7 @@ type JobDetailsRouteProps = {
   params: Promise<{
     jobId: string;
   }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
 export async function generateMetadata({
@@ -52,8 +53,14 @@ export async function generateMetadata({
 
 export default async function JobDetailsRoute({
   params,
+  searchParams,
 }: JobDetailsRouteProps) {
   const { jobId } = await params;
+  const resolvedSearchParams = await searchParams;
+  const from = Array.isArray(resolvedSearchParams?.from)
+    ? resolvedSearchParams?.from[0]
+    : resolvedSearchParams?.from;
+  const backHref = from?.startsWith("/jobs") ? from : "/jobs";
 
-  return <JobDetailsPage jobId={jobId} />;
+  return <JobDetailsPage jobId={jobId} backHref={backHref} />;
 }

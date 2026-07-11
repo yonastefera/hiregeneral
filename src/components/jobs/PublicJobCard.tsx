@@ -18,14 +18,22 @@ import type { JobListing } from "@/data/jobPlatform";
 type PublicJobCardProps = {
   job: JobListing;
   saveHref: string;
+  returnHref?: string;
 };
 
-export function PublicJobCard({ job, saveHref }: PublicJobCardProps) {
+export function PublicJobCard({
+  job,
+  saveHref,
+  returnHref,
+}: PublicJobCardProps) {
   const isExternal = Boolean(job.applyUrl);
   const displayTitle = listingTitle(job.title);
   const displayLocation = listingLocation(job.location);
 
-  const detailsHref = `/jobs/${job.slug}`;
+  const detailsPath = `/jobs/${job.slug}`;
+  const detailsHref = returnHref
+    ? `${detailsPath}?from=${encodeURIComponent(returnHref)}`
+    : detailsPath;
   const applyHref =
     isExternal && job.applyUrl ? job.applyUrl : `/jobs/${job.slug}/apply`;
 

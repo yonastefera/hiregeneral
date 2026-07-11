@@ -137,7 +137,11 @@ export function JobsResultsList({ state, data }: JobsResultsListProps) {
           <ul className="min-w-0 space-y-4" aria-label="Job listings">
             {jobs.map((job) => (
               <li key={job.id}>
-                <PublicJobCard job={job} saveHref={saveHref} />
+                <PublicJobCard
+                  job={job}
+                  saveHref={saveHref}
+                  returnHref={currentHref}
+                />
               </li>
             ))}
           </ul>
