@@ -107,8 +107,8 @@ export function buildJobsApiParams(state: JobsSearchState) {
     daysAgo: state.dateFilter,
     distance: state.distance,
 
-    loadMode: hasKeywordSearch ? "pool" : "diverse",
-    balance: "company",
+    loadMode: hasKeywordSearch ? "pool" : "latest",
+    balance: "none",
   });
 
   if (hasKeywordSearch) {
