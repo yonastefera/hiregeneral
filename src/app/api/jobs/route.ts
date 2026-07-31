@@ -23,7 +23,7 @@ const MAX_PAGE_SIZE = 25;
 const EASY_APPLY_SCAN_PAGE_SIZE = 25;
 const EASY_APPLY_MAX_SCAN_PAGES = 40;
 
-const JOBS_API_CACHE_VERSION = process.env.JOBS_API_CACHE_VERSION ?? "3";
+const JOBS_API_CACHE_VERSION = process.env.JOBS_API_CACHE_VERSION ?? "4";
 const JOBS_BROWSE_CACHE_TTL_SECONDS = 60 * 3; // 3 minutes
 const JOBS_SEARCH_CACHE_TTL_SECONDS = 60; // 1 minute
 const JOBS_FILTER_CACHE_TTL_SECONDS = 60 * 2; // 2 minutes
@@ -473,13 +473,15 @@ async function searchJobsDirect(params: {
   const postedAfter = new Date(
     Date.now() - params.daysAgo * 24 * 60 * 60 * 1000,
   ).toISOString();
+  const now = new Date().toISOString();
   const start = (params.page - 1) * params.pageSize;
 
   let request = supabaseAdmin
     .from("jobs")
     .select(JOB_LISTING_SELECT, { count: "exact" })
     .eq("status", "published")
-    .gte("posted_at", postedAfter);
+    .gte("posted_at", postedAfter)
+    .or(`expires_at.is.null,expires_at.gt.${now}`);
 
   const query = params.query.trim();
   const location = params.location.trim();
