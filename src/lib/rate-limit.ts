@@ -10,4 +10,11 @@ export const locationSearchRateLimit = new Ratelimit({
   prefix: "ratelimit:locations",
 });
 
+export const applicationSubmissionRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(20, "1 h"),
+  analytics: true,
+  prefix: "ratelimit:applications",
+});
+
 export { redis };
