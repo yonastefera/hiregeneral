@@ -19,6 +19,7 @@ import {
 } from "@/lib/ingest/upsert-jobs";
 import type { ImportedJob } from "@/lib/ingest/normalize";
 import { ingestionRateLimit } from "@/lib/rate-limit";
+import { recordPrivilegedAction } from "@/lib/security/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -333,6 +334,16 @@ async function runJobsIngestion(request: Request) {
         skippedSources: 0,
       },
     );
+
+    await recordPrivilegedAction({
+      action: "admin.job_ingestion_completed",
+      targetType: "job_ingestion",
+      targetId: requestedSourceSlug ?? requestedSourceType ?? "all",
+      metadata: {
+        totalSources: sources.length,
+        ...totals,
+      },
+    });
 
     return NextResponse.json({
       ok: totals.failedSources === 0,

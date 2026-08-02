@@ -7,6 +7,7 @@ import {
   safeServerError,
 } from "@/lib/http/api-security";
 import { adminSeedRateLimit } from "@/lib/rate-limit";
+import { recordPrivilegedAction } from "@/lib/security/audit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type CollegeScorecardSchool = {
@@ -121,6 +122,13 @@ export async function POST(request: Request) {
       }));
 
     if (rows.length === 0) {
+      await recordPrivilegedAction({
+        action: "admin.school_seed_completed",
+        targetType: "school_import",
+        targetId: String(startPage),
+        metadata: { startPage, lastPage: page, totalUpserted },
+      });
+
       return NextResponse.json({
         done: true,
         lastPage: page,
@@ -141,6 +149,13 @@ export async function POST(request: Request) {
     totalUpserted += rows.length;
     lastPage = page;
   }
+
+  await recordPrivilegedAction({
+    action: "admin.school_seed_completed",
+    targetType: "school_import",
+    targetId: String(startPage),
+    metadata: { startPage, lastPage, totalUpserted },
+  });
 
   return NextResponse.json({
     done: false,

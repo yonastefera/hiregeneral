@@ -204,22 +204,70 @@ export type Database = {
       };
       billing_events: {
         Row: {
+          attempts: number;
+          claim_token: string | null;
           event_type: string;
           id: string;
-          processed_at: string;
+          last_attempt_at: string;
+          last_error: string | null;
+          processed_at: string | null;
+          status: string;
           stripe_event_id: string;
         };
         Insert: {
+          attempts?: number;
+          claim_token?: string | null;
           event_type: string;
           id?: string;
-          processed_at?: string;
+          last_attempt_at?: string;
+          last_error?: string | null;
+          processed_at?: string | null;
+          status?: string;
           stripe_event_id: string;
         };
         Update: {
+          attempts?: number;
+          claim_token?: string | null;
           event_type?: string;
           id?: string;
-          processed_at?: string;
+          last_attempt_at?: string;
+          last_error?: string | null;
+          processed_at?: string | null;
+          status?: string;
           stripe_event_id?: string;
+        };
+        Relationships: [];
+      };
+      security_audit_log: {
+        Row: {
+          action: string;
+          actor_id: string | null;
+          actor_role: string;
+          created_at: string;
+          id: string;
+          metadata: Json;
+          target_id: string | null;
+          target_type: string;
+        };
+        Insert: {
+          action: string;
+          actor_id?: string | null;
+          actor_role?: string;
+          created_at?: string;
+          id?: string;
+          metadata?: Json;
+          target_id?: string | null;
+          target_type: string;
+        };
+        Update: {
+          action?: string;
+          actor_id?: string | null;
+          actor_role?: string;
+          created_at?: string;
+          id?: string;
+          metadata?: Json;
+          target_id?: string | null;
+          target_type?: string;
         };
         Relationships: [];
       };
@@ -813,6 +861,15 @@ export type Database = {
       };
     };
     Functions: {
+      append_security_audit: {
+        Args: {
+          p_action: string;
+          p_metadata?: Json;
+          p_target_id: string;
+          p_target_type: string;
+        };
+        Returns: undefined;
+      };
       assign_initial_role: {
         Args: {
           p_email: string | null;
@@ -827,6 +884,18 @@ export type Database = {
         Args: {
           _role: Database["public"]["Enums"]["app_role"];
           _user_id: string;
+        };
+        Returns: boolean;
+      };
+      claim_billing_event: {
+        Args: { p_event_type: string; p_stripe_event_id: string };
+        Returns: string;
+      };
+      finish_billing_event: {
+        Args: {
+          p_claim_token: string;
+          p_status: string;
+          p_stripe_event_id: string;
         };
         Returns: boolean;
       };

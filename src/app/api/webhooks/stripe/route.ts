@@ -39,31 +39,37 @@ function unixToIso(value: unknown) {
   return new Date(seconds * 1000).toISOString();
 }
 
-async function markProcessed(event: StripeEvent) {
+async function claimEvent(event: StripeEvent) {
   const supabase = createSupabaseAdminClient();
-  const { error } = await supabase.from("billing_events").insert({
-    stripe_event_id: event.id,
-    event_type: event.type,
+  const { data, error } = await supabase.rpc("claim_billing_event", {
+    p_stripe_event_id: event.id,
+    p_event_type: event.type,
   });
-
-  if (error && error.code !== "23505") {
-    throw new Error(error.message);
-  }
-}
-
-async function alreadyProcessed(eventId: string) {
-  const supabase = createSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("billing_events")
-    .select("id")
-    .eq("stripe_event_id", eventId)
-    .maybeSingle();
 
   if (error) {
     throw new Error(error.message);
   }
 
-  return Boolean(data);
+  return data;
+}
+
+async function finishEvent(
+  eventId: string,
+  claimToken: string,
+  status: "completed" | "failed",
+) {
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase.rpc("finish_billing_event", {
+    p_stripe_event_id: eventId,
+    p_claim_token: claimToken,
+    p_status: status,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
 }
 
 async function updateCompanySubscription(params: {
@@ -226,31 +232,58 @@ async function processStripeEvent(event: StripeEvent) {
 }
 
 export async function POST(request: NextRequest) {
+  const body = await boundedTextBody(request, JSON_BODY_LIMITS.webhook);
+  if (!body.ok) return body.response;
+
   let event: StripeEvent;
 
   try {
-    const body = await boundedTextBody(request, JSON_BODY_LIMITS.webhook);
-    if (!body.ok) return body.response;
-    const payload = body.data;
     event = verifyStripeWebhookEvent({
-      payload,
+      payload: body.data,
       signatureHeader: request.headers.get("stripe-signature"),
       webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
     });
+  } catch (error) {
+    logServerError("stripe_webhook_verification_failed", error);
+    return NextResponse.json(
+      { error: "Could not verify Stripe webhook." },
+      { status: 400 },
+    );
+  }
 
-    if (await alreadyProcessed(event.id)) {
+  let claimToken: string;
+
+  try {
+    const claimed = await claimEvent(event);
+    if (!claimed) {
       return NextResponse.json({ received: true, duplicate: true });
     }
+    claimToken = claimed;
+  } catch (error) {
+    logServerError("stripe_webhook_claim_failed", error);
+    return NextResponse.json(
+      { error: "Could not process Stripe webhook." },
+      { status: 500 },
+    );
+  }
 
+  try {
     await processStripeEvent(event);
-    await markProcessed(event);
+    await finishEvent(event.id, claimToken, "completed");
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    logServerError("stripe_webhook_rejected", error);
+    logServerError("stripe_webhook_processing_failed", error);
+
+    try {
+      await finishEvent(event.id, claimToken, "failed");
+    } catch (finishError) {
+      logServerError("stripe_webhook_failure_record_failed", finishError);
+    }
+
     return NextResponse.json(
       { error: "Could not process Stripe webhook." },
-      { status: 400 },
+      { status: 500 },
     );
   }
 }
