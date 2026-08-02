@@ -10,6 +10,56 @@ const BLS_BASE_URL = "https://download.bls.gov/pub/time.series/oe";
 const SOURCE_NAME = "U.S. Bureau of Labor Statistics OEWS";
 const SOURCE_URL = `${BLS_BASE_URL}/`;
 const BATCH_SIZE = 500;
+const DEFAULT_OCCUPATION_CODES = [
+  "151252",
+  "151254",
+  "151255",
+  "152051",
+  "151299",
+  "151243",
+  "151212",
+  "151241",
+  "151244",
+  "151253",
+  "151211",
+  "113021",
+  "131082",
+  "131111",
+  "111021",
+  "119199",
+  "132011",
+  "132051",
+  "132054",
+  "132031",
+  "131071",
+  "113121",
+  "131151",
+  "172051",
+  "172141",
+  "172071",
+  "172061",
+  "172011",
+  "172041",
+  "172112",
+  "172031",
+  "291141",
+  "291171",
+  "291151",
+  "291071",
+  "291229",
+  "291215",
+  "291214",
+  "291212",
+  "291217",
+  "291223",
+  "291051",
+  "291123",
+  "291122",
+  "292034",
+  "292035",
+  "151232",
+  "151231",
+];
 
 type DataTypeKey =
   | "employment"
@@ -68,9 +118,9 @@ const supabase = createClient(supabaseUrl, serviceRoleKey);
 function selectedOccupationCodes() {
   const value = process.env.BLS_OEWS_OCCUPATION_CODES?.trim();
 
-  if (!value || value.toLowerCase() === "all") {
-    return null;
-  }
+  if (value?.toLowerCase() === "all") return null;
+
+  if (!value) return new Set(DEFAULT_OCCUPATION_CODES);
 
   return new Set(
     value

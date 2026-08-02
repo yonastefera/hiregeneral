@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 import type {
   Candidate,
@@ -23,6 +24,7 @@ type ApplicationRow = {
   created_at: string;
   resume_url: string | null;
   status: string;
+  user_id: string;
   years_experience: string | null;
   jobs: CandidateJobRow | CandidateJobRow[] | null;
 };
@@ -80,7 +82,10 @@ function candidateMatches(candidate: Candidate, query: string) {
   ].some((value) => value.toLowerCase().includes(query));
 }
 
-function mapCandidate(row: ApplicationRow): Candidate {
+function mapCandidate(
+  row: ApplicationRow,
+  resumeUrl: string | null,
+): Candidate {
   const job = Array.isArray(row.jobs) ? row.jobs[0] : row.jobs;
   const name =
     row.applicant_full_name?.trim() ||
@@ -101,8 +106,25 @@ function mapCandidate(row: ApplicationRow): Candidate {
     status: mapCandidateStatus(row.status),
     match: null,
     email: row.applicant_email,
-    resumeUrl: row.resume_url,
+    resumeUrl,
   };
+}
+
+async function createAuthorizedResumeUrl(row: ApplicationRow) {
+  const path = row.resume_url?.trim();
+
+  if (!path || !path.startsWith(`${row.user_id}/`)) return null;
+
+  const { data, error } = await createSupabaseAdminClient()
+    .storage.from("resumes")
+    .createSignedUrl(path, 60 * 5);
+
+  if (error) {
+    console.error("[getEmployerCandidates:resume]", error);
+    return null;
+  }
+
+  return data.signedUrl;
 }
 
 async function resolveEmployerContext(params: GetEmployerCandidatesParams) {
@@ -178,6 +200,7 @@ export async function getEmployerCandidates(
       created_at,
       resume_url,
       status,
+      user_id,
       years_experience,
       jobs!inner(id, title, recruiter_id)
     `,
@@ -201,8 +224,14 @@ export async function getEmployerCandidates(
     };
   }
 
-  const candidates = ((data ?? []) as ApplicationRow[])
-    .map(mapCandidate)
+  const authorizedRows = await Promise.all(
+    ((data ?? []) as ApplicationRow[]).map(async (row) => ({
+      row,
+      resumeUrl: await createAuthorizedResumeUrl(row),
+    })),
+  );
+  const candidates = authorizedRows
+    .map(({ row, resumeUrl }) => mapCandidate(row, resumeUrl))
     .filter((candidate) => candidateMatches(candidate, searchTerm));
 
   return {

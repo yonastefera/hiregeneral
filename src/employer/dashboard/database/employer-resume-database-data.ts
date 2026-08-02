@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type {
   EducationItem,
   ProfileLink,
@@ -133,17 +134,18 @@ function getStoredResumeUrl(resumeUrl: string | null) {
 }
 
 async function getResumeViewUrl(
-  supabase: SupabaseServerClient,
+  profileUserId: string,
   resumeUrl: string | null,
 ) {
   const storedResumeUrl = getStoredResumeUrl(resumeUrl);
 
   if (!storedResumeUrl) return null;
-  if (isPublicUrl(storedResumeUrl)) return storedResumeUrl;
+  if (isPublicUrl(storedResumeUrl)) return null;
+  if (!storedResumeUrl.startsWith(`${profileUserId}/`)) return null;
 
-  const { data, error } = await supabase.storage
-    .from("resumes")
-    .createSignedUrl(storedResumeUrl, 60 * 10);
+  const { data, error } = await createSupabaseAdminClient()
+    .storage.from("resumes")
+    .createSignedUrl(storedResumeUrl, 60 * 5);
 
   if (error) {
     return null;
@@ -575,7 +577,10 @@ export async function getEmployerResumeDatabaseData(
   const candidatesWithResume = await Promise.all(
     filteredProfiles.map(async (candidate) => ({
       ...candidate,
-      resumeViewUrl: await getResumeViewUrl(supabase, candidate.resumeUrl),
+      resumeViewUrl: await getResumeViewUrl(
+        candidate.profileUserId,
+        candidate.resumeUrl,
+      ),
     })),
   );
   const candidates = candidatesWithResume

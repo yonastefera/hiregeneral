@@ -1,11 +1,11 @@
-// app/api/stats/route.ts
-import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  const supabase = await createClient();
+  const supabase = createSupabaseAdminClient();
 
   const [
     { count: totalJobs },
