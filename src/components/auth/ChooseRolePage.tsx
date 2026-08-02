@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { routeForRole, type AppRole } from "@/lib/auth/roles";
+import { safeInternalPath, safeNextForRole } from "@/lib/auth/security";
 import { cn } from "@/lib/utils";
 
 const roleOptions: Array<{
@@ -61,10 +62,7 @@ export default function ChooseRolePage() {
   const [saving, setSaving] = useState(false);
 
   const nextUrl = useMemo(() => {
-    if (!requestedNext || !requestedNext.startsWith("/")) return null;
-    if (requestedNext.startsWith("//")) return null;
-
-    return requestedNext;
+    return safeInternalPath(requestedNext);
   }, [requestedNext]);
 
   useEffect(() => {
@@ -84,7 +82,9 @@ export default function ChooseRolePage() {
         const body = (await response.json()) as RolePayload;
 
         if (body.role) {
-          router.replace(nextUrl ?? routeForRole(body.role));
+          router.replace(
+            safeNextForRole(nextUrl, body.role) ?? routeForRole(body.role),
+          );
           return;
         }
 
@@ -115,7 +115,11 @@ export default function ChooseRolePage() {
       }
 
       toast.success("Your workspace is ready.");
-      router.replace(nextUrl ?? body.redirectTo ?? routeForRole(selectedRole));
+      router.replace(
+        safeNextForRole(nextUrl, body.role ?? selectedRole) ??
+          body.redirectTo ??
+          routeForRole(selectedRole),
+      );
       router.refresh();
     } catch (error) {
       toast.error(

@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase/client";
 import { routeForRole, type AppRole } from "@/lib/auth/roles";
+import { safeInternalPath } from "@/lib/auth/security";
 import type { UserFlow } from "@/data/jobPlatform";
 
 const roles: { value: UserFlow; label: string; tag: string }[] = [
@@ -32,10 +33,6 @@ const proofPoints = [
 
 type AuthMode = "signin" | "signup" | "forgot";
 
-function isSafeInternalPath(value: string) {
-  return value.startsWith("/") && !value.startsWith("//");
-}
-
 function canUseEmployerPath(role: AppRole | null | undefined) {
   return role === "recruiter" || role === "admin";
 }
@@ -47,8 +44,8 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
   const isEmployerIntent = roleHint === "employer" || roleHint === "recruiter";
   const fallbackNextUrl = isEmployerIntent ? "/employers/dashboard" : "/jobs";
   const requestedNextUrl = searchParams.get("next") ?? fallbackNextUrl;
-  const nextUrl = isSafeInternalPath(requestedNextUrl)
-    ? requestedNextUrl
+  const nextUrl = safeInternalPath(requestedNextUrl)
+    ? safeInternalPath(requestedNextUrl)!
     : fallbackNextUrl;
   const roleIntent = isEmployerIntent ? "&role=employer" : "";
   const authIntentQuery = `next=${encodeURIComponent(nextUrl)}${roleIntent}`;
@@ -161,7 +158,9 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
         return;
       }
 
-      toast.success("Password reset link sent.");
+      toast.success(
+        "If an account exists, a password reset link will be sent.",
+      );
       return;
     }
 
@@ -197,7 +196,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
     setLoading(false);
 
     if (error) {
-      toast.error(error.message);
+      toast.error("Email or password is incorrect.");
       return;
     }
 

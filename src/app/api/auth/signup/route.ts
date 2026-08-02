@@ -1,15 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { isAppRole, routeForRole } from "@/lib/auth/roles";
+import {
+  normalizePublicRole,
+  retryAfterSeconds,
+  trustedOrigin,
+} from "@/lib/auth/security";
+import { authRateLimitKeys } from "@/lib/auth/rate-limit-keys";
+import { routeForRole } from "@/lib/auth/roles";
 import { sendConfirmationEmail } from "@/lib/email/send";
+import { signupRateLimit } from "@/lib/rate-limit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 const signupSchema = z.object({
   email: z.email(),
   fullName: z.string().trim().min(1).max(120).optional(),
-  password: z.string().min(6).max(256),
-  role: z.string().refine(isAppRole, "Invalid role"),
+  password: z.string().min(8).max(256),
+  role: z
+    .unknown()
+    .transform(normalizePublicRole)
+    .pipe(z.enum(["job_seeker", "recruiter"])),
 });
 
 export async function POST(request: NextRequest) {
@@ -24,7 +34,31 @@ export async function POST(request: NextRequest) {
   }
 
   const { email, fullName, password, role } = parsed.data;
-  const origin = request.nextUrl.origin;
+  const keys = authRateLimitKeys(request, email);
+  try {
+    const limits = await Promise.all([
+      signupRateLimit.limit(keys.ip),
+      signupRateLimit.limit(keys.email),
+    ]);
+    const blocked = limits.find((result) => !result.success);
+    if (blocked) {
+      return NextResponse.json(
+        { error: "Too many attempts. Please try again later." },
+        {
+          status: 429,
+          headers: { "Retry-After": retryAfterSeconds(blocked.reset) },
+        },
+      );
+    }
+  } catch (error) {
+    console.error("[auth-signup-rate-limit]", error);
+    return NextResponse.json(
+      { error: "Could not create account." },
+      { status: 503 },
+    );
+  }
+
+  const origin = trustedOrigin(request.nextUrl.origin);
   const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(routeForRole(role))}`;
   const admin = createSupabaseAdminClient();
 
@@ -42,7 +76,11 @@ export async function POST(request: NextRequest) {
   });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    console.error("[auth-signup]", error.message);
+    return NextResponse.json(
+      { error: "Could not create account." },
+      { status: 400 },
+    );
   }
 
   const confirmUrl = data.properties?.action_link;
@@ -54,11 +92,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  await sendConfirmationEmail({
-    to: email,
-    confirmUrl,
-    fullName,
-  });
+  try {
+    await sendConfirmationEmail({ to: email, confirmUrl, fullName });
+  } catch (error) {
+    console.error("[auth-signup-email]", error);
+    return NextResponse.json(
+      { error: "Could not create account." },
+      { status: 503 },
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }

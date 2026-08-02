@@ -51,7 +51,9 @@ export default function ResetPassword() {
     setLoading(false);
 
     if (error) {
-      toast.error(error.message);
+      toast.error(
+        "Could not update password. Request a new reset link and try again.",
+      );
       return;
     }
 

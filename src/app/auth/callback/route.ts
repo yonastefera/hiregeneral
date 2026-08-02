@@ -2,102 +2,90 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import type { Database } from "@/lib/supabase/types";
-import { normalizeAppRole, routeForRole } from "@/lib/auth/roles";
+import { assignInitialRole, primaryRole } from "@/lib/auth/role-assignment";
+import {
+  normalizePublicRole,
+  safeInternalPath,
+  safeNextForRole,
+  trustedOrigin,
+} from "@/lib/auth/security";
+import { routeForRole } from "@/lib/auth/roles";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-
-function safeNext(value: string | null) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return null;
-
-  return value;
-}
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const code = searchParams.get("code");
-  const next = safeNext(searchParams.get("next"));
-  const origin = req.nextUrl.origin;
+  const next = safeInternalPath(searchParams.get("next"));
+  const origin = trustedOrigin(req.nextUrl.origin);
 
-  if (code) {
-    const cookieStore = await cookies();
+  try {
+    if (code) {
+      const cookieStore = await cookies();
 
-    const supabase = createServerClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options),
-            );
+      const supabase = createServerClient<Database>(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          cookies: {
+            getAll() {
+              return cookieStore.getAll();
+            },
+            setAll(cookiesToSet) {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options),
+              );
+            },
           },
         },
-      },
-    );
+      );
 
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
 
-    if (!error) {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      if (!error) {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      if (!user) {
-        return NextResponse.redirect(`${origin}/signin?error=oauth`);
-      }
+        if (!user) {
+          return NextResponse.redirect(`${origin}/signin?error=oauth`);
+        }
 
-      if (next === "/reset-password") {
-        return NextResponse.redirect(`${origin}/reset-password`);
-      }
+        if (next === "/reset-password") {
+          return NextResponse.redirect(`${origin}/reset-password`);
+        }
 
-      const admin = createSupabaseAdminClient();
-      const { data: roles } = await admin
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id);
+        const admin = createSupabaseAdminClient();
+        const { data: roles, error: rolesError } = await admin
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id);
 
-      const metadataRole = normalizeAppRole(user.user_metadata?.role);
-      const existingRole =
-        roles?.find((row) => row.role === "admin")?.role ??
-        roles?.find((row) => row.role === "recruiter")?.role ??
-        roles?.find((row) => row.role === "job_seeker")?.role ??
-        null;
-      const role = existingRole ?? metadataRole;
+        if (rolesError)
+          throw new Error("Could not load account role.", {
+            cause: rolesError,
+          });
 
-      if (role && !existingRole) {
-        await admin.from("profiles").upsert(
-          {
-            user_id: user.id,
-            full_name:
-              user.user_metadata?.full_name ??
-              user.user_metadata?.name ??
-              user.email?.split("@")[0] ??
-              null,
-            email: user.email ?? null,
-            user_type: role,
-          },
-          { onConflict: "user_id" },
-        );
+        const metadataRole = normalizePublicRole(user.user_metadata?.role);
+        const existingRole = primaryRole(roles);
+        let role = existingRole;
 
-        await admin.from("user_roles").upsert(
-          {
-            user_id: user.id,
-            role,
-          },
-          { onConflict: "user_id,role" },
-        );
-      }
+        if (metadataRole && !existingRole) {
+          role = await assignInitialRole({ admin, user, role: metadataRole });
+        }
 
-      if (!role) {
+        if (!role) {
+          return NextResponse.redirect(
+            `${origin}/auth/choose-role${next ? `?next=${encodeURIComponent(next)}` : ""}`,
+          );
+        }
+
         return NextResponse.redirect(
-          `${origin}/auth/choose-role${next ? `?next=${encodeURIComponent(next)}` : ""}`,
+          `${origin}${safeNextForRole(next, role) ?? routeForRole(role)}`,
         );
       }
-
-      return NextResponse.redirect(`${origin}${next ?? routeForRole(role)}`);
     }
+  } catch (error) {
+    console.error("[auth-callback]", error);
   }
 
   // Something went wrong — send to sign in with an error flag

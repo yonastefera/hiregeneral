@@ -17,4 +17,18 @@ export const applicationSubmissionRateLimit = new Ratelimit({
   prefix: "ratelimit:applications",
 });
 
+export const signupRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(6, "1 h"),
+  analytics: true,
+  prefix: "ratelimit:auth:signup",
+});
+
+export const passwordResetRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(5, "1 h"),
+  analytics: true,
+  prefix: "ratelimit:auth:password-reset",
+});
+
 export { redis };
