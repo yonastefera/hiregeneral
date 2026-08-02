@@ -4,6 +4,10 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Database } from "@/lib/supabase/types";
 import { assignInitialRole, primaryRole } from "@/lib/auth/role-assignment";
 import {
+  createRecoveryAuthorization,
+  RECOVERY_COOKIE,
+} from "@/lib/auth/recovery-authorization";
+import {
   normalizePublicRole,
   safeInternalPath,
   safeNextForRole,
@@ -51,7 +55,19 @@ export async function GET(req: NextRequest) {
         }
 
         if (next === "/reset-password") {
-          return NextResponse.redirect(`${origin}/reset-password`);
+          const response = NextResponse.redirect(`${origin}/reset-password`);
+          response.cookies.set(
+            RECOVERY_COOKIE,
+            createRecoveryAuthorization(user.id),
+            {
+              httpOnly: true,
+              maxAge: 15 * 60,
+              path: "/api/auth/password-update",
+              sameSite: "lax",
+              secure: new URL(origin).protocol === "https:",
+            },
+          );
+          return response;
         }
 
         const admin = createSupabaseAdminClient();

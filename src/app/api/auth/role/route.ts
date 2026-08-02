@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { assignInitialRole, primaryRole } from "@/lib/auth/role-assignment";
-import { normalizePublicRole } from "@/lib/auth/security";
+import { retryAfterSeconds } from "@/lib/auth/security";
 import { routeForRole, type AppRole } from "@/lib/auth/roles";
+import { roleSelectionSchema } from "@/lib/auth/validation";
+import { readJsonBody } from "@/lib/http/json-body";
+import { roleSelectionRateLimit } from "@/lib/rate-limit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -77,10 +80,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json().catch(() => ({}));
-  const selectedRole = normalizePublicRole(body.role);
+  const parsed = roleSelectionSchema.safeParse(await readJsonBody(request));
 
-  if (!selectedRole) {
+  if (!parsed.success) {
     return NextResponse.json(
       { error: "Choose either job seeker or employer." },
       { status: 400 },
@@ -88,11 +90,32 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const limit = await roleSelectionRateLimit.limit(user.id);
+    if (!limit.success) {
+      return NextResponse.json(
+        { error: "Too many attempts. Please try again later." },
+        {
+          status: 429,
+          headers: { "Retry-After": retryAfterSeconds(limit.reset) },
+        },
+      );
+    }
+  } catch (error) {
+    console.error("[auth-role-rate-limit]", error);
+    return NextResponse.json(
+      { error: "Could not save account role." },
+      { status: 503 },
+    );
+  }
+
+  const { role: selectedRole, fullName } = parsed.data;
+
+  try {
     const role = await assignInitialRole({
       admin: createSupabaseAdminClient(),
       user,
       role: selectedRole,
-      fullName: body.fullName,
+      fullName,
     });
 
     return NextResponse.json({ role, redirectTo: routeForRole(role) });

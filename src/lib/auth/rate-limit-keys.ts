@@ -8,10 +8,11 @@ export function authRateLimitKeys(request: Request, email: string) {
     ?.split(",")[0]
     ?.trim();
   const ip = request.headers.get("x-real-ip")?.trim() || forwarded || "unknown";
-  const emailHash = createHash("sha256")
-    .update(email.trim().toLowerCase())
-    .digest("hex")
-    .slice(0, 24);
+  const hash = (value: string) =>
+    createHash("sha256").update(value).digest("hex").slice(0, 24);
 
-  return { ip: `ip:${ip}`, email: `email:${emailHash}` };
+  return {
+    ip: `ip:${hash(ip)}`,
+    email: `email:${hash(email.trim().toLowerCase())}`,
+  };
 }

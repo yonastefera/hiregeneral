@@ -1,18 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
-
 import { sendPasswordResetEmail } from "@/lib/email/send";
 import { retryAfterSeconds, trustedOrigin } from "@/lib/auth/security";
 import { authRateLimitKeys } from "@/lib/auth/rate-limit-keys";
+import { passwordResetSchema } from "@/lib/auth/validation";
+import { readJsonBody } from "@/lib/http/json-body";
 import { passwordResetRateLimit } from "@/lib/rate-limit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
-const passwordResetSchema = z.object({
-  email: z.email(),
-});
+const RESET_MESSAGE =
+  "If the address is eligible, an email will arrive shortly.";
+
+function resetResponse() {
+  return NextResponse.json({ ok: true, message: RESET_MESSAGE });
+}
 
 export async function POST(request: NextRequest) {
-  const body = await request.json().catch(() => null);
+  const body = await readJsonBody(request);
   const parsed = passwordResetSchema.safeParse(body);
 
   if (!parsed.success) {
@@ -41,7 +44,7 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error("[password-reset-rate-limit]", error);
-    return NextResponse.json({ ok: true });
+    return resetResponse();
   }
 
   const origin = trustedOrigin(request.nextUrl.origin);
@@ -58,7 +61,7 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     console.error("[password-reset-email]", error.message);
-    return NextResponse.json({ ok: true });
+    return resetResponse();
   }
 
   const resetUrl = data.properties?.action_link;
@@ -78,5 +81,5 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true });
+  return resetResponse();
 }

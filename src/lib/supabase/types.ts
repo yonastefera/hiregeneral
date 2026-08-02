@@ -813,6 +813,15 @@ export type Database = {
       };
     };
     Functions: {
+      assign_initial_role: {
+        Args: {
+          p_email: string | null;
+          p_full_name: string;
+          p_role: Database["public"]["Enums"]["app_role"];
+          p_user_id: string;
+        };
+        Returns: Database["public"]["Enums"]["app_role"];
+      };
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"];

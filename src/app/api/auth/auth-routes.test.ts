@@ -57,7 +57,7 @@ describe("POST /api/auth/signup", () => {
     expect(mocks.generateLink).not.toHaveBeenCalled();
   });
 
-  it("returns a safe error instead of provider details", async () => {
+  it("returns the generic eligibility response for duplicate signup", async () => {
     mocks.generateLink.mockResolvedValue({
       data: {},
       error: { message: "User already registered" },
@@ -70,10 +70,58 @@ describe("POST /api/auth/signup", () => {
       }),
     );
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      error: "Could not create account.",
+      ok: true,
+      message: "If the address is eligible, an email will arrive shortly.",
     });
+  });
+
+  it.each(["admin", "owner", "unknown"])(
+    "rejects the %s role",
+    async (role) => {
+      const response = await signup(
+        request("/api/auth/signup", {
+          email: "person@example.com",
+          password: "correct-horse-battery-staple",
+          role,
+        }),
+      );
+      expect(response.status).toBe(400);
+    },
+  );
+
+  it.each(["job_seeker", "recruiter"])(
+    "accepts a valid %s signup",
+    async (role) => {
+      mocks.generateLink.mockResolvedValue({
+        data: { properties: { action_link: "https://example.test/confirm" } },
+        error: null,
+      });
+      const response = await signup(
+        request("/api/auth/signup", {
+          email: " Person@Example.COM ",
+          password: "correct-horse-battery-staple",
+          role,
+        }),
+      );
+      expect(response.status).toBe(200);
+      expect(mocks.generateLink).toHaveBeenCalledWith(
+        expect.objectContaining({ email: "person@example.com" }),
+      );
+    },
+  );
+
+  it("rejects unknown signup fields", async () => {
+    const response = await signup(
+      request("/api/auth/signup", {
+        email: "person@example.com",
+        password: "correct-horse-battery-staple",
+        role: "job_seeker",
+        isAdmin: true,
+      }),
+    );
+    expect(response.status).toBe(400);
   });
 
   it("rate limits by both request and email identity", async () => {
@@ -105,7 +153,10 @@ describe("POST /api/auth/password-reset", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true });
+    expect(await response.json()).toEqual({
+      ok: true,
+      message: "If the address is eligible, an email will arrive shortly.",
+    });
   });
 
   it("does not reveal reset email delivery failures", async () => {
@@ -124,6 +175,9 @@ describe("POST /api/auth/password-reset", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true });
+    expect(await response.json()).toEqual({
+      ok: true,
+      message: "If the address is eligible, an email will arrive shortly.",
+    });
   });
 });

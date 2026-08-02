@@ -31,4 +31,11 @@ export const passwordResetRateLimit = new Ratelimit({
   prefix: "ratelimit:auth:password-reset",
 });
 
+export const roleSelectionRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(10, "1 h"),
+  analytics: true,
+  prefix: "ratelimit:auth:role-selection",
+});
+
 export { redis };

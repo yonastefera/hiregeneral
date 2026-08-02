@@ -1,58 +1,55 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, LockKeyhole, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { supabase } from "@/lib/supabase/client";
+import {
+  PASSWORD_MIN_LENGTH,
+  passwordUpdateSchema,
+} from "@/lib/auth/validation";
 
 export default function ResetPassword() {
   const router = useRouter();
 
   const [password, setPassword] = useState("");
+  const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [loading, setLoading] = useState(false);
-  const [hasRecoveryToken, setHasRecoveryToken] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-
-      setHasRecoveryToken(
-        Boolean(data.session) ||
-          window.location.hash.includes("type=recovery") ||
-          window.location.search.includes("type=recovery"),
-      );
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setHasRecoveryToken(Boolean(session));
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
 
   const handleSubmit = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    const parsed = passwordUpdateSchema.safeParse({
+      password,
+      passwordConfirmation,
+    });
+    if (!parsed.success) {
+      toast.error(
+        password !== passwordConfirmation
+          ? "Passwords do not match."
+          : `Use at least ${PASSWORD_MIN_LENGTH} characters.`,
+      );
+      return;
+    }
+
     setLoading(true);
-
-    const { error } = await supabase.auth.updateUser({ password });
-
+    const response = await fetch("/api/auth/password-update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(parsed.data),
+    });
     setLoading(false);
 
-    if (error) {
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
       toast.error(
-        "Could not update password. Request a new reset link and try again.",
+        body?.error ??
+          "Could not update password. Request a new reset link and try again.",
       );
       return;
     }
@@ -86,9 +83,7 @@ export default function ResetPassword() {
           Set a new password
         </h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          {hasRecoveryToken
-            ? "Create a secure password to regain access."
-            : "Open this page from the secure reset link in your email."}
+          Create a password with at least {PASSWORD_MIN_LENGTH} characters.
         </p>
 
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
@@ -98,7 +93,7 @@ export default function ResetPassword() {
               <LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="password"
-                minLength={8}
+                minLength={PASSWORD_MIN_LENGTH}
                 required
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
@@ -108,9 +103,22 @@ export default function ResetPassword() {
             </div>
           </label>
 
+          <label className="block text-sm font-medium">
+            Confirm new password
+            <Input
+              type="password"
+              minLength={PASSWORD_MIN_LENGTH}
+              required
+              value={passwordConfirmation}
+              onChange={(event) => setPasswordConfirmation(event.target.value)}
+              placeholder="Confirm password"
+              className="mt-1.5 h-12 rounded-xl border-border bg-background text-[15px]"
+            />
+          </label>
+
           <Button
             className="group h-12 w-full rounded-2xl bg-foreground text-[15px] font-medium text-background shadow-lift hover:bg-foreground/90"
-            disabled={loading || !hasRecoveryToken}
+            disabled={loading}
           >
             {loading ? "Updating..." : "Update password"}
             <ArrowRight className="ml-1 size-4 transition group-hover:translate-x-0.5" />

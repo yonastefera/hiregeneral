@@ -1,29 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
-
-import {
-  normalizePublicRole,
-  retryAfterSeconds,
-  trustedOrigin,
-} from "@/lib/auth/security";
+import { retryAfterSeconds, trustedOrigin } from "@/lib/auth/security";
 import { authRateLimitKeys } from "@/lib/auth/rate-limit-keys";
 import { routeForRole } from "@/lib/auth/roles";
+import { signupSchema } from "@/lib/auth/validation";
 import { sendConfirmationEmail } from "@/lib/email/send";
+import { readJsonBody } from "@/lib/http/json-body";
 import { signupRateLimit } from "@/lib/rate-limit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
-const signupSchema = z.object({
-  email: z.email(),
-  fullName: z.string().trim().min(1).max(120).optional(),
-  password: z.string().min(8).max(256),
-  role: z
-    .unknown()
-    .transform(normalizePublicRole)
-    .pipe(z.enum(["job_seeker", "recruiter"])),
-});
+const ELIGIBILITY_MESSAGE =
+  "If the address is eligible, an email will arrive shortly.";
+
+function eligibilityResponse() {
+  return NextResponse.json({ ok: true, message: ELIGIBILITY_MESSAGE });
+}
 
 export async function POST(request: NextRequest) {
-  const body = await request.json().catch(() => null);
+  const body = await readJsonBody(request);
   const parsed = signupSchema.safeParse(body);
 
   if (!parsed.success) {
@@ -52,10 +45,7 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error("[auth-signup-rate-limit]", error);
-    return NextResponse.json(
-      { error: "Could not create account." },
-      { status: 503 },
-    );
+    return eligibilityResponse();
   }
 
   const origin = trustedOrigin(request.nextUrl.origin);
@@ -77,30 +67,21 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     console.error("[auth-signup]", error.message);
-    return NextResponse.json(
-      { error: "Could not create account." },
-      { status: 400 },
-    );
+    return eligibilityResponse();
   }
 
   const confirmUrl = data.properties?.action_link;
 
   if (!confirmUrl) {
-    return NextResponse.json(
-      { error: "Could not create confirmation link." },
-      { status: 500 },
-    );
+    console.error("[auth-signup] Supabase did not return a confirmation link.");
+    return eligibilityResponse();
   }
 
   try {
     await sendConfirmationEmail({ to: email, confirmUrl, fullName });
   } catch (error) {
     console.error("[auth-signup-email]", error);
-    return NextResponse.json(
-      { error: "Could not create account." },
-      { status: 503 },
-    );
   }
 
-  return NextResponse.json({ ok: true });
+  return eligibilityResponse();
 }

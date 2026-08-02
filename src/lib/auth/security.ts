@@ -10,7 +10,12 @@ export function normalizePublicRole(value: unknown): PublicAppRole | null {
 
 export function safeInternalPath(value: string | null | undefined) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return null;
-  if (value.includes("\\") || /[\u0000-\u001f\u007f]/.test(value)) return null;
+  if (
+    value.includes("\\") ||
+    /[\u0000-\u001f\u007f]/.test(value) ||
+    /%(?:00|0[0-9a-f]|1[0-9a-f]|7f|2f|5c)/i.test(value)
+  )
+    return null;
 
   try {
     const url = new URL(value, "https://hiregeneral.invalid");
@@ -42,12 +47,14 @@ export function safeNextForRole(value: string | null, role: AppRole) {
 
 export function trustedOrigin(requestOrigin: string) {
   const configured =
-    process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL;
+    process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_SITE_URL;
   const candidate = configured?.trim().replace(/\/$/, "") || requestOrigin;
 
   try {
     const url = new URL(candidate);
-    if (url.protocol !== "https:" && url.protocol !== "http:")
+    const isLocal =
+      url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    if (url.protocol !== "https:" && !(url.protocol === "http:" && isLocal))
       throw new Error();
     return url.origin;
   } catch {

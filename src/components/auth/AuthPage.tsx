@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase/client";
 import { routeForRole, type AppRole } from "@/lib/auth/roles";
 import { safeInternalPath } from "@/lib/auth/security";
+import { PASSWORD_MIN_LENGTH } from "@/lib/auth/validation";
 import type { UserFlow } from "@/data/jobPlatform";
 
 const roles: { value: UserFlow; label: string; tag: string }[] = [
@@ -379,11 +380,19 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   required
-                  minLength={8}
+                  minLength={
+                    mode === "signup" ? PASSWORD_MIN_LENGTH : undefined
+                  }
                   placeholder="Password"
                   className="h-11 rounded-xl border-border bg-background pl-10 text-sm"
                 />
               </Field>
+            )}
+
+            {mode === "signup" && (
+              <p className="text-xs text-muted-foreground">
+                Use at least {PASSWORD_MIN_LENGTH} characters.
+              </p>
             )}
 
             {mode === "signup" && (

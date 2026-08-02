@@ -2,7 +2,7 @@ export type AppRole = "admin" | "recruiter" | "job_seeker";
 
 export const ROLE_ROUTES: Record<AppRole, string> = {
   admin: "/admin/dashboard",
-  recruiter: "/employer/dashboard",
+  recruiter: "/employers/dashboard",
   job_seeker: "/job-seeker/dashboard",
 };
 

@@ -23,6 +23,9 @@ describe("auth security", () => {
     "https://evil.test",
     "//evil.test",
     "/\\evil.test",
+    "/%5cevil.test",
+    "/%2f%2fevil.test",
+    "/jobs%0d%0aLocation:evil",
     "/ok\nLocation: bad",
   ])("rejects unsafe redirect %s", (value) =>
     expect(safeInternalPath(value)).toBeNull(),
@@ -43,6 +46,14 @@ describe("auth security", () => {
     process.env.NEXT_PUBLIC_SITE_URL = "https://www.hiregeneral.com/path";
     expect(trustedOrigin("https://attacker.test")).toBe(
       "https://www.hiregeneral.com",
+    );
+  });
+
+  it("prefers the canonical app URL", () => {
+    process.env.NEXT_PUBLIC_APP_URL = "https://app.hiregeneral.com";
+    process.env.NEXT_PUBLIC_SITE_URL = "https://www.hiregeneral.com";
+    expect(trustedOrigin("https://attacker.test")).toBe(
+      "https://app.hiregeneral.com",
     );
   });
 });
