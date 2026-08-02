@@ -6,6 +6,7 @@ import { passwordResetSchema } from "@/lib/auth/validation";
 import { logAuthEvent } from "@/lib/auth/log";
 import { readJsonBody } from "@/lib/http/json-body";
 import { passwordResetRateLimit } from "@/lib/rate-limit";
+import { enforceDuplicateCooldown } from "@/lib/security/abuse";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 const RESET_MESSAGE =
@@ -49,6 +50,14 @@ export async function POST(request: NextRequest) {
     });
     return resetResponse();
   }
+
+  const duplicate = await enforceDuplicateCooldown({
+    scope: "password_reset",
+    actorKey: keys.ip,
+    content: email,
+    ttlSeconds: 60,
+  });
+  if (duplicate) return duplicate;
 
   const origin = trustedOrigin(request.nextUrl.origin);
   const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent("/reset-password")}`;

@@ -6,8 +6,8 @@ export const RECOVERY_COOKIE = "hg-password-recovery";
 const RECOVERY_TTL_SECONDS = 15 * 60;
 
 function secret() {
-  const value = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!value) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY.");
+  const value = process.env.AUTH_RECOVERY_SECRET;
+  if (!value) throw new Error("Missing AUTH_RECOVERY_SECRET.");
   return value;
 }
 

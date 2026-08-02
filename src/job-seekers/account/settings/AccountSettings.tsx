@@ -71,14 +71,11 @@ export default function AccountSettings() {
     setDeleting(true);
 
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          deletion_requested_at: new Date().toISOString(),
-        })
-        .eq("user_id", user.id);
+      const deletionResponse = await fetch("/api/account/deletion", {
+        method: "POST",
+      });
 
-      if (error) {
+      if (!deletionResponse.ok) {
         toast.error("Could not request account deletion. Please try again.");
         return;
       }

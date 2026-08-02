@@ -8,7 +8,7 @@ import {
 } from "@/lib/auth/recovery-authorization";
 
 beforeAll(() => {
-  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-secret";
+  process.env.AUTH_RECOVERY_SECRET = "test-recovery-secret";
 });
 
 describe("password recovery authorization", () => {

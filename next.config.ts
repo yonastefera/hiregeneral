@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+import { phaseTwoSecurityHeaders } from "./src/lib/security/headers";
+
 const securityHeaders = [
   {
     key: "X-DNS-Prefetch-Control",
@@ -62,7 +64,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/(.*)",
-        headers: securityHeaders,
+        headers: [...securityHeaders, ...phaseTwoSecurityHeaders()],
       },
     ];
   },

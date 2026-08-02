@@ -121,7 +121,7 @@ export async function GET(request: Request) {
       return jsonResponse(cached);
     }
   } catch (error) {
-    console.error("[locations] Redis cache read failed. Continuing.", error);
+    logServerError("location_cache_read_failed", error);
   }
 
   try {
@@ -145,10 +145,7 @@ export async function GET(request: Request) {
       );
     }
   } catch (error) {
-    console.error(
-      "[locations] Rate limit failed. Continuing without it.",
-      error,
-    );
+    logServerError("location_rate_limit_unavailable", error);
   }
 
   const supabase = await createClient();
@@ -177,7 +174,7 @@ export async function GET(request: Request) {
       ex: LOCATION_CACHE_TTL_SECONDS,
     });
   } catch (error) {
-    console.error("[locations] Redis cache write failed. Continuing.", error);
+    logServerError("location_cache_write_failed", error);
   }
 
   return jsonResponse(payload);

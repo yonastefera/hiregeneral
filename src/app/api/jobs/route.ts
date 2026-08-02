@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 
 import { redis } from "@/lib/rate-limit";
 import { logServerError, safeServerError } from "@/lib/http/api-security";
+import { createSupabasePublicClient } from "@/lib/supabase/public";
 import {
   JOB_ENRICHMENT_SELECT,
   mapJobEnrichments,
@@ -11,10 +11,7 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
+const supabasePublic = createSupabasePublicClient();
 
 const NEW_JOBS_WINDOW_DAYS = 7;
 const DEFAULT_COMPANY_BALANCE = "none";
@@ -265,7 +262,7 @@ async function readJobsCache(cacheKey: string) {
   try {
     return await redis.get<JobsApiPayload>(cacheKey);
   } catch (error) {
-    console.error("[GET /api/jobs] Redis read failed. Continuing.", error);
+    logServerError("jobs_cache_read_failed", error);
     return null;
   }
 }
@@ -280,7 +277,7 @@ async function writeJobsCache(
       ex: ttlSeconds,
     });
   } catch (error) {
-    console.error("[GET /api/jobs] Redis write failed. Continuing.", error);
+    logServerError("jobs_cache_write_failed", error);
   }
 }
 
@@ -324,8 +321,8 @@ async function hydrateJobDetails(candidates: JobCandidateRow[]) {
   const ids = candidates.map((job) => job.id);
   const [{ data, error }, { data: enrichmentRows, error: enrichmentError }] =
     await Promise.all([
-      supabaseAdmin.from("jobs").select(JOB_DETAIL_SELECT).in("id", ids),
-      supabaseAdmin
+      supabasePublic.from("jobs").select(JOB_DETAIL_SELECT).in("id", ids),
+      supabasePublic
         .from("job_enrichments")
         .select(JOB_ENRICHMENT_SELECT)
         .in("job_id", ids)
@@ -436,7 +433,7 @@ async function searchJobsPublic(params: {
   pageSize: number;
   balance: string;
 }) {
-  const { data, error } = await supabaseAdmin.rpc("search_jobs_public", {
+  const { data, error } = await supabasePublic.rpc("search_jobs_public", {
     p_query: params.query.trim() || null,
     p_days_ago: params.daysAgo,
     p_location: params.location.trim() || null,
@@ -477,7 +474,7 @@ async function searchJobsDirect(params: {
   const now = new Date().toISOString();
   const start = (params.page - 1) * params.pageSize;
 
-  let request = supabaseAdmin
+  let request = supabasePublic
     .from("jobs")
     .select(JOB_LISTING_SELECT, { count: "exact" })
     .eq("status", "published")
@@ -721,8 +718,6 @@ export async function GET(req: NextRequest) {
         newJobs = toCount(rows[0]?.new_jobs_count);
       }
     } catch (rpcError) {
-      console.error("[GET /api/jobs] search_jobs_public failed:", rpcError);
-
       if (!isStatementTimeout(rpcError)) {
         logServerError("jobs_search_query_failed", rpcError);
         return safeServerError("Failed to load jobs.");
@@ -748,11 +743,6 @@ export async function GET(req: NextRequest) {
         total = fallbackResult.total;
         newJobs = fallbackResult.newJobs;
       } catch (fallbackError) {
-        console.error(
-          "[GET /api/jobs] Direct jobs fallback failed:",
-          fallbackError,
-        );
-
         logServerError("jobs_search_fallback_failed", fallbackError);
         return safeServerError("Failed to load jobs.");
       }

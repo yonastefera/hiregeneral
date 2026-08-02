@@ -10,6 +10,7 @@ import {
   safeServerError,
 } from "@/lib/http/api-security";
 import { employerMessageRateLimit } from "@/lib/rate-limit";
+import { enforceDuplicateCooldown } from "@/lib/security/abuse";
 
 export const runtime = "nodejs";
 
@@ -64,6 +65,14 @@ export async function POST(request: NextRequest) {
   }
 
   const { conversationId, body } = parsed.data;
+  const duplicate = await enforceDuplicateCooldown({
+    scope: "employer_message",
+    actorKey: auth.user.id,
+    content: `${conversationId}\n${body}`,
+    ttlSeconds: 15,
+  });
+  if (duplicate) return duplicate;
+
   const { data: conversation, error: conversationError } = await auth.supabase
     .from("conversations")
     .select("id")

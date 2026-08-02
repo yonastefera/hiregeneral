@@ -86,5 +86,15 @@ export const passwordUpdateRateLimit = mutationLimiter(
   "1 h",
   "password-update",
 );
+export const userMessageRateLimit = mutationLimiter(
+  120,
+  "1 h",
+  "user-messages",
+);
+export const accountDeletionRateLimit = mutationLimiter(
+  3,
+  "24 h",
+  "account-deletion",
+);
 
 export { redis };

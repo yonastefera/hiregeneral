@@ -68,10 +68,7 @@ export async function GET(request: Request) {
       return jsonResponse(cached);
     }
   } catch (error) {
-    console.error(
-      "[keyword-suggestions] Redis read failed. Continuing.",
-      error,
-    );
+    logServerError("keyword_suggestions_cache_read_failed", error);
   }
 
   const supabase = await createClient();
@@ -94,10 +91,7 @@ export async function GET(request: Request) {
       ex: KEYWORD_CACHE_TTL_SECONDS,
     });
   } catch (error) {
-    console.error(
-      "[keyword-suggestions] Redis write failed. Continuing.",
-      error,
-    );
+    logServerError("keyword_suggestions_cache_write_failed", error);
   }
 
   return jsonResponse(payload);

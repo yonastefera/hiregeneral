@@ -7,6 +7,7 @@ import { logAuthEvent } from "@/lib/auth/log";
 import { sendConfirmationEmail } from "@/lib/email/send";
 import { readJsonBody } from "@/lib/http/json-body";
 import { signupRateLimit } from "@/lib/rate-limit";
+import { enforceDuplicateCooldown } from "@/lib/security/abuse";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 const ELIGIBILITY_MESSAGE =
@@ -50,6 +51,14 @@ export async function POST(request: NextRequest) {
     });
     return eligibilityResponse();
   }
+
+  const duplicate = await enforceDuplicateCooldown({
+    scope: "signup",
+    actorKey: keys.ip,
+    content: email,
+    ttlSeconds: 60,
+  });
+  if (duplicate) return duplicate;
 
   const origin = trustedOrigin(request.nextUrl.origin);
   const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(routeForRole(role))}`;

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { retryAfterSeconds } from "@/lib/auth/security";
 import { readJsonBodyResult } from "@/lib/http/json-body";
+import { writeRedactedLog } from "@/lib/logging/redact";
 
 export const JSON_BODY_LIMITS = {
   small: 8_192,
@@ -79,14 +80,10 @@ function safeErrorMetadata(error: unknown) {
 }
 
 export function logServerError(context: string, error: unknown) {
-  console.error(
-    JSON.stringify({
-      scope: "api",
-      event: context,
-      ...safeErrorMetadata(error),
-      timestamp: new Date().toISOString(),
-    }),
-  );
+  writeRedactedLog("error", context, {
+    scope: "api",
+    ...safeErrorMetadata(error),
+  });
 }
 
 export function safeServerError(message: string) {

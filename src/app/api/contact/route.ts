@@ -10,6 +10,7 @@ import {
   safeServerError,
 } from "@/lib/http/api-security";
 import { contactSubmissionRateLimit } from "@/lib/rate-limit";
+import { enforceDuplicateCooldown } from "@/lib/security/abuse";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -119,6 +120,14 @@ export async function POST(request: NextRequest) {
   if (parsed.data.website) {
     return NextResponse.json({ ok: true });
   }
+
+  const duplicate = await enforceDuplicateCooldown({
+    scope: "contact",
+    actorKey: requestIp(request),
+    content: `${parsed.data.email}\n${parsed.data.subject}\n${parsed.data.message}`,
+    ttlSeconds: 10 * 60,
+  });
+  if (duplicate) return duplicate;
 
   try {
     const supabase = createSupabaseAdminClient();

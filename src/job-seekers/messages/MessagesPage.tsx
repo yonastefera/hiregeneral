@@ -248,28 +248,13 @@ export default function MessagesPage() {
     scrollToBottom();
 
     try {
-      const sentAt = new Date().toISOString();
-
-      const { error: messageError } = await supabase.from("messages").insert({
-        conversation_id: conversationId,
-        sender_id: userId,
-        body,
+      const response = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId, body }),
       });
 
-      if (messageError) {
-        throw messageError;
-      }
-
-      const { error: conversationError } = await supabase
-        .from("conversations")
-        .update({
-          last_message_at: sentAt,
-        })
-        .eq("id", conversationId);
-
-      if (conversationError) {
-        throw conversationError;
-      }
+      if (!response.ok) throw new Error("Message request failed");
 
       const { data, error: refreshError } = await supabase
         .from("messages")

@@ -1,18 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 
 import { redis } from "@/lib/rate-limit";
 import { logServerError, safeServerError } from "@/lib/http/api-security";
+import { createSupabasePublicClient } from "@/lib/supabase/public";
 import { htmlToText, cleanTextArray } from "@/lib/text/html";
 import { JOB_ENRICHMENT_SELECT, mapJobEnrichment } from "@/lib/jobs/enrichment";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
+const supabasePublic = createSupabasePublicClient();
 
 const JOB_DETAIL_CACHE_TTL_SECONDS = 60 * 10; // 10 minutes
 const JOB_DETAIL_CACHE_VERSION = process.env.JOB_DETAIL_CACHE_VERSION ?? "2";
@@ -120,7 +117,7 @@ function getJobDetailCacheKey(slug: string) {
 }
 
 function getPublishedJobDetailQuery(now = new Date().toISOString()) {
-  return supabaseAdmin
+  return supabasePublic
     .from("jobs")
     .select(JOB_DETAIL_SELECT)
     .eq("status", "published")
@@ -177,7 +174,7 @@ function jsonResponse(payload: JobDetailPayload, status = 200) {
 }
 
 async function loadJobEnrichment(jobId: string) {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabasePublic
     .from("job_enrichments")
     .select(JOB_ENRICHMENT_SELECT)
     .eq("job_id", jobId)
@@ -235,7 +232,7 @@ export async function GET(
           return jsonResponse(cached);
         }
       } catch (error) {
-        console.error("[GET /api/jobs/[slug]] Redis read failed:", error);
+        logServerError("job_detail_cache_read_failed", error);
       }
     }
 
@@ -279,7 +276,7 @@ export async function GET(
           ex: JOB_DETAIL_CACHE_TTL_SECONDS,
         });
       } catch (error) {
-        console.error("[GET /api/jobs/[slug]] Redis write failed:", error);
+        logServerError("job_detail_cache_write_failed", error);
       }
     }
 

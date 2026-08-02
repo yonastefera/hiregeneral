@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
@@ -8,6 +9,16 @@ function source(relativePath: string) {
     fileURLToPath(new URL(`../../${relativePath}`, import.meta.url)),
     "utf8",
   );
+}
+
+const apiRoot = fileURLToPath(new URL("../../app/api", import.meta.url));
+
+function routeFiles(directory = apiRoot): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) return routeFiles(path);
+    return entry.name === "route.ts" ? [path] : [];
+  });
 }
 
 const boundedJsonRoutes = [
@@ -21,6 +32,7 @@ const boundedJsonRoutes = [
   "app/api/employers/billing/create-checkout-session/route.ts",
   "app/api/notification-settings/route.ts",
   "app/api/saved/route.ts",
+  "app/api/messages/route.ts",
 ];
 
 const rateLimitedRoutes = [
@@ -36,6 +48,8 @@ const rateLimitedRoutes = [
   "app/api/ingest/jobs/route.ts",
   "app/api/notification-settings/route.ts",
   "app/api/saved/route.ts",
+  "app/api/messages/route.ts",
+  "app/api/account/deletion/route.ts",
 ];
 
 describe("high-risk mutation security wiring", () => {
@@ -53,5 +67,41 @@ describe("high-risk mutation security wiring", () => {
     expect(route).toContain("boundedTextBody(");
     expect(route).toContain('error: "Could not process Stripe webhook."');
     expect(route).not.toContain("error instanceof Error");
+  });
+
+  it.each([
+    "app/api/contact/route.ts",
+    "app/api/auth/signup/route.ts",
+    "app/api/auth/password-reset/route.ts",
+    "app/api/employers/invite/route.ts",
+    "app/api/employers/messages/route.ts",
+    "app/api/messages/route.ts",
+  ])("rejects duplicate abuse for %s", (route) => {
+    expect(source(route)).toContain("enforceDuplicateCooldown({");
+  });
+
+  it.each(boundedJsonRoutes)(
+    "does not bypass bounded parsing in %s",
+    (route) => {
+      expect(source(route)).not.toMatch(/(?:request|req)\.json\(/);
+    },
+  );
+
+  it("routes all API logging through redaction helpers", () => {
+    for (const route of routeFiles()) {
+      expect(readFileSync(route, "utf8"), route).not.toMatch(
+        /console\.(?:error|warn|info|log)\(/,
+      );
+    }
+  });
+
+  it.each([
+    "app/api/jobs/route.ts",
+    "app/api/jobs/[slug]/route.ts",
+    "app/api/salaries/route.ts",
+  ])("uses anonymous rather than service-role access for %s", (route) => {
+    const routeSource = source(route);
+    expect(routeSource).toContain("createSupabasePublicClient");
+    expect(routeSource).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
   });
 });

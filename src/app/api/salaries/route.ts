@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 
 import { redis } from "@/lib/rate-limit";
+import { createSupabasePublicClient } from "@/lib/supabase/public";
+import { logServerError } from "@/lib/http/api-security";
 import {
   US_STATE_NAMES_BY_ABBR,
   normalizeUsStateRegion,
@@ -10,10 +11,7 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
+const supabasePublic = createSupabasePublicClient();
 
 const SAMPLE_LIMIT = 500;
 const HOURS_PER_YEAR = 2080;
@@ -523,7 +521,7 @@ function areaTypeRank(areaType: string) {
 }
 
 async function latestBenchmarkReleaseYear() {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabasePublic
     .from("salary_benchmarks")
     .select("release_year")
     .not("annual_median", "is", null)
@@ -549,7 +547,7 @@ async function findBlsSalary(career: string, location: string) {
   const codes = occupationCodesForCareer(career);
   const tokens = searchTokens(career);
 
-  let query = supabaseAdmin
+  let query = supabasePublic
     .from("salary_benchmarks")
     .select(BLS_SALARY_SELECT)
     .eq("release_year", latestYear)
@@ -661,7 +659,7 @@ async function loadJobSalarySamples(career: string, location: string) {
     ...tokens.map((token) => `search_text.ilike.%${escapeIlikeValue(token)}%`),
   ].join(",");
 
-  let query = supabaseAdmin
+  let query = supabasePublic
     .from("jobs")
     .select(
       "id, company_name, title, location, salary_min, salary_max, salary_currency, posted_at, slug",
@@ -749,7 +747,7 @@ export async function GET(req: NextRequest) {
         return jsonResponse(cached);
       }
     } catch (error) {
-      console.error("[salary] Redis read failed. Continuing.", error);
+      logServerError("salary_cache_read_failed", error);
     }
 
     const [blsSalary, samples] = await Promise.all([
@@ -791,7 +789,7 @@ export async function GET(req: NextRequest) {
           ex: SALARY_CACHE_TTL_SECONDS,
         });
       } catch (error) {
-        console.error("[salary] Redis write failed. Continuing.", error);
+        logServerError("salary_cache_write_failed", error);
       }
 
       return jsonResponse(payload);
@@ -830,7 +828,7 @@ export async function GET(req: NextRequest) {
         ex: SALARY_CACHE_TTL_SECONDS,
       });
     } catch (error) {
-      console.error("[salary] Redis write failed. Continuing.", error);
+      logServerError("salary_cache_write_failed", error);
     }
 
     return jsonResponse(payload);

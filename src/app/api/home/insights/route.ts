@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { loadHomeInsights } from "@/home/home-insights";
+import { logServerError } from "@/lib/http/api-security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error("[api/home/salary-insights]", error);
+    logServerError("home_insights_load_failed", error);
 
     return NextResponse.json({
       salaryBands: [],

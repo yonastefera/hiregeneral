@@ -15,6 +15,10 @@ vi.mock("@/lib/rate-limit", () => ({
   signupRateLimit: { limit: mocks.limit },
   passwordResetRateLimit: { limit: mocks.limit },
 }));
+
+vi.mock("@/lib/security/abuse", () => ({
+  enforceDuplicateCooldown: vi.fn().mockResolvedValue(null),
+}));
 vi.mock("@/lib/supabase/admin", () => ({
   createSupabaseAdminClient: () => ({
     auth: { admin: { generateLink: mocks.generateLink } },
