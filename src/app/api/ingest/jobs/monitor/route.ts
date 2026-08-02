@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { logServerError, safeServerError } from "@/lib/http/api-security";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -466,12 +468,7 @@ export async function GET(request: Request) {
         })),
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: error instanceof Error ? error.message : "Unknown monitor error",
-      },
-      { status: 500 },
-    );
+    logServerError("ingestion_monitor_failed", error);
+    return safeServerError("Could not load ingestion status.");
   }
 }

@@ -2,11 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import {
-  BILLING_PLANS,
   getEmployerBillingSummary,
   type BillingPlanKey,
 } from "@/employer/dashboard/subscription/employer-billing-data";
 import { requireEmployerUser } from "@/lib/auth/require-employer-user";
+import { trustedOrigin } from "@/lib/auth/security";
+import {
+  boundedJsonBody,
+  enforceRateLimit,
+  logServerError,
+  safeServerError,
+} from "@/lib/http/api-security";
+import { employerBillingRateLimit } from "@/lib/rate-limit";
 import { createStripeCheckoutSession } from "@/lib/stripe/server";
 
 export const runtime = "nodejs";
@@ -28,9 +35,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const parsed = checkoutSchema.safeParse(
-    await request.json().catch(() => null),
-  );
+  const limited = await enforceRateLimit({
+    limiter: employerBillingRateLimit,
+    key: auth.user.id,
+    context: "billing_checkout_create",
+  });
+  if (limited) return limited;
+
+  const body = await boundedJsonBody(request);
+  if (!body.ok) return body.response;
+  const parsed = checkoutSchema.safeParse(body.data);
 
   if (!parsed.success) {
     return NextResponse.json(
@@ -42,12 +56,8 @@ export async function POST(request: NextRequest) {
   const priceId = getPlanPriceId(parsed.data.plan);
 
   if (!priceId) {
-    return NextResponse.json(
-      {
-        error: `Missing Stripe price id for the ${BILLING_PLANS[parsed.data.plan].name} plan.`,
-      },
-      { status: 500 },
-    );
+    logServerError("billing_checkout_price_missing", null);
+    return safeServerError("Could not create checkout session.");
   }
 
   try {
@@ -58,19 +68,11 @@ export async function POST(request: NextRequest) {
     });
 
     if (!summary.plan.stripeCustomerId) {
-      return NextResponse.json(
-        {
-          error:
-            summary.stripeWarning ||
-            "Could not prepare a Stripe customer for this company.",
-        },
-        { status: 500 },
-      );
+      logServerError("billing_checkout_customer_missing", null);
+      return safeServerError("Could not create checkout session.");
     }
 
-    const origin =
-      process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-      request.nextUrl.origin;
+    const origin = trustedOrigin(request.nextUrl.origin);
     const session = await createStripeCheckoutSession({
       customerId: summary.plan.stripeCustomerId,
       priceId,
@@ -89,14 +91,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ url: session.url });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Could not create checkout session.",
-      },
-      { status: 500 },
-    );
+    logServerError("billing_checkout_create_failed", error);
+    return safeServerError("Could not create checkout session.");
   }
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getHiringCompaniesThisWeek } from "@/employer/landing/hiring-this-week";
+import { logServerError, safeServerError } from "@/lib/http/api-security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,14 +12,7 @@ export async function GET() {
 
     return NextResponse.json({ companies });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Could not load hiring companies.",
-      },
-      { status: 500 },
-    );
+    logServerError("hiring_companies_load_failed", error);
+    return safeServerError("Could not load hiring companies.");
   }
 }

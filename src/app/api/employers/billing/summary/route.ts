@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getEmployerBillingSummary } from "@/employer/dashboard/subscription/employer-billing-data";
 import { requireEmployerUser } from "@/lib/auth/require-employer-user";
+import { logServerError, safeServerError } from "@/lib/http/api-security";
 
 export const runtime = "nodejs";
 
@@ -21,14 +22,7 @@ export async function GET() {
 
     return NextResponse.json({ summary });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Could not load billing summary.",
-      },
-      { status: 500 },
-    );
+    logServerError("billing_summary_load_failed", error);
+    return safeServerError("Could not load billing summary.");
   }
 }

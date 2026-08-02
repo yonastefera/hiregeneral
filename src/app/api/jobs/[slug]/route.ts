@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 import { redis } from "@/lib/rate-limit";
+import { logServerError, safeServerError } from "@/lib/http/api-security";
 import { htmlToText, cleanTextArray } from "@/lib/text/html";
 import { JOB_ENRICHMENT_SELECT, mapJobEnrichment } from "@/lib/jobs/enrichment";
 
@@ -241,9 +242,8 @@ export async function GET(
     let { data, error } = await findJobBySlugOrId(normalizedSlug);
 
     if (error) {
-      console.error("[GET /api/jobs/[slug]] Supabase error:", error);
-
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      logServerError("job_detail_query_failed", error);
+      return safeServerError("Could not load the job.");
     }
 
     if (!data) {
@@ -253,9 +253,8 @@ export async function GET(
       error = legacyResult.error;
 
       if (error) {
-        console.error("[GET /api/jobs/[slug]] Legacy lookup error:", error);
-
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        logServerError("job_detail_legacy_query_failed", error);
+        return safeServerError("Could not load the job.");
       }
     }
 
@@ -286,13 +285,7 @@ export async function GET(
 
     return jsonResponse(payload);
   } catch (error) {
-    console.error("[GET /api/jobs/[slug]] Fatal error:", error);
-
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Unknown server error",
-      },
-      { status: 500 },
-    );
+    logServerError("job_detail_load_failed", error);
+    return safeServerError("Could not load the job.");
   }
 }

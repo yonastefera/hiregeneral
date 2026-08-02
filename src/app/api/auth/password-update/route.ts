@@ -6,8 +6,12 @@ import {
   verifyRecoveryAuthorization,
 } from "@/lib/auth/recovery-authorization";
 import { passwordUpdateSchema } from "@/lib/auth/validation";
-import { logAuthEvent } from "@/lib/auth/log";
-import { readJsonBody } from "@/lib/http/json-body";
+import {
+  boundedJsonBody,
+  enforceRateLimit,
+  logServerError,
+} from "@/lib/http/api-security";
+import { passwordUpdateRateLimit } from "@/lib/rate-limit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -15,7 +19,9 @@ const INVALID_RECOVERY_MESSAGE =
   "This recovery link is invalid or expired. Request a new one.";
 
 export async function POST(request: NextRequest) {
-  const parsed = passwordUpdateSchema.safeParse(await readJsonBody(request));
+  const body = await boundedJsonBody(request);
+  if (!body.ok) return body.response;
+  const parsed = passwordUpdateSchema.safeParse(body.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Please check your new password." },
@@ -42,12 +48,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const limited = await enforceRateLimit({
+    limiter: passwordUpdateRateLimit,
+    key: user.id,
+    context: "password_update",
+  });
+  if (limited) return limited;
+
   const { error } = await createSupabaseAdminClient().auth.admin.updateUserById(
     user.id,
     { password: parsed.data.password },
   );
   if (error) {
-    logAuthEvent("error", "password_update_failed", { error: error.message });
+    logServerError("password_update_failed", error);
     return NextResponse.json(
       { error: "Could not update password. Request a new link and try again." },
       { status: 503 },
@@ -58,9 +71,7 @@ export async function POST(request: NextRequest) {
     scope: "global",
   });
   if (signOutError)
-    logAuthEvent("error", "password_update_session_revocation_failed", {
-      error: signOutError.message,
-    });
+    logServerError("password_update_session_revocation_failed", signOutError);
 
   const response = NextResponse.json({ ok: true });
   response.cookies.set(RECOVERY_COOKIE, "", {

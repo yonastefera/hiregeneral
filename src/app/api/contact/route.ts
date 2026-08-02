@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import {
+  boundedJsonBody,
+  enforceRateLimit,
+  JSON_BODY_LIMITS,
+  logServerError,
+  requestIp,
+  safeServerError,
+} from "@/lib/http/api-security";
+import { contactSubmissionRateLimit } from "@/lib/rate-limit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -28,11 +37,6 @@ const contactSchema = z.object({
   sourcePath: z.string().trim().max(240).optional().default("/contact"),
   website: z.string().trim().max(240).optional().default(""),
 });
-
-function getErrorMessage(error: unknown) {
-  if (error instanceof Error) return error.message;
-  return "Could not send your message.";
-}
 
 function escapeHtml(value: string) {
   return value
@@ -88,13 +92,22 @@ function sendContactNotification(params: {
       `,
     }),
   }).catch((error) => {
-    console.error("[contact notification]", error);
+    logServerError("contact_notification_failed", error);
   });
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json().catch(() => null);
-  const parsed = contactSchema.safeParse(body);
+  const limited = await enforceRateLimit({
+    limiter: contactSubmissionRateLimit,
+    key: requestIp(request),
+    context: "contact_submission",
+  });
+  if (limited) return limited;
+
+  const body = await boundedJsonBody(request, JSON_BODY_LIMITS.small);
+  if (!body.ok) return body.response;
+
+  const parsed = contactSchema.safeParse(body.data);
 
   if (!parsed.success) {
     return NextResponse.json(
@@ -126,7 +139,8 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      logServerError("contact_insert_failed", error);
+      return safeServerError("Could not send your message.");
     }
 
     if (data) {
@@ -145,9 +159,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true, id: data?.id }, { status: 201 });
   } catch (error) {
-    return NextResponse.json(
-      { error: getErrorMessage(error) },
-      { status: 500 },
-    );
+    logServerError("contact_submission_failed", error);
+    return safeServerError("Could not send your message.");
   }
 }

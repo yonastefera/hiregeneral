@@ -6,6 +6,11 @@ import {
 } from "@/employer/dashboard/subscription/employer-billing-data";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
+  boundedTextBody,
+  JSON_BODY_LIMITS,
+  logServerError,
+} from "@/lib/http/api-security";
+import {
   verifyStripeWebhookEvent,
   type StripeEvent,
 } from "@/lib/stripe/server";
@@ -224,7 +229,9 @@ export async function POST(request: NextRequest) {
   let event: StripeEvent;
 
   try {
-    const payload = await request.text();
+    const body = await boundedTextBody(request, JSON_BODY_LIMITS.webhook);
+    if (!body.ok) return body.response;
+    const payload = body.data;
     event = verifyStripeWebhookEvent({
       payload,
       signatureHeader: request.headers.get("stripe-signature"),
@@ -240,13 +247,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true });
   } catch (error) {
+    logServerError("stripe_webhook_rejected", error);
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Could not process Stripe webhook.",
-      },
+      { error: "Could not process Stripe webhook." },
       { status: 400 },
     );
   }

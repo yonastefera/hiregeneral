@@ -3,6 +3,13 @@ import { z } from "zod";
 
 import { getEmployerCompanyProfile } from "@/employer/dashboard/company/employer-company-data";
 import { requireEmployerUser } from "@/lib/auth/require-employer-user";
+import {
+  boundedJsonBody,
+  enforceRateLimit,
+  logServerError,
+  safeServerError,
+} from "@/lib/http/api-security";
+import { employerCompanyRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -49,8 +56,16 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const rawBody = await request.json().catch(() => null);
-  const parsed = companySchema.safeParse(rawBody);
+  const limited = await enforceRateLimit({
+    limiter: employerCompanyRateLimit,
+    key: auth.user.id,
+    context: "employer_company_update",
+  });
+  if (limited) return limited;
+
+  const body = await boundedJsonBody(request);
+  if (!body.ok) return body.response;
+  const parsed = companySchema.safeParse(body.data);
 
   if (!parsed.success) {
     return NextResponse.json(
@@ -85,10 +100,11 @@ export async function PUT(request: NextRequest) {
   const existingCompanyResult = await existingCompanyQuery;
 
   if (existingCompanyResult.error) {
-    return NextResponse.json(
-      { error: existingCompanyResult.error.message },
-      { status: 500 },
+    logServerError(
+      "employer_company_lookup_failed",
+      existingCompanyResult.error,
     );
+    return safeServerError("Could not save the company profile.");
   }
 
   const companyId = payload.id ?? existingCompanyResult.data?.id ?? null;
@@ -103,7 +119,8 @@ export async function PUT(request: NextRequest) {
   const { data: savedCompany, error } = await mutation.select("id").single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    logServerError("employer_company_save_failed", error);
+    return safeServerError("Could not save the company profile.");
   }
 
   if (savedCompany?.id) {
@@ -116,7 +133,7 @@ export async function PUT(request: NextRequest) {
       .eq("company_id", savedCompany.id);
 
     if (jobLogoError) {
-      console.error("[employerCompany:syncJobLogos]", jobLogoError);
+      logServerError("employer_company_logo_sync_failed", jobLogoError);
     }
   }
 

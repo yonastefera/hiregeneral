@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { locationSearchRateLimit, redis } from "@/lib/rate-limit";
+import { logServerError, safeServerError } from "@/lib/http/api-security";
 
 type LocationRow = {
   id: number | string;
@@ -157,21 +158,8 @@ export async function GET(request: Request) {
   });
 
   if (error) {
-    console.error("[locations] Supabase RPC failed:", {
-      query,
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-      code: error.code,
-    });
-
-    return NextResponse.json(
-      {
-        error: "Could not fetch location suggestions.",
-        details: error.message,
-      },
-      { status: 500 },
-    );
+    logServerError("location_search_query_failed", error);
+    return safeServerError("Could not fetch location suggestions.");
   }
 
   const locations = dedupeLocations(

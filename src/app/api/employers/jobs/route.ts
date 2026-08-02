@@ -2,7 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireEmployerUser } from "@/lib/auth/require-employer-user";
+import {
+  boundedJsonBody,
+  enforceRateLimit,
+  JSON_BODY_LIMITS,
+  logServerError,
+  safeServerError,
+} from "@/lib/http/api-security";
 import { slugify } from "@/lib/ingest/normalize";
+import { employerJobRateLimit } from "@/lib/rate-limit";
 import { getEmployerJobsPage } from "@/employer/dashboard/jobs/employer-jobs-data";
 
 export const runtime = "nodejs";
@@ -98,7 +106,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const rawBody = await request.json().catch(() => null);
+  const limited = await enforceRateLimit({
+    limiter: employerJobRateLimit,
+    key: auth.user.id,
+    context: "employer_job_create",
+  });
+  if (limited) return limited;
+
+  const body = await boundedJsonBody(request, JSON_BODY_LIMITS.job);
+  if (!body.ok) return body.response;
+  const rawBody = body.data as Record<string, unknown>;
 
   const parsed = postJobSchema.safeParse({
     ...rawBody,
@@ -139,10 +156,8 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
 
   if (companyLookupError) {
-    return NextResponse.json(
-      { error: companyLookupError.message },
-      { status: 500 },
-    );
+    logServerError("employer_job_company_lookup_failed", companyLookupError);
+    return safeServerError("Could not create the job.");
   }
 
   let company = existingCompany;
@@ -159,10 +174,8 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (createCompanyError) {
-      return NextResponse.json(
-        { error: createCompanyError.message },
-        { status: 500 },
-      );
+      logServerError("employer_job_company_create_failed", createCompanyError);
+      return safeServerError("Could not create the job.");
     }
 
     company = createdCompany;
@@ -216,7 +229,8 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (jobError) {
-    return NextResponse.json({ error: jobError.message }, { status: 500 });
+    logServerError("employer_job_create_failed", jobError);
+    return safeServerError("Could not create the job.");
   }
 
   return NextResponse.json({ job }, { status: 201 });
@@ -229,7 +243,16 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const rawBody = await request.json().catch(() => null);
+  const limited = await enforceRateLimit({
+    limiter: employerJobRateLimit,
+    key: auth.user.id,
+    context: "employer_job_update",
+  });
+  if (limited) return limited;
+
+  const body = await boundedJsonBody(request, JSON_BODY_LIMITS.job);
+  if (!body.ok) return body.response;
+  const rawBody = body.data as Record<string, unknown>;
   const parsed = postJobSchema.safeParse({
     ...rawBody,
     salaryMin: cleanNullableNumber(rawBody?.salaryMin),
@@ -300,7 +323,8 @@ export async function PUT(request: NextRequest) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    logServerError("employer_job_update_failed", error);
+    return safeServerError("Could not update the job.");
   }
 
   return NextResponse.json({ job });

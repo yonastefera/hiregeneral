@@ -3,6 +3,13 @@ import { z } from "zod";
 
 import { getEmployerMessagesData } from "@/employer/dashboard/messages/employer-messages-data";
 import { requireEmployerUser } from "@/lib/auth/require-employer-user";
+import {
+  boundedJsonBody,
+  enforceRateLimit,
+  logServerError,
+  safeServerError,
+} from "@/lib/http/api-security";
+import { employerMessageRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -35,8 +42,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const rawBody = await request.json().catch(() => null);
-  const parsed = sendMessageSchema.safeParse(rawBody);
+  const limited = await enforceRateLimit({
+    limiter: employerMessageRateLimit,
+    key: auth.user.id,
+    context: "employer_message_send",
+  });
+  if (limited) return limited;
+
+  const bodyResult = await boundedJsonBody(request);
+  if (!bodyResult.ok) return bodyResult.response;
+  const parsed = sendMessageSchema.safeParse(bodyResult.data);
 
   if (!parsed.success) {
     return NextResponse.json(
@@ -57,10 +72,11 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
 
   if (conversationError) {
-    return NextResponse.json(
-      { error: conversationError.message },
-      { status: 500 },
+    logServerError(
+      "employer_message_conversation_lookup_failed",
+      conversationError,
     );
+    return safeServerError("Could not send the message.");
   }
 
   if (!conversation) {
@@ -78,7 +94,8 @@ export async function POST(request: NextRequest) {
   });
 
   if (insertError) {
-    return NextResponse.json({ error: insertError.message }, { status: 500 });
+    logServerError("employer_message_insert_failed", insertError);
+    return safeServerError("Could not send the message.");
   }
 
   const { error: updateError } = await auth.supabase
@@ -89,7 +106,7 @@ export async function POST(request: NextRequest) {
     .eq("id", conversationId);
 
   if (updateError) {
-    console.error("[employerMessages:updateConversation]", updateError);
+    logServerError("employer_message_conversation_update_failed", updateError);
   }
 
   const data = await getEmployerMessagesData({

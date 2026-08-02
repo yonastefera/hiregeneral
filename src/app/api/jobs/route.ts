@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 import { redis } from "@/lib/rate-limit";
+import { logServerError, safeServerError } from "@/lib/http/api-security";
 import {
   JOB_ENRICHMENT_SELECT,
   mapJobEnrichments,
@@ -723,13 +724,8 @@ export async function GET(req: NextRequest) {
       console.error("[GET /api/jobs] search_jobs_public failed:", rpcError);
 
       if (!isStatementTimeout(rpcError)) {
-        return NextResponse.json(
-          {
-            error: "Failed to load jobs.",
-            details: rpcError,
-          },
-          { status: 500 },
-        );
+        logServerError("jobs_search_query_failed", rpcError);
+        return safeServerError("Failed to load jobs.");
       }
 
       try {
@@ -757,13 +753,8 @@ export async function GET(req: NextRequest) {
           fallbackError,
         );
 
-        return NextResponse.json(
-          {
-            error: "Failed to load jobs.",
-            details: fallbackError,
-          },
-          { status: 500 },
-        );
+        logServerError("jobs_search_fallback_failed", fallbackError);
+        return safeServerError("Failed to load jobs.");
       }
     }
 
@@ -787,13 +778,7 @@ export async function GET(req: NextRequest) {
 
     return jobsJsonResponse(payload, ttlSeconds);
   } catch (error) {
-    console.error("[GET /api/jobs] Fatal error:", error);
-
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Unknown server error",
-      },
-      { status: 500 },
-    );
+    logServerError("jobs_search_failed", error);
+    return safeServerError("Failed to load jobs.");
   }
 }

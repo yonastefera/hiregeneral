@@ -1,7 +1,18 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+
+import {
+  boundedJsonBody,
+  enforceRateLimit,
+  logServerError,
+  safeServerError,
+} from "@/lib/http/api-security";
+import { savedJobRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
+
+const savedJobSchema = z.object({ job_id: z.string().uuid() });
 
 // GET — returns all saved job ids for the current user
 export async function GET() {
@@ -33,7 +44,8 @@ export async function GET() {
     .order("created_at", { ascending: false });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    logServerError("saved_jobs_load_failed", error);
+    return safeServerError("Could not load saved jobs.");
   }
 
   return NextResponse.json({ data });
@@ -56,11 +68,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ data: [] });
   }
 
-  const { job_id } = await req.json();
+  const limited = await enforceRateLimit({
+    limiter: savedJobRateLimit,
+    key: user.id,
+    context: "saved_job_toggle",
+  });
+  if (limited) return limited;
 
-  if (!job_id) {
-    return NextResponse.json({ error: "job_id is required" }, { status: 400 });
+  const body = await boundedJsonBody(req);
+  if (!body.ok) return body.response;
+  const parsed = savedJobSchema.safeParse(body.data);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "A valid job id is required." },
+      { status: 400 },
+    );
   }
+  const { job_id } = parsed.data;
 
   // Check if already saved
   const { data: existing } = await supabase
@@ -71,19 +95,29 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (existing) {
-    await supabase
+    const { error: deleteError } = await supabase
       .from("saved_jobs")
       .delete()
       .eq("user_id", user.id)
       .eq("job_id", job_id);
 
+    if (deleteError) {
+      logServerError("saved_job_delete_failed", deleteError);
+      return safeServerError("Could not update saved jobs.");
+    }
+
     return NextResponse.json({ saved: false });
   }
 
-  await supabase.from("saved_jobs").insert({
+  const { error: insertError } = await supabase.from("saved_jobs").insert({
     user_id: user.id,
     job_id,
   });
+
+  if (insertError) {
+    logServerError("saved_job_insert_failed", insertError);
+    return safeServerError("Could not update saved jobs.");
+  }
 
   return NextResponse.json({ saved: true });
 }

@@ -3,6 +3,13 @@ import { z } from "zod";
 
 import { getEmployerInviteData } from "@/employer/dashboard/invite/employer-invite-data";
 import { requireEmployerUser } from "@/lib/auth/require-employer-user";
+import {
+  boundedJsonBody,
+  enforceRateLimit,
+  logServerError,
+  safeServerError,
+} from "@/lib/http/api-security";
+import { employerInviteRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -36,8 +43,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const rawBody = await request.json().catch(() => null);
-  const parsed = inviteSchema.safeParse(rawBody);
+  const limited = await enforceRateLimit({
+    limiter: employerInviteRateLimit,
+    key: auth.user.id,
+    context: "employer_invite_send",
+  });
+  if (limited) return limited;
+
+  const body = await boundedJsonBody(request);
+  if (!body.ok) return body.response;
+  const parsed = inviteSchema.safeParse(body.data);
 
   if (!parsed.success) {
     return NextResponse.json(
@@ -60,7 +75,8 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
 
   if (jobError) {
-    return NextResponse.json({ error: jobError.message }, { status: 500 });
+    logServerError("employer_invite_job_lookup_failed", jobError);
+    return safeServerError("Could not send the invitation.");
   }
 
   if (!job) {
@@ -78,7 +94,8 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
 
   if (profileError) {
-    return NextResponse.json({ error: profileError.message }, { status: 500 });
+    logServerError("employer_invite_profile_lookup_failed", profileError);
+    return safeServerError("Could not send the invitation.");
   }
 
   if (!profile) {
@@ -104,7 +121,8 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (inviteError) {
-    return NextResponse.json({ error: inviteError.message }, { status: 500 });
+    logServerError("employer_invite_save_failed", inviteError);
+    return safeServerError("Could not send the invitation.");
   }
 
   return NextResponse.json({ invite }, { status: 201 });

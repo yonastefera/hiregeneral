@@ -1,4 +1,10 @@
 import { NextResponse } from "next/server";
+import {
+  enforceRateLimit,
+  logServerError,
+  requestIp,
+  safeServerError,
+} from "@/lib/http/api-security";
 import { getJobSourceAdapter } from "@/lib/ingest/adapters";
 import { enhanceImportedJobFromDetailPage } from "@/lib/ingest/job-detail-extractor";
 import {
@@ -12,6 +18,7 @@ import {
   upsertImportedJobs,
 } from "@/lib/ingest/upsert-jobs";
 import type { ImportedJob } from "@/lib/ingest/normalize";
+import { ingestionRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -138,24 +145,9 @@ async function runJobsIngestion(request: Request) {
     const authHeaders = expectedAuthHeaders();
     const isCronRequest = isVercelCronRequest(request);
 
-    if (missing.length > 0) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: `Missing environment variables: ${missing.join(", ")}`,
-        },
-        { status: 500 },
-      );
-    }
-
     if (authHeaders.length === 0 && !isCronRequest) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "Missing environment variable: INGEST_SECRET or CRON_SECRET",
-        },
-        { status: 500 },
-      );
+      logServerError("ingestion_auth_not_configured", null);
+      return safeServerError("Job ingestion is unavailable.");
     }
 
     const authHeader = request.headers.get("authorization");
@@ -170,6 +162,18 @@ async function runJobsIngestion(request: Request) {
         },
         { status: 401 },
       );
+    }
+
+    const limited = await enforceRateLimit({
+      limiter: ingestionRateLimit,
+      key: requestIp(request),
+      context: "job_ingestion",
+    });
+    if (limited) return limited;
+
+    if (missing.length > 0) {
+      logServerError("ingestion_environment_incomplete", null);
+      return safeServerError("Job ingestion is unavailable.");
     }
 
     const url = new URL(request.url);
@@ -337,13 +341,8 @@ async function runJobsIngestion(request: Request) {
       sources: sourcesResult,
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: error instanceof Error ? error.message : "Unknown route error",
-      },
-      { status: 500 },
-    );
+    logServerError("job_ingestion_failed", error);
+    return safeServerError("Job ingestion failed.");
   }
 }
 

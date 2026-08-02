@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { redis } from "@/lib/rate-limit";
+import { logServerError, safeServerError } from "@/lib/http/api-security";
 import { createClient } from "@/lib/supabase/server";
 
 type KeywordSuggestionRow = {
@@ -80,21 +81,8 @@ export async function GET(request: Request) {
   });
 
   if (error) {
-    console.error("[keyword-suggestions] Supabase RPC failed:", {
-      query,
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-      code: error.code,
-    });
-
-    return NextResponse.json(
-      {
-        error: "Could not fetch keyword suggestions.",
-        details: error.message,
-      },
-      { status: 500 },
-    );
+    logServerError("keyword_suggestions_query_failed", error);
+    return safeServerError("Could not fetch keyword suggestions.");
   }
 
   const payload: KeywordSuggestionsPayload = {

@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
 
+import {
+  enforceRateLimit,
+  logServerError,
+  requestIp,
+  safeServerError,
+} from "@/lib/http/api-security";
+import { adminSeedRateLimit } from "@/lib/rate-limit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type CollegeScorecardSchool = {
@@ -41,15 +48,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
+  const limited = await enforceRateLimit({
+    limiter: adminSeedRateLimit,
+    key: requestIp(request),
+    context: "admin_school_seed",
+  });
+  if (limited) return limited;
+
   let apiKey: string;
 
   try {
     apiKey = getRequiredEnv("COLLEGE_SCORECARD_API_KEY");
   } catch {
-    return NextResponse.json(
-      { error: "Missing COLLEGE_SCORECARD_API_KEY." },
-      { status: 500 },
-    );
+    logServerError("admin_school_seed_not_configured", null);
+    return safeServerError("School import is unavailable.");
   }
 
   const supabase = createSupabaseAdminClient();
@@ -122,15 +134,8 @@ export async function POST(request: Request) {
     });
 
     if (error) {
-      return NextResponse.json(
-        {
-          error: "Could not upsert schools.",
-          details: error.message,
-          page,
-          totalUpserted,
-        },
-        { status: 500 },
-      );
+      logServerError("admin_school_seed_save_failed", error);
+      return safeServerError("Could not save schools.");
     }
 
     totalUpserted += rows.length;

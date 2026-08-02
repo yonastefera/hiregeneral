@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
+import {
+  boundedJsonBody,
+  enforceRateLimit,
+  logServerError,
+} from "@/lib/http/api-security";
+import { notificationSettingsRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
 type NotificationPreferenceKey =
@@ -16,6 +23,15 @@ const defaultPreferences: NotificationPreferences = {
   savedJobReminders: true,
   marketingEmails: false,
 };
+
+const preferencesSchema = z.object({
+  preferences: z.object({
+    jobAlerts: z.boolean(),
+    applicationUpdates: z.boolean(),
+    savedJobReminders: z.boolean(),
+    marketingEmails: z.boolean(),
+  }),
+});
 
 function normalizePreferences(value: unknown): NotificationPreferences {
   if (!value || typeof value !== "object") {
@@ -88,8 +104,23 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json().catch(() => null);
-  const preferences = normalizePreferences(body?.preferences);
+  const limited = await enforceRateLimit({
+    limiter: notificationSettingsRateLimit,
+    key: user.id,
+    context: "notification_settings_update",
+  });
+  if (limited) return limited;
+
+  const body = await boundedJsonBody(request);
+  if (!body.ok) return body.response;
+  const parsed = preferencesSchema.safeParse(body.data);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Please check your notification settings." },
+      { status: 400 },
+    );
+  }
+  const preferences = parsed.data.preferences;
 
   const { error } = await supabase
     .from("profiles")
@@ -99,6 +130,7 @@ export async function PATCH(request: Request) {
     .eq("user_id", user.id);
 
   if (error) {
+    logServerError("notification_settings_update_failed", error);
     return NextResponse.json(
       { error: "Could not save notification settings." },
       { status: 500 },

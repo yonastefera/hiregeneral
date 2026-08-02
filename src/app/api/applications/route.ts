@@ -7,6 +7,11 @@ import {
   getOwnedResumeFileName,
   isJobAcceptingApplications,
 } from "@/lib/applications/submission";
+import {
+  boundedJsonBody,
+  JSON_BODY_LIMITS,
+  logServerError,
+} from "@/lib/http/api-security";
 import { applicationSubmissionRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
@@ -43,11 +48,12 @@ export async function POST(req: NextRequest) {
       );
     }
   } catch (error) {
-    console.error("[POST /api/applications] Rate limit unavailable", error);
+    logServerError("application_rate_limit_unavailable", error);
   }
 
-  const body = await req.json().catch(() => null);
-  const parsed = applicationSubmissionSchema.safeParse(body);
+  const body = await boundedJsonBody(req, JSON_BODY_LIMITS.medium);
+  if (!body.ok) return body.response;
+  const parsed = applicationSubmissionSchema.safeParse(body.data);
 
   if (!parsed.success) {
     return NextResponse.json(
@@ -74,7 +80,7 @@ export async function POST(req: NextRequest) {
     .list(user.id, { limit: 10, search: resumeFileName });
 
   if (resumeError) {
-    console.error("[POST /api/applications] Resume verification", resumeError);
+    logServerError("application_resume_verification_failed", resumeError);
     return NextResponse.json({ error: INTERNAL_ERROR }, { status: 500 });
   }
 
@@ -92,7 +98,7 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   if (jobError) {
-    console.error("[POST /api/applications] Job verification", jobError);
+    logServerError("application_job_verification_failed", jobError);
     return NextResponse.json({ error: INTERNAL_ERROR }, { status: 500 });
   }
 
@@ -132,7 +138,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.error("[POST /api/applications]", error);
+    logServerError("application_insert_failed", error);
 
     return NextResponse.json({ error: INTERNAL_ERROR }, { status: 500 });
   }
@@ -144,7 +150,7 @@ export async function POST(req: NextRequest) {
       jobTitle: job.title,
       companyName: job.company_name,
     }).catch((emailError) => {
-      console.error("[POST /api/applications] Confirmation email", emailError);
+      logServerError("application_confirmation_email_failed", emailError);
     });
   }
 
@@ -181,7 +187,7 @@ export async function GET() {
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("[GET /api/applications]", error);
+    logServerError("applications_load_failed", error);
 
     return NextResponse.json({ error: INTERNAL_ERROR }, { status: 500 });
   }
