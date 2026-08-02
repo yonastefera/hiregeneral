@@ -818,6 +818,7 @@ export type Database = {
           p_email: string | null;
           p_full_name: string;
           p_role: Database["public"]["Enums"]["app_role"];
+          p_source: string;
           p_user_id: string;
         };
         Returns: Database["public"]["Enums"]["app_role"];

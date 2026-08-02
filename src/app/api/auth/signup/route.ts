@@ -3,6 +3,7 @@ import { retryAfterSeconds, trustedOrigin } from "@/lib/auth/security";
 import { authRateLimitKeys } from "@/lib/auth/rate-limit-keys";
 import { routeForRole } from "@/lib/auth/roles";
 import { signupSchema } from "@/lib/auth/validation";
+import { logAuthEvent } from "@/lib/auth/log";
 import { sendConfirmationEmail } from "@/lib/email/send";
 import { readJsonBody } from "@/lib/http/json-body";
 import { signupRateLimit } from "@/lib/rate-limit";
@@ -44,7 +45,9 @@ export async function POST(request: NextRequest) {
       );
     }
   } catch (error) {
-    console.error("[auth-signup-rate-limit]", error);
+    logAuthEvent("error", "signup_rate_limit_failed", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
     return eligibilityResponse();
   }
 
@@ -66,21 +69,25 @@ export async function POST(request: NextRequest) {
   });
 
   if (error) {
-    console.error("[auth-signup]", error.message);
+    logAuthEvent("error", "signup_link_generation_failed", {
+      error: error.message,
+    });
     return eligibilityResponse();
   }
 
   const confirmUrl = data.properties?.action_link;
 
   if (!confirmUrl) {
-    console.error("[auth-signup] Supabase did not return a confirmation link.");
+    logAuthEvent("error", "signup_link_missing");
     return eligibilityResponse();
   }
 
   try {
     await sendConfirmationEmail({ to: email, confirmUrl, fullName });
   } catch (error) {
-    console.error("[auth-signup-email]", error);
+    logAuthEvent("error", "signup_email_delivery_failed", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
   }
 
   return eligibilityResponse();

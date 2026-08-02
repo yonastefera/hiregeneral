@@ -24,6 +24,7 @@ export async function assignInitialRole(params: {
   user: User;
   role: PublicAppRole;
   fullName?: unknown;
+  source: "oauth_callback" | "role_selection";
 }) {
   const { admin, user, role } = params;
   const fullName =
@@ -37,6 +38,7 @@ export async function assignInitialRole(params: {
     p_role: role,
     p_full_name: fullName,
     p_email: user.email ?? null,
+    p_source: params.source,
   });
 
   if (error || !data)

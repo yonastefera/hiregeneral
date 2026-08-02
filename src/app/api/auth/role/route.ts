@@ -4,6 +4,7 @@ import { assignInitialRole, primaryRole } from "@/lib/auth/role-assignment";
 import { retryAfterSeconds } from "@/lib/auth/security";
 import { routeForRole, type AppRole } from "@/lib/auth/roles";
 import { roleSelectionSchema } from "@/lib/auth/validation";
+import { logAuthEvent } from "@/lib/auth/log";
 import { readJsonBody } from "@/lib/http/json-body";
 import { roleSelectionRateLimit } from "@/lib/rate-limit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -65,7 +66,9 @@ export async function GET() {
   try {
     return NextResponse.json(await resolveRole(user.id));
   } catch (error) {
-    console.error("[auth-role-read]", error);
+    logAuthEvent("error", "role_read_failed", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
     return NextResponse.json(
       { error: "Could not load account." },
       { status: 503 },
@@ -101,7 +104,9 @@ export async function POST(request: NextRequest) {
       );
     }
   } catch (error) {
-    console.error("[auth-role-rate-limit]", error);
+    logAuthEvent("error", "role_selection_rate_limit_failed", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
     return NextResponse.json(
       { error: "Could not save account role." },
       { status: 503 },
@@ -116,11 +121,15 @@ export async function POST(request: NextRequest) {
       user,
       role: selectedRole,
       fullName,
+      source: "role_selection",
     });
 
     return NextResponse.json({ role, redirectTo: routeForRole(role) });
   } catch (error) {
-    console.error("[auth-role-write]", error);
+    logAuthEvent("error", "role_assignment_failed", {
+      source: "role_selection",
+      error: error instanceof Error ? error.message : "unknown",
+    });
     return NextResponse.json(
       { error: "Could not save account role." },
       { status: 503 },

@@ -6,6 +6,7 @@ import {
   verifyRecoveryAuthorization,
 } from "@/lib/auth/recovery-authorization";
 import { passwordUpdateSchema } from "@/lib/auth/validation";
+import { logAuthEvent } from "@/lib/auth/log";
 import { readJsonBody } from "@/lib/http/json-body";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
     { password: parsed.data.password },
   );
   if (error) {
-    console.error("[password-update]", error.message);
+    logAuthEvent("error", "password_update_failed", { error: error.message });
     return NextResponse.json(
       { error: "Could not update password. Request a new link and try again." },
       { status: 503 },
@@ -57,7 +58,9 @@ export async function POST(request: NextRequest) {
     scope: "global",
   });
   if (signOutError)
-    console.error("[password-update-signout]", signOutError.message);
+    logAuthEvent("error", "password_update_session_revocation_failed", {
+      error: signOutError.message,
+    });
 
   const response = NextResponse.json({ ok: true });
   response.cookies.set(RECOVERY_COOKIE, "", {

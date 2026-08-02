@@ -15,6 +15,7 @@ describe("atomic initial role assignment", () => {
       admin: { rpc } as never,
       user: user as never,
       role: "job_seeker",
+      source: "role_selection",
     });
 
     expect(role).toBe("admin");
@@ -35,6 +36,7 @@ describe("atomic initial role assignment", () => {
         admin: { rpc } as never,
         user: user as never,
         role: "recruiter",
+        source: "oauth_callback",
       }),
     ).rejects.toThrow("Could not assign account role.");
     expect(rpc).toHaveBeenCalledOnce();

@@ -15,6 +15,7 @@ import {
 } from "@/lib/auth/security";
 import { routeForRole } from "@/lib/auth/roles";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { logAuthEvent } from "@/lib/auth/log";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -86,7 +87,12 @@ export async function GET(req: NextRequest) {
         let role = existingRole;
 
         if (metadataRole && !existingRole) {
-          role = await assignInitialRole({ admin, user, role: metadataRole });
+          role = await assignInitialRole({
+            admin,
+            user,
+            role: metadataRole,
+            source: "oauth_callback",
+          });
         }
 
         if (!role) {
@@ -101,7 +107,9 @@ export async function GET(req: NextRequest) {
       }
     }
   } catch (error) {
-    console.error("[auth-callback]", error);
+    logAuthEvent("error", "oauth_callback_failed", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
   }
 
   // Something went wrong — send to sign in with an error flag

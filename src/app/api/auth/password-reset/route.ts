@@ -3,6 +3,7 @@ import { sendPasswordResetEmail } from "@/lib/email/send";
 import { retryAfterSeconds, trustedOrigin } from "@/lib/auth/security";
 import { authRateLimitKeys } from "@/lib/auth/rate-limit-keys";
 import { passwordResetSchema } from "@/lib/auth/validation";
+import { logAuthEvent } from "@/lib/auth/log";
 import { readJsonBody } from "@/lib/http/json-body";
 import { passwordResetRateLimit } from "@/lib/rate-limit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -43,7 +44,9 @@ export async function POST(request: NextRequest) {
       );
     }
   } catch (error) {
-    console.error("[password-reset-rate-limit]", error);
+    logAuthEvent("error", "password_reset_rate_limit_failed", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
     return resetResponse();
   }
 
@@ -60,7 +63,9 @@ export async function POST(request: NextRequest) {
   });
 
   if (error) {
-    console.error("[password-reset-email]", error.message);
+    logAuthEvent("error", "password_reset_link_generation_failed", {
+      error: error.message,
+    });
     return resetResponse();
   }
 
@@ -77,7 +82,9 @@ export async function POST(request: NextRequest) {
             : undefined,
       });
     } catch (error) {
-      console.error("[password-reset-email]", error);
+      logAuthEvent("error", "password_reset_email_delivery_failed", {
+        error: error instanceof Error ? error.message : "unknown",
+      });
     }
   }
 
