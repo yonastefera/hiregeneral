@@ -1,20 +1,7 @@
-"use client";
-
 import { ArrowRight, Search } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect } from "react";
 
 const NotFound = () => {
-  const pathname = usePathname();
-
-  useEffect(() => {
-    console.error(
-      "404 Error: User attempted to access non-existent route:",
-      pathname,
-    );
-  }, [pathname]);
-
   return (
     <main className="flex min-h-[calc(100vh-5rem)] items-center justify-center bg-white px-4 py-20 text-neutral-950">
       <div className="mx-auto max-w-2xl text-center">
