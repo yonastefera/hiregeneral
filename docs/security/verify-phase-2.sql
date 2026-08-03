@@ -5,6 +5,11 @@ WITH required_functions(name) AS (
   VALUES
     ('claim_billing_event'),
     ('finish_billing_event'),
+    ('apply_company_billing_event'),
+    ('current_employer_entitlements'),
+    ('enforce_job_entitlements'),
+    ('enforce_invitation_entitlements'),
+    ('enforce_employer_message_entitlements'),
     ('append_security_audit'),
     ('audit_job_lifecycle'),
     ('audit_employer_invitation'),
@@ -42,7 +47,10 @@ FROM (
     ('audit_company_billing_change'),
     ('audit_billing_receipt'),
     ('audit_job_boost'),
-    ('audit_account_deletion')
+    ('audit_account_deletion'),
+    ('enforce_job_entitlements'),
+    ('enforce_invitation_entitlements'),
+    ('enforce_employer_message_entitlements')
 ) AS required_triggers(name)
 
 UNION ALL

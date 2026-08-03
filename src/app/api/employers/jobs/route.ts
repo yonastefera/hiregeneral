@@ -3,6 +3,10 @@ import { z } from "zod";
 
 import { requireEmployerUser } from "@/lib/auth/require-employer-user";
 import {
+  entitlementDenied,
+  loadEmployerEntitlements,
+} from "@/lib/billing/entitlements";
+import {
   boundedJsonBody,
   enforceRateLimit,
   JSON_BODY_LIMITS,
@@ -16,6 +20,7 @@ import { getEmployerJobsPage } from "@/employer/dashboard/jobs/employer-jobs-dat
 export const runtime = "nodejs";
 
 const jobStatusSchema = z.enum(["draft", "published"]);
+const boostSchema = z.enum(["none", "3", "5", "10", "20"]);
 
 const screeningQuestionSchema = z.object({
   id: z.string().trim().min(1),
@@ -40,7 +45,7 @@ const postJobSchema = z.object({
   salaryMax: z.coerce.number().int().nonnegative().nullable().default(null),
   salaryCurrency: z.string().trim().length(3).default("USD"),
   payFrequency: z.string().trim().min(1).default("Per year"),
-  boostId: z.string().trim().min(1).default("none"),
+  boostId: boostSchema.default("none"),
   notificationEmail: z.string().trim().email().optional().or(z.literal("")),
   screeningQuestions: z.array(screeningQuestionSchema).max(12).default([]),
   status: jobStatusSchema.default("published"),
@@ -181,6 +186,24 @@ export async function POST(request: NextRequest) {
     company = createdCompany;
   }
 
+  try {
+    const entitlements = await loadEmployerEntitlements(supabase);
+    if (
+      payload.status === "published" &&
+      entitlements.activeJobs >= entitlements.activeJobLimit
+    ) {
+      return entitlementDenied("Your active job limit has been reached.");
+    }
+    if (payload.boostId !== "none" && entitlements.boostCredits < 1) {
+      return entitlementDenied(
+        "A boost credit is required for this placement.",
+      );
+    }
+  } catch (error) {
+    logServerError("employer_job_entitlement_load_failed", error);
+    return safeServerError("Could not create the job.");
+  }
+
   const skills = splitCommaList(payload.skills);
   const responsibilities = payload.description
     .split(/\n+/)
@@ -229,6 +252,9 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (jobError) {
+    if (jobError.code === "P0001") {
+      return entitlementDenied("Your job or boost entitlement is unavailable.");
+    }
     logServerError("employer_job_create_failed", jobError);
     return safeServerError("Could not create the job.");
   }
@@ -291,6 +317,43 @@ export async function PUT(request: NextRequest) {
     .filter((item) => item.length > 12)
     .slice(0, 8);
   const { supabase, user } = auth;
+  const { data: existingJob, error: existingJobError } = await supabase
+    .from("jobs")
+    .select("id, status, boost_id")
+    .eq("id", payload.id)
+    .eq("recruiter_id", user.id)
+    .maybeSingle();
+
+  if (existingJobError) {
+    logServerError("employer_job_entitlement_lookup_failed", existingJobError);
+    return safeServerError("Could not update the job.");
+  }
+  if (!existingJob) {
+    return NextResponse.json({ error: "Job was not found." }, { status: 404 });
+  }
+
+  try {
+    const entitlements = await loadEmployerEntitlements(supabase);
+    if (
+      payload.status === "published" &&
+      existingJob.status !== "published" &&
+      entitlements.activeJobs >= entitlements.activeJobLimit
+    ) {
+      return entitlementDenied("Your active job limit has been reached.");
+    }
+    if (
+      payload.boostId !== "none" &&
+      existingJob.boost_id !== payload.boostId &&
+      entitlements.boostCredits < 1
+    ) {
+      return entitlementDenied(
+        "A boost credit is required for this placement.",
+      );
+    }
+  } catch (error) {
+    logServerError("employer_job_entitlement_load_failed", error);
+    return safeServerError("Could not update the job.");
+  }
   const { data: job, error } = await supabase
     .from("jobs")
     .update({
@@ -323,6 +386,9 @@ export async function PUT(request: NextRequest) {
     .single();
 
   if (error) {
+    if (error.code === "P0001") {
+      return entitlementDenied("Your job or boost entitlement is unavailable.");
+    }
     logServerError("employer_job_update_failed", error);
     return safeServerError("Could not update the job.");
   }

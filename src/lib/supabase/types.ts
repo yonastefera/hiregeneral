@@ -861,6 +861,19 @@ export type Database = {
       };
     };
     Functions: {
+      apply_company_billing_event: {
+        Args: {
+          p_active_job_limit: number | null;
+          p_company_id: string | null;
+          p_current_period_end: string | null;
+          p_customer_id: string | null;
+          p_event_created: number;
+          p_plan: string | null;
+          p_status: string | null;
+          p_subscription_id: string | null;
+        };
+        Returns: boolean;
+      };
       append_security_audit: {
         Args: {
           p_action: string;
@@ -891,6 +904,7 @@ export type Database = {
         Args: { p_event_type: string; p_stripe_event_id: string };
         Returns: string;
       };
+      current_employer_entitlements: { Args: never; Returns: Json };
       finish_billing_event: {
         Args: {
           p_claim_token: string;

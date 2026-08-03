@@ -1,6 +1,7 @@
 import { Briefcase, Eye, FileText, Users } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
+import { loadEmployerEntitlements } from "@/lib/billing/entitlements";
 
 import {
   getEmployerJobsPage,
@@ -28,6 +29,7 @@ type EmployerActivityRow = {
 };
 
 export type EmployerDashboardData = {
+  premiumAnalytics: boolean;
   jobs: EmployerJobsPageData["jobs"];
   stats: {
     label: string;
@@ -95,6 +97,7 @@ async function loadRecentActivity(
       activity.applicant_full_name || activity.applicant_email || "A candidate";
 
     return {
+      premiumAnalytics: false,
       name: candidate,
       description: `applied to ${job?.title ?? "a role"}`,
       time: relativeTime(activity.created_at),
@@ -130,6 +133,7 @@ export async function getEmployerDashboardData(): Promise<EmployerDashboardData>
 
   if (!user) {
     return {
+      premiumAnalytics: false,
       jobs: [],
       stats: [
         { label: "Published jobs", value: "0", icon: Briefcase },
@@ -141,20 +145,23 @@ export async function getEmployerDashboardData(): Promise<EmployerDashboardData>
     };
   }
 
-  const [jobsResult, activity, applicationCount] = await Promise.all([
-    getEmployerJobsPage({
-      supabase,
-      recruiterId: user.id,
-      page: 1,
-      pageSize: 4,
-      status: "All",
-    }),
-    loadRecentActivity(supabase, user.id),
-    countApplications(supabase, user.id),
-  ]);
+  const [jobsResult, activity, applicationCount, entitlements] =
+    await Promise.all([
+      getEmployerJobsPage({
+        supabase,
+        recruiterId: user.id,
+        page: 1,
+        pageSize: 4,
+        status: "All",
+      }),
+      loadRecentActivity(supabase, user.id),
+      countApplications(supabase, user.id),
+      loadEmployerEntitlements(supabase),
+    ]);
   const totals = jobsResult.data.totals;
 
   return {
+    premiumAnalytics: entitlements.premiumAnalytics,
     jobs: jobsResult.data.jobs,
     stats: [
       {

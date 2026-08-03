@@ -21,6 +21,7 @@ export type StripeCustomer = {
   id: string;
   email?: string | null;
   name?: string | null;
+  metadata?: Record<string, string>;
 };
 
 export type StripePaymentMethodSummary = {
@@ -34,9 +35,15 @@ export type StripePaymentMethodSummary = {
 export type StripeEvent = {
   id: string;
   type: string;
+  created?: number;
   data: {
     object: Record<string, unknown>;
   };
+};
+
+export type StripeCharge = {
+  id: string;
+  customer: string | null;
 };
 
 function getStripeSecretKey() {
@@ -122,6 +129,13 @@ export async function createStripeCustomer(params: {
   });
 }
 
+export async function retrieveStripeCustomer(customerId: string) {
+  return stripeRequest<StripeCustomer>(
+    `/customers/${encodeURIComponent(customerId)}`,
+    { method: "GET" },
+  );
+}
+
 export async function createStripeCheckoutSession(params: {
   customerId: string;
   priceId: string;
@@ -194,6 +208,15 @@ export async function listStripePaymentMethods(customerId: string) {
       } satisfies StripePaymentMethodSummary;
     })
     .filter((method): method is StripePaymentMethodSummary => Boolean(method));
+}
+
+export async function retrieveStripeCharge(chargeId: string) {
+  return stripeRequest<StripeCharge>(
+    `/charges/${encodeURIComponent(chargeId)}`,
+    {
+      method: "GET",
+    },
+  );
 }
 
 function parseStripeSignature(header: string) {

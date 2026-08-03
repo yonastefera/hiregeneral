@@ -17,6 +17,11 @@ Reviewed: 2026-08-02
 | Account deletion request             | Authenticated profile owner and RLS                           | No request body             | 3/day                                    | Generic errors and account-deletion audit trigger |
 | Ingestion and school import          | Cron/shared or administrative secret                          | Query/header validation     | Operational limits                       | Generic errors and privileged-action audit        |
 
+Employer jobs, public candidate sourcing, invitations, outbound messaging,
+boost credits, and premium analytics also require the server entitlement
+snapshot and remain protected by database triggers or RLS against direct and
+concurrent bypasses.
+
 ## Intentional exceptions
 
 - Signout is not rate limited because preventing a user from terminating their

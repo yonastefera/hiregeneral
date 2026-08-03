@@ -9,6 +9,11 @@ import {
   safeServerError,
 } from "@/lib/http/api-security";
 import { employerBillingRateLimit } from "@/lib/rate-limit";
+import { recordPrivilegedAction } from "@/lib/security/audit";
+import {
+  assertStripeCustomerOwnership,
+  isTrustedStripeRedirect,
+} from "@/lib/stripe/ownership";
 import { createStripePortalSession } from "@/lib/stripe/server";
 
 export const runtime = "nodejs";
@@ -39,10 +44,27 @@ export async function POST(request: NextRequest) {
       return safeServerError("Could not create billing portal session.");
     }
 
+    await assertStripeCustomerOwnership({
+      customerId: summary.plan.stripeCustomerId,
+      companyId: summary.companyId,
+    });
+
     const origin = trustedOrigin(request.nextUrl.origin);
     const portalSession = await createStripePortalSession({
       customerId: summary.plan.stripeCustomerId,
       returnUrl: `${origin}/employers/dashboard/subscription`,
+    });
+
+    if (!isTrustedStripeRedirect(portalSession.url)) {
+      logServerError("billing_portal_redirect_invalid", null);
+      return safeServerError("Could not create billing portal session.");
+    }
+
+    await recordPrivilegedAction({
+      action: "billing.portal_session_created",
+      targetType: "company",
+      targetId: summary.companyId,
+      metadata: { stripe_session_id: portalSession.id },
     });
 
     return NextResponse.json({ url: portalSession.url });

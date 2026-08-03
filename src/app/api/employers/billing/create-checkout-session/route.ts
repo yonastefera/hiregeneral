@@ -14,6 +14,11 @@ import {
   safeServerError,
 } from "@/lib/http/api-security";
 import { employerBillingRateLimit } from "@/lib/rate-limit";
+import { recordPrivilegedAction } from "@/lib/security/audit";
+import {
+  assertStripeCustomerOwnership,
+  isTrustedStripeRedirect,
+} from "@/lib/stripe/ownership";
 import { createStripeCheckoutSession } from "@/lib/stripe/server";
 
 export const runtime = "nodejs";
@@ -72,6 +77,11 @@ export async function POST(request: NextRequest) {
       return safeServerError("Could not create checkout session.");
     }
 
+    await assertStripeCustomerOwnership({
+      customerId: summary.plan.stripeCustomerId,
+      companyId: summary.companyId,
+    });
+
     const origin = trustedOrigin(request.nextUrl.origin);
     const session = await createStripeCheckoutSession({
       customerId: summary.plan.stripeCustomerId,
@@ -82,12 +92,20 @@ export async function POST(request: NextRequest) {
       plan: parsed.data.plan,
     });
 
-    if (!session.url) {
-      return NextResponse.json(
-        { error: "Stripe did not return a checkout URL." },
-        { status: 500 },
-      );
+    if (!isTrustedStripeRedirect(session.url)) {
+      logServerError("billing_checkout_redirect_invalid", null);
+      return safeServerError("Could not create checkout session.");
     }
+
+    await recordPrivilegedAction({
+      action: "billing.checkout_session_created",
+      targetType: "company",
+      targetId: summary.companyId,
+      metadata: {
+        plan: parsed.data.plan,
+        stripe_session_id: session.id,
+      },
+    });
 
     return NextResponse.json({ url: session.url });
   } catch (error) {

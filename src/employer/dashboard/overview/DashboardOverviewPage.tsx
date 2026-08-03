@@ -39,7 +39,7 @@ export function DashboardOverviewPage({ data }: DashboardOverviewPageProps) {
         <DashboardCurrentRoles jobs={data.jobs} />
 
         <div className="space-y-4">
-          <DashboardAiInsight />
+          {data.premiumAnalytics ? <DashboardAiInsight /> : null}
           <DashboardRecentActivity activity={data.recentActivity} />
         </div>
       </div>

@@ -4,6 +4,10 @@ import { z } from "zod";
 import { getEmployerInviteData } from "@/employer/dashboard/invite/employer-invite-data";
 import { requireEmployerUser } from "@/lib/auth/require-employer-user";
 import {
+  entitlementDenied,
+  loadEmployerEntitlements,
+} from "@/lib/billing/entitlements";
+import {
   boundedJsonBody,
   enforceRateLimit,
   logServerError,
@@ -25,6 +29,18 @@ export async function GET(request: NextRequest) {
 
   if (!auth.user) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
+  try {
+    const entitlements = await loadEmployerEntitlements(auth.supabase);
+    if (!entitlements.candidateDatabase) {
+      return entitlementDenied(
+        "An active Growth or Pro plan is required for candidate invitations.",
+      );
+    }
+  } catch (error) {
+    logServerError("employer_invite_entitlement_load_failed", error);
+    return safeServerError("Could not load candidate invitations.");
   }
 
   const { searchParams } = new URL(request.url);
@@ -67,6 +83,23 @@ export async function POST(request: NextRequest) {
 
   const { candidateId, jobId, message } = parsed.data;
   const { supabase, user } = auth;
+
+  try {
+    const entitlements = await loadEmployerEntitlements(supabase);
+    if (!entitlements.candidateDatabase) {
+      return entitlementDenied(
+        "An active Growth or Pro plan is required for candidate invitations.",
+      );
+    }
+    if (entitlements.invitationsUsed >= entitlements.invitationLimit) {
+      return entitlementDenied(
+        "Your monthly invitation limit has been reached.",
+      );
+    }
+  } catch (error) {
+    logServerError("employer_invite_entitlement_load_failed", error);
+    return safeServerError("Could not send the invitation.");
+  }
 
   const duplicate = await enforceDuplicateCooldown({
     scope: "employer_invite",
@@ -130,6 +163,9 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (inviteError) {
+    if (inviteError.code === "P0001") {
+      return entitlementDenied("Your invitation entitlement is unavailable.");
+    }
     logServerError("employer_invite_save_failed", inviteError);
     return safeServerError("Could not send the invitation.");
   }

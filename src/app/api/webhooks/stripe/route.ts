@@ -5,6 +5,7 @@ import {
   normalizeBillingPlan,
 } from "@/employer/dashboard/subscription/employer-billing-data";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { recordPrivilegedAction } from "@/lib/security/audit";
 import {
   boundedTextBody,
   JSON_BODY_LIMITS,
@@ -12,6 +13,7 @@ import {
 } from "@/lib/http/api-security";
 import {
   verifyStripeWebhookEvent,
+  retrieveStripeCharge,
   type StripeEvent,
 } from "@/lib/stripe/server";
 
@@ -73,6 +75,7 @@ async function finishEvent(
 }
 
 async function updateCompanySubscription(params: {
+  eventCreated: number;
   companyId: string | null;
   customerId: string | null;
   subscriptionId: string | null;
@@ -81,48 +84,57 @@ async function updateCompanySubscription(params: {
   currentPeriodEnd: string | null;
 }) {
   const supabase = createSupabaseAdminClient();
-  const planKey = normalizeBillingPlan(params.plan);
-  const plan = BILLING_PLANS[planKey];
-  const values = {
-    stripe_customer_id: params.customerId,
-    stripe_subscription_id: params.subscriptionId,
-    billing_plan: planKey,
-    subscription_status: params.status || "inactive",
-    current_period_end: params.currentPeriodEnd,
-    active_job_limit: plan.activeJobLimit,
-  };
+  const planKey = params.plan ? normalizeBillingPlan(params.plan) : null;
+  const { error } = await supabase.rpc("apply_company_billing_event", {
+    p_company_id: params.companyId,
+    p_customer_id: params.customerId,
+    p_subscription_id: params.subscriptionId,
+    p_plan: planKey,
+    p_status: params.status,
+    p_current_period_end: params.currentPeriodEnd,
+    p_active_job_limit: planKey ? BILLING_PLANS[planKey].activeJobLimit : null,
+    p_event_created: params.eventCreated,
+  });
 
-  const query = supabase.from("companies").update(values);
-  const result = params.companyId
-    ? await query.eq("id", params.companyId)
-    : params.customerId
-      ? await query.eq("stripe_customer_id", params.customerId)
-      : { error: null };
-
-  if (result.error) {
-    throw new Error(result.error.message);
+  if (error) {
+    throw new Error(error.message);
   }
 }
 
-async function handleCheckoutCompleted(object: Record<string, unknown>) {
+async function handleCheckoutCompleted(
+  object: Record<string, unknown>,
+  eventCreated: number,
+) {
   const metadata = getMetadata(object);
+  const companyId = metadata.companyId ?? null;
+  const customerId = getString(object.customer);
+  const subscriptionId = getString(object.subscription);
+
+  if (!companyId || !customerId || !subscriptionId) {
+    throw new Error("Checkout session is missing billing ownership fields.");
+  }
 
   await updateCompanySubscription({
-    companyId: metadata.companyId ?? null,
-    customerId: getString(object.customer),
-    subscriptionId: getString(object.subscription),
+    eventCreated,
+    companyId,
+    customerId,
+    subscriptionId,
     plan: metadata.plan ?? null,
     status: "active",
     currentPeriodEnd: null,
   });
 }
 
-async function handleSubscriptionChange(object: Record<string, unknown>) {
+async function handleSubscriptionChange(
+  object: Record<string, unknown>,
+  eventCreated: number,
+) {
   const metadata = getMetadata(object);
   const status = getString(object.status) || "inactive";
   const currentPeriodEnd = unixToIso(object.current_period_end);
 
   await updateCompanySubscription({
+    eventCreated,
     companyId: metadata.companyId ?? null,
     customerId: getString(object.customer),
     subscriptionId: getString(object.id),
@@ -191,40 +203,98 @@ async function handleInvoicePaid(object: Record<string, unknown>) {
   }
 }
 
-async function handleInvoicePaymentFailed(object: Record<string, unknown>) {
+async function handleInvoicePaymentFailed(
+  object: Record<string, unknown>,
+  eventCreated: number,
+) {
   const customerId = getString(object.customer);
 
   if (!customerId) return;
 
-  const supabase = createSupabaseAdminClient();
-  const { error } = await supabase
-    .from("companies")
-    .update({
-      subscription_status: "past_due",
-      stripe_subscription_id: getString(object.subscription),
-    })
-    .eq("stripe_customer_id", customerId);
+  await updateCompanySubscription({
+    eventCreated,
+    companyId: null,
+    customerId,
+    subscriptionId: getString(object.subscription),
+    plan: null,
+    status: "past_due",
+    currentPeriodEnd: null,
+  });
+}
 
-  if (error) {
-    throw new Error(error.message);
+async function companyIdForCustomer(customerId: string | null) {
+  if (!customerId) return null;
+
+  const { data, error } = await createSupabaseAdminClient()
+    .from("companies")
+    .select("id")
+    .eq("stripe_customer_id", customerId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data?.id ?? null;
+}
+
+async function handleBillingRiskEvent(
+  event: StripeEvent,
+  object: Record<string, unknown>,
+) {
+  let customerId = getString(object.customer);
+
+  if (!customerId) {
+    const chargeId = getString(object.charge);
+    if (chargeId) customerId = (await retrieveStripeCharge(chargeId)).customer;
   }
+
+  const companyId = await companyIdForCustomer(customerId);
+  const objectId = getString(object.id) ?? event.id;
+
+  await recordPrivilegedAction({
+    action: `billing.${event.type}`,
+    targetType: event.type.startsWith("charge.dispute")
+      ? "stripe_dispute"
+      : "stripe_charge",
+    targetId: objectId,
+    metadata: {
+      company_id: companyId,
+      customer_id: customerId,
+      status: getString(object.status),
+      reason: getString(object.reason),
+      amount: getNumber(object.amount),
+      currency: getString(object.currency),
+    },
+  });
 }
 
 async function processStripeEvent(event: StripeEvent) {
+  const eventCreated = getNumber(event.created);
+
+  if (!eventCreated || eventCreated <= 0) {
+    throw new Error("Stripe event is missing its creation timestamp.");
+  }
+
   switch (event.type) {
     case "checkout.session.completed":
-      await handleCheckoutCompleted(event.data.object);
+      await handleCheckoutCompleted(event.data.object, eventCreated);
       break;
     case "customer.subscription.created":
     case "customer.subscription.updated":
     case "customer.subscription.deleted":
-      await handleSubscriptionChange(event.data.object);
+      await handleSubscriptionChange(event.data.object, eventCreated);
       break;
     case "invoice.paid":
       await handleInvoicePaid(event.data.object);
       break;
     case "invoice.payment_failed":
-      await handleInvoicePaymentFailed(event.data.object);
+      await handleInvoicePaymentFailed(event.data.object, eventCreated);
+      break;
+    case "charge.refunded":
+    case "charge.dispute.created":
+    case "charge.dispute.updated":
+    case "charge.dispute.closed":
+    case "charge.dispute.funds_withdrawn":
+    case "charge.dispute.funds_reinstated":
+      await handleBillingRiskEvent(event, event.data.object);
       break;
     default:
       break;
