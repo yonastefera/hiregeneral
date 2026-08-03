@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
-import { redis } from "@/lib/rate-limit";
-import { logServerError, safeServerError } from "@/lib/http/api-security";
+import { publicJobSearchRateLimit, redis } from "@/lib/rate-limit";
+import {
+  enforceRateLimit,
+  logServerError,
+  requestIp,
+  safeServerError,
+} from "@/lib/http/api-security";
 import { createSupabasePublicClient } from "@/lib/supabase/public";
 import {
   JOB_ENRICHMENT_SELECT,
@@ -25,6 +31,17 @@ const JOBS_API_CACHE_VERSION = process.env.JOBS_API_CACHE_VERSION ?? "4";
 const JOBS_BROWSE_CACHE_TTL_SECONDS = 60 * 3; // 3 minutes
 const JOBS_SEARCH_CACHE_TTL_SECONDS = 60; // 1 minute
 const JOBS_FILTER_CACHE_TTL_SECONDS = 60 * 2; // 2 minutes
+const publicJobQuerySchema = z.object({
+  query: z.string().max(160),
+  location: z.string().max(160),
+  distance: z.string().max(20),
+  workMode: z.string().max(40),
+  employmentType: z.string().max(40),
+  category: z.string().max(100),
+  company: z.string().max(160),
+  excludeId: z.string().max(100),
+  balance: z.enum(["none", "company"]),
+});
 
 const JOB_DETAIL_SELECT = `
   id,
@@ -623,6 +640,31 @@ export async function GET(req: NextRequest) {
       DEFAULT_PAGE_SIZE,
       MAX_PAGE_SIZE,
     );
+
+    const parsedQuery = publicJobQuerySchema.safeParse({
+      query,
+      location,
+      distance,
+      workMode,
+      employmentType,
+      category,
+      company,
+      excludeId,
+      balance,
+    });
+    if (!parsedQuery.success) {
+      return NextResponse.json(
+        { error: "Invalid job search parameters." },
+        { status: 400 },
+      );
+    }
+
+    const limited = await enforceRateLimit({
+      limiter: publicJobSearchRateLimit,
+      key: requestIp(req),
+      context: "public_job_search",
+    });
+    if (limited) return limited;
 
     const ttlSeconds = cacheTtlForRequest({
       query,

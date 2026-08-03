@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
-import { redis } from "@/lib/rate-limit";
-import { logServerError, safeServerError } from "@/lib/http/api-security";
+import {
+  enforceRateLimit,
+  logServerError,
+  requestIp,
+  safeServerError,
+} from "@/lib/http/api-security";
+import { keywordSuggestionRateLimit, redis } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
 type KeywordSuggestionRow = {
@@ -24,6 +30,7 @@ type KeywordSuggestionsPayload = {
 
 const KEYWORD_CACHE_TTL_SECONDS = 60 * 60 * 24; // 24 hours
 const KEYWORD_CACHE_VERSION = process.env.KEYWORD_CACHE_VERSION ?? "1";
+const querySchema = z.string().trim().max(100);
 
 function normalizeQuery(value: string | null) {
   return value?.trim().replace(/\s+/g, " ") ?? "";
@@ -53,11 +60,23 @@ function jsonResponse(payload: KeywordSuggestionsPayload, status = 200) {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const query = normalizeQuery(searchParams.get("query"));
+  const parsed = querySchema.safeParse(
+    normalizeQuery(searchParams.get("query")),
+  );
+  if (!parsed.success)
+    return NextResponse.json({ error: "Invalid query." }, { status: 400 });
+  const query = parsed.data;
 
   if (query.length < 2) {
     return jsonResponse({ suggestions: [] });
   }
+
+  const limited = await enforceRateLimit({
+    limiter: keywordSuggestionRateLimit,
+    key: requestIp(request),
+    context: "keyword_suggestions",
+  });
+  if (limited) return limited;
 
   const cacheKey = getKeywordCacheKey(query);
 

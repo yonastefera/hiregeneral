@@ -1,5 +1,13 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
+import {
+  enforceRateLimit,
+  logServerError,
+  requestIp,
+  safeServerError,
+} from "@/lib/http/api-security";
+import { schoolSearchRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
 type SchoolRow = {
@@ -17,6 +25,7 @@ type SchoolSuggestion = {
   state: string | null;
   label: string;
 };
+const querySchema = z.string().trim().max(120);
 
 function normalizeQuery(value: string | null) {
   return value?.trim().replace(/\s+/g, " ") ?? "";
@@ -56,11 +65,23 @@ function rankSchool(name: string, query: string) {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const query = normalizeQuery(searchParams.get("query"));
+  const parsed = querySchema.safeParse(
+    normalizeQuery(searchParams.get("query")),
+  );
+  if (!parsed.success)
+    return NextResponse.json({ error: "Invalid query." }, { status: 400 });
+  const query = parsed.data;
 
   if (query.length < 1) {
     return NextResponse.json({ schools: [] });
   }
+
+  const limited = await enforceRateLimit({
+    limiter: schoolSearchRateLimit,
+    key: requestIp(request),
+    context: "school_search",
+  });
+  if (limited) return limited;
 
   const supabase = await createClient();
   const safeQuery = escapeIlike(query);
@@ -74,10 +95,8 @@ export async function GET(request: Request) {
     .limit(80);
 
   if (error) {
-    return NextResponse.json(
-      { error: "Could not fetch school suggestions." },
-      { status: 500 },
-    );
+    logServerError("school_search_query_failed", error);
+    return safeServerError("Could not fetch school suggestions.");
   }
 
   const schools = ((data ?? []) as SchoolRow[])
@@ -98,5 +117,12 @@ export async function GET(request: Request) {
     .slice(0, 8)
     .map(toSuggestion);
 
-  return NextResponse.json({ schools });
+  return NextResponse.json(
+    { schools },
+    {
+      headers: {
+        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+      },
+    },
+  );
 }

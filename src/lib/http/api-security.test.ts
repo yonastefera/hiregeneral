@@ -5,9 +5,12 @@ import {
   boundedJsonBody,
   boundedTextBody,
   enforceRateLimit,
+  formatZodErrors,
   logServerError,
+  rateLimitResponse,
   safeServerError,
 } from "@/lib/http/api-security";
+import { z } from "zod";
 
 describe("API security helpers", () => {
   it("rejects declared and actual oversized JSON bodies", async () => {
@@ -70,6 +73,24 @@ describe("API security helpers", () => {
 
     expect(response?.status).toBe(429);
     expect(response?.headers.get("Retry-After")).toBeTruthy();
+  });
+
+  it("builds consistent rate-limit responses", async () => {
+    const response = rateLimitResponse(Date.now() + 30_000, "Slow down.");
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBeTruthy();
+    await expect(response.json()).resolves.toEqual({ error: "Slow down." });
+  });
+
+  it("formats Zod failures without exposing submitted values", () => {
+    const result = z
+      .object({ email: z.email() })
+      .safeParse({ email: "secret" });
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    const errors = formatZodErrors(result.error);
+    expect(errors).toHaveProperty("email");
+    expect(JSON.stringify(errors)).not.toContain("secret");
   });
 
   it("never returns provider details and logs only safe metadata", async () => {

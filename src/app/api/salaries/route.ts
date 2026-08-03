@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
-import { redis } from "@/lib/rate-limit";
+import { redis, salaryLookupRateLimit } from "@/lib/rate-limit";
 import { createSupabasePublicClient } from "@/lib/supabase/public";
-import { logServerError } from "@/lib/http/api-security";
+import {
+  enforceRateLimit,
+  logServerError,
+  requestIp,
+  safeServerError,
+} from "@/lib/http/api-security";
 import {
   US_STATE_NAMES_BY_ABBR,
   normalizeUsStateRegion,
@@ -17,6 +23,10 @@ const SAMPLE_LIMIT = 500;
 const HOURS_PER_YEAR = 2080;
 const SALARY_CACHE_TTL_SECONDS = 60 * 60 * 24; // 24 hours
 const SALARY_CACHE_VERSION = process.env.SALARY_CACHE_VERSION ?? "1";
+const salaryQuerySchema = z.object({
+  career: z.string().trim().min(1).max(120),
+  location: z.string().trim().max(120),
+});
 
 type SalaryJobRow = {
   id: string;
@@ -728,15 +738,24 @@ function formatSamples(samples: SalarySample[]) {
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = req.nextUrl;
-    const career = searchParams.get("career")?.trim() ?? "";
-    const location = searchParams.get("location")?.trim() ?? "";
-
-    if (!career) {
+    const parsed = salaryQuerySchema.safeParse({
+      career: searchParams.get("career") ?? "",
+      location: searchParams.get("location") ?? "",
+    });
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Career name is required." },
+        { error: "Invalid career or location." },
         { status: 400 },
       );
     }
+    const { career, location } = parsed.data;
+
+    const limited = await enforceRateLimit({
+      limiter: salaryLookupRateLimit,
+      key: requestIp(req),
+      context: "salary_lookup",
+    });
+    if (limited) return limited;
 
     const cacheKey = getSalaryCacheKey(career, location);
 
@@ -833,14 +852,7 @@ export async function GET(req: NextRequest) {
 
     return jsonResponse(payload);
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Could not calculate salary estimate.",
-      },
-      { status: 500 },
-    );
+    logServerError("salary_lookup_failed", error);
+    return safeServerError("Could not calculate salary estimate.");
   }
 }

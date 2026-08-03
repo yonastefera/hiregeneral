@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
-import { redis } from "@/lib/rate-limit";
-import { logServerError, safeServerError } from "@/lib/http/api-security";
+import { publicJobDetailRateLimit, redis } from "@/lib/rate-limit";
+import {
+  enforceRateLimit,
+  logServerError,
+  requestIp,
+  safeServerError,
+} from "@/lib/http/api-security";
 import { createSupabasePublicClient } from "@/lib/supabase/public";
 import { htmlToText, cleanTextArray } from "@/lib/text/html";
 import { JOB_ENRICHMENT_SELECT, mapJobEnrichment } from "@/lib/jobs/enrichment";
@@ -16,6 +22,12 @@ const JOB_DETAIL_CACHE_VERSION = process.env.JOB_DETAIL_CACHE_VERSION ?? "2";
 const SHOULD_CACHE_JOB_DETAILS =
   process.env.NODE_ENV === "production" &&
   process.env.JOB_DETAIL_CACHE_DISABLED !== "1";
+const jobSlugSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(240)
+  .regex(/^[a-zA-Z0-9_-]+$/);
 const JOB_DETAIL_SELECT = `
   id,
   recruiter_id,
@@ -211,16 +223,22 @@ async function cleanJob(job: JobRow): Promise<JobDetailPayload> {
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   context: { params: Promise<{ slug: string }> },
 ) {
   try {
     const { slug } = await context.params;
-    const normalizedSlug = slug?.trim();
+    const parsedSlug = jobSlugSchema.safeParse(slug);
+    if (!parsedSlug.success)
+      return NextResponse.json({ error: "Invalid job slug." }, { status: 400 });
+    const normalizedSlug = parsedSlug.data;
 
-    if (!normalizedSlug) {
-      return NextResponse.json({ error: "Missing job slug" }, { status: 400 });
-    }
+    const limited = await enforceRateLimit({
+      limiter: publicJobDetailRateLimit,
+      key: requestIp(req),
+      context: "public_job_detail",
+    });
+    if (limited) return limited;
 
     const cacheKey = getJobDetailCacheKey(normalizedSlug);
 

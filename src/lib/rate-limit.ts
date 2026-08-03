@@ -10,6 +10,22 @@ export const locationSearchRateLimit = new Ratelimit({
   prefix: "ratelimit:locations",
 });
 
+function publicReadLimiter(requests: number, prefix: string) {
+  return new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(requests, "1 m"),
+    analytics: true,
+    prefix: `ratelimit:public:${prefix}`,
+  });
+}
+
+export const keywordSuggestionRateLimit = publicReadLimiter(90, "keywords");
+export const reverseGeocodeRateLimit = publicReadLimiter(30, "reverse-geocode");
+export const salaryLookupRateLimit = publicReadLimiter(45, "salaries");
+export const schoolSearchRateLimit = publicReadLimiter(90, "schools");
+export const publicJobSearchRateLimit = publicReadLimiter(120, "jobs");
+export const publicJobDetailRateLimit = publicReadLimiter(180, "job-details");
+
 export const applicationSubmissionRateLimit = new Ratelimit({
   redis,
   limiter: Ratelimit.slidingWindow(20, "1 h"),

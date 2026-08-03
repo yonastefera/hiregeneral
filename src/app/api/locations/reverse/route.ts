@@ -1,4 +1,13 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
+
+import {
+  enforceRateLimit,
+  logServerError,
+  requestIp,
+  safeServerError,
+} from "@/lib/http/api-security";
+import { reverseGeocodeRateLimit } from "@/lib/rate-limit";
 
 type GoogleAddressComponent = {
   long_name: string;
@@ -18,6 +27,11 @@ type GoogleReverseGeocodeResponse = {
   status: string;
   error_message?: string;
 };
+
+const coordinatesSchema = z.object({
+  lat: z.coerce.number().min(-90).max(90),
+  lng: z.coerce.number().min(-180).max(180),
+});
 
 function getComponent(
   components: GoogleAddressComponent[],
@@ -63,10 +77,11 @@ function pickLocationFromGoogleResult(result: GoogleGeocodeResult) {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
 
-  const lat = Number(searchParams.get("lat"));
-  const lng = Number(searchParams.get("lng"));
-
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+  const parsed = coordinatesSchema.safeParse({
+    lat: searchParams.get("lat"),
+    lng: searchParams.get("lng"),
+  });
+  if (!parsed.success) {
     return NextResponse.json(
       {
         error: "Missing or invalid lat/lng.",
@@ -76,18 +91,22 @@ export async function GET(request: Request) {
       },
     );
   }
+  const { lat, lng } = parsed.data;
+
+  const limited = await enforceRateLimit({
+    limiter: reverseGeocodeRateLimit,
+    key: requestIp(request),
+    context: "reverse_geocode",
+  });
+  if (limited) return limited;
 
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
 
   if (!apiKey) {
-    return NextResponse.json(
-      {
-        error: "Missing GOOGLE_MAPS_API_KEY.",
-      },
-      {
-        status: 500,
-      },
-    );
+    logServerError("reverse_geocode_not_configured", {
+      code: "CONFIGURATION_MISSING",
+    });
+    return safeServerError("Reverse geocoding is unavailable.");
   }
 
   const googleUrl = new URL(
@@ -99,11 +118,19 @@ export async function GET(request: Request) {
   googleUrl.searchParams.set("result_type", "locality|postal_code");
   googleUrl.searchParams.set("language", "en");
 
-  const response = await fetch(googleUrl.toString(), {
-    next: {
-      revalidate: 60 * 60 * 24,
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(googleUrl.toString(), {
+      next: { revalidate: 60 * 60 * 24 },
+      signal: AbortSignal.timeout(5_000),
+    });
+  } catch (error) {
+    logServerError("reverse_geocode_provider_failed", error);
+    return NextResponse.json(
+      { error: "Reverse geocoding is temporarily unavailable." },
+      { status: 502 },
+    );
+  }
 
   if (!response.ok) {
     return NextResponse.json(
@@ -119,12 +146,9 @@ export async function GET(request: Request) {
   const body = (await response.json()) as GoogleReverseGeocodeResponse;
 
   if (body.status !== "OK") {
+    logServerError("reverse_geocode_provider_rejected", { code: body.status });
     return NextResponse.json(
-      {
-        error:
-          body.error_message ??
-          `Google reverse geocoding failed with status: ${body.status}`,
-      },
+      { error: "Reverse geocoding is temporarily unavailable." },
       {
         status: 502,
       },
@@ -147,7 +171,13 @@ export async function GET(request: Request) {
     );
   }
 
-  return NextResponse.json({
-    location,
-  });
+  return NextResponse.json(
+    { location },
+    {
+      headers: {
+        "Cache-Control":
+          "public, s-maxage=86400, stale-while-revalidate=604800",
+      },
+    },
+  );
 }

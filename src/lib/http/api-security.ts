@@ -1,5 +1,6 @@
 import type { Ratelimit } from "@upstash/ratelimit";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { retryAfterSeconds } from "@/lib/auth/security";
 import { readJsonBodyResult } from "@/lib/http/json-body";
@@ -68,6 +69,25 @@ export function requestIp(request: Request) {
   return forwarded || request.headers.get("x-real-ip")?.trim() || "unknown";
 }
 
+export const clientIdentifier = requestIp;
+
+export function formatZodErrors(error: z.ZodError) {
+  return z.flattenError(error).fieldErrors;
+}
+
+export function rateLimitResponse(
+  reset: number,
+  message = "Too many requests. Please try again later.",
+) {
+  return NextResponse.json(
+    { error: message },
+    {
+      status: 429,
+      headers: { "Retry-After": retryAfterSeconds(reset) },
+    },
+  );
+}
+
 function safeErrorMetadata(error: unknown) {
   if (!error || typeof error !== "object") return {};
 
@@ -100,13 +120,7 @@ export async function enforceRateLimit(params: {
     const result = await params.limiter.limit(params.key);
     if (result.success) return null;
 
-    return NextResponse.json(
-      { error: params.message ?? "Too many requests. Please try again later." },
-      {
-        status: 429,
-        headers: { "Retry-After": retryAfterSeconds(result.reset) },
-      },
-    );
+    return rateLimitResponse(result.reset, params.message);
   } catch (error) {
     logServerError(`${params.context}_rate_limit_unavailable`, error);
     return null;

@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
 import { locationSearchRateLimit, redis } from "@/lib/rate-limit";
-import { logServerError, safeServerError } from "@/lib/http/api-security";
+import {
+  enforceRateLimit,
+  logServerError,
+  requestIp,
+  safeServerError,
+} from "@/lib/http/api-security";
 
 type LocationRow = {
   id: number | string;
@@ -28,6 +34,7 @@ type LocationSearchPayload = {
 
 const LOCATION_CACHE_TTL_SECONDS = 60 * 60 * 24 * 7;
 const LOCATION_CACHE_VERSION = process.env.LOCATION_CACHE_VERSION ?? "6";
+const querySchema = z.string().trim().max(120);
 
 function normalizeQuery(value: string | null) {
   return value?.trim().replace(/\s+/g, " ") ?? "";
@@ -39,17 +46,6 @@ function cleanText(value: string | null | undefined) {
 
 function getLocationCacheKey(query: string) {
   return `locations:${LOCATION_CACHE_VERSION}:${query.toLowerCase()}`;
-}
-
-function getClientIdentifier(request: Request) {
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  const realIp = request.headers.get("x-real-ip");
-
-  if (forwardedFor) {
-    return forwardedFor.split(",")[0]?.trim() || "unknown";
-  }
-
-  return realIp || "unknown";
 }
 
 function toSuggestion(location: LocationRow): LocationSuggestion | null {
@@ -101,7 +97,12 @@ function jsonResponse(payload: LocationSearchPayload, status = 200) {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const query = normalizeQuery(searchParams.get("query"));
+  const parsed = querySchema.safeParse(
+    normalizeQuery(searchParams.get("query")),
+  );
+  if (!parsed.success)
+    return NextResponse.json({ error: "Invalid query." }, { status: 400 });
+  const query = parsed.data;
 
   if (query.length < 2) {
     return jsonResponse({ locations: [] });
@@ -124,29 +125,13 @@ export async function GET(request: Request) {
     logServerError("location_cache_read_failed", error);
   }
 
-  try {
-    const identifier = getClientIdentifier(request);
-    const rateLimitResult = await locationSearchRateLimit.limit(identifier);
-
-    if (!rateLimitResult.success) {
-      return NextResponse.json(
-        { error: "Too many location searches. Please try again shortly." },
-        {
-          status: 429,
-          headers: {
-            "Retry-After": String(
-              Math.max(
-                1,
-                Math.ceil((rateLimitResult.reset - Date.now()) / 1000),
-              ),
-            ),
-          },
-        },
-      );
-    }
-  } catch (error) {
-    logServerError("location_rate_limit_unavailable", error);
-  }
+  const limited = await enforceRateLimit({
+    limiter: locationSearchRateLimit,
+    key: requestIp(request),
+    context: "location_search",
+    message: "Too many location searches. Please try again shortly.",
+  });
+  if (limited) return limited;
 
   const supabase = await createClient();
 
