@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import {
@@ -41,11 +42,23 @@ function normalizeSchoolName(value: string) {
   return value.trim().replace(/\s+/g, " ");
 }
 
+function secretsMatch(provided: string | null, expected: string | undefined) {
+  if (!provided || !expected) return false;
+
+  const providedBytes = Buffer.from(provided);
+  const expectedBytes = Buffer.from(expected);
+
+  return (
+    providedBytes.length === expectedBytes.length &&
+    timingSafeEqual(providedBytes, expectedBytes)
+  );
+}
+
 export async function POST(request: Request) {
   const adminSecret = process.env.ADMIN_SEED_SECRET;
   const providedSecret = request.headers.get("x-admin-seed-secret");
 
-  if (!adminSecret || providedSecret !== adminSecret) {
+  if (!secretsMatch(providedSecret, adminSecret)) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 

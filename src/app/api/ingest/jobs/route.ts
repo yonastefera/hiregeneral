@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import {
   enforceRateLimit,
   logServerError,
@@ -26,6 +27,11 @@ export const dynamic = "force-dynamic";
 
 const DEFAULT_SOURCE_TIMEOUT_MS = 90_000;
 const DEFAULT_DETAIL_ENHANCEMENT_CONCURRENCY = 3;
+
+const ingestionQuerySchema = z.object({
+  sourceSlug: z.string().trim().min(1).max(120).nullable(),
+  sourceType: z.string().trim().min(1).max(80).nullable(),
+});
 
 type SourceResult = {
   companyName: string;
@@ -178,8 +184,20 @@ async function runJobsIngestion(request: Request) {
     }
 
     const url = new URL(request.url);
-    const requestedSourceSlug = url.searchParams.get("sourceSlug");
-    const requestedSourceType = url.searchParams.get("sourceType");
+    const parsedQuery = ingestionQuerySchema.safeParse({
+      sourceSlug: url.searchParams.get("sourceSlug"),
+      sourceType: url.searchParams.get("sourceType"),
+    });
+
+    if (!parsedQuery.success) {
+      return NextResponse.json(
+        { error: "Invalid ingestion filters." },
+        { status: 400 },
+      );
+    }
+
+    const { sourceSlug: requestedSourceSlug, sourceType: requestedSourceType } =
+      parsedQuery.data;
     const allSources = await getEnabledJobSources();
     const sources = allSources.filter((source) => {
       if (requestedSourceSlug && source.sourceSlug !== requestedSourceSlug) {
