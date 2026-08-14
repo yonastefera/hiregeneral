@@ -24,14 +24,18 @@ const defaultPreferences: NotificationPreferences = {
   marketingEmails: false,
 };
 
-const preferencesSchema = z.object({
-  preferences: z.object({
-    jobAlerts: z.boolean(),
-    applicationUpdates: z.boolean(),
-    savedJobReminders: z.boolean(),
-    marketingEmails: z.boolean(),
-  }),
-});
+const preferencesSchema = z
+  .object({
+    preferences: z
+      .object({
+        jobAlerts: z.boolean(),
+        applicationUpdates: z.boolean(),
+        savedJobReminders: z.boolean(),
+        marketingEmails: z.boolean(),
+      })
+      .strict(),
+  })
+  .strict();
 
 function normalizePreferences(value: unknown): NotificationPreferences {
   if (!value || typeof value !== "object") {

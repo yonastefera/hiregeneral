@@ -12,7 +12,7 @@ import { savedJobRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
-const savedJobSchema = z.object({ job_id: z.string().uuid() });
+const savedJobSchema = z.object({ job_id: z.string().uuid() }).strict();
 
 // GET — returns all saved job ids for the current user
 export async function GET() {
@@ -60,12 +60,8 @@ export async function POST(req: NextRequest) {
     error: authError,
   } = await supabase.auth.getUser();
 
-  if (authError) {
+  if (authError || !user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  if (!user) {
-    return NextResponse.json({ data: [] });
   }
 
   const limited = await enforceRateLimit({
