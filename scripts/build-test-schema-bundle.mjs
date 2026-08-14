@@ -32,6 +32,7 @@ const dated = [
   "20260802_data_retention.sql",
   "20260809_job_enrichments_rls.sql",
   "20260814_application_submission_fields.sql",
+  "20260814_job_applicant_counts_view.sql",
 ];
 
 if (legacy.length !== 98) {

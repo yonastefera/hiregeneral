@@ -62,6 +62,18 @@ describe("employer candidate access", () => {
     );
   });
 
+  it("accepts the all-jobs filter used by the candidates dashboard", async () => {
+    const response = await candidates(
+      new NextRequest(
+        "https://www.hiregeneral.com/api/employers/candidates?jobId=all",
+      ),
+    );
+    expect(response.status).toBe(200);
+    expect(mocks.getCandidates).toHaveBeenCalledWith(
+      expect.objectContaining({ recruiterId: user.id, jobId: "all" }),
+    );
+  });
+
   it("requires a paid candidate-database entitlement", async () => {
     mocks.loadEntitlements.mockResolvedValue({ candidateDatabase: false });
     const response = await database(

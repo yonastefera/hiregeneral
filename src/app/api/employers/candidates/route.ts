@@ -7,7 +7,7 @@ import { logServerError, safeServerError } from "@/lib/http/api-security";
 
 export const runtime = "nodejs";
 const candidateQuerySchema = z.object({
-  jobId: z.string().uuid().nullable(),
+  jobId: z.union([z.literal("all"), z.string().uuid()]).nullable(),
   query: z.string().trim().max(160).nullable(),
 });
 

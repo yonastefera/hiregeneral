@@ -13,6 +13,7 @@ import {
   JOB_ENRICHMENT_SELECT,
   mapJobEnrichments,
 } from "@/lib/jobs/enrichment";
+import { shouldUseDirectJobsFallback } from "@/lib/jobs/search-fallback";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -414,21 +415,6 @@ function isNewJob(row: JobsPublicRpcRow) {
   return Date.now() - postedAt <= NEW_JOBS_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 }
 
-function isStatementTimeout(error: unknown) {
-  if (!error || typeof error !== "object") return false;
-
-  const maybeError = error as {
-    code?: unknown;
-    message?: unknown;
-  };
-
-  return (
-    maybeError.code === "57014" ||
-    (typeof maybeError.message === "string" &&
-      maybeError.message.toLowerCase().includes("statement timeout"))
-  );
-}
-
 function escapePostgrestPattern(value: string) {
   return value.replace(/[%_*]/g, "\\$&");
 }
@@ -760,7 +746,7 @@ export async function GET(req: NextRequest) {
         newJobs = toCount(rows[0]?.new_jobs_count);
       }
     } catch (rpcError) {
-      if (!isStatementTimeout(rpcError)) {
+      if (!shouldUseDirectJobsFallback(rpcError)) {
         logServerError("jobs_search_query_failed", rpcError);
         return safeServerError("Failed to load jobs.");
       }

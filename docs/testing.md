@@ -46,11 +46,27 @@ only as the control client that confirms the hidden fixture exists.
 
 ## Authenticated end-to-end journeys
 
-The public job-search smoke test runs in CI. Full seeker, employer, billing, and
-admin journeys require deterministic seeded users, an email confirmation inbox
-hook, disposable resume fixtures, and Stripe test-mode fixtures. Those journeys
-should be enabled only after that isolated environment is available; they must
-not mutate shared staging or production data.
+The public job-search, seeker/employer registration, and password-reset browser
+tests run in CI. Authentication requests are intercepted in the browser tests,
+so they validate UI payloads and feedback without creating accounts or sending
+email.
+
+Full authenticated seeker, employer, billing, and admin journeys require the
+application server itself to use the dedicated test-project URL and publishable
+key, plus deterministic seeded users, disposable resume fixtures, and Stripe
+test-mode fixtures. Those journeys must never mutate shared staging or
+production data.
+
+The authenticated runner builds into `.next-e2e-auth`, starts on port 3100, and
+refuses the known production Supabase project. It is deliberately opt-in:
+
+```bash
+RUN_AUTHENTICATED_E2E=1 npm run test:e2e:authenticated
+```
+
+It reads the ignored `.env.rls.test`, maps those credentials only into its
+build and server child processes, and runs tests serially. Authenticated specs
+must restore any fixture state they modify.
 
 ## Dependency scanning
 
