@@ -15,29 +15,31 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
-const contactSchema = z.object({
-  name: z.string().trim().min(2).max(120),
-  email: z.string().trim().email().max(180),
-  company: z.string().trim().max(160).optional().default(""),
-  audience: z
-    .enum(["job_seeker", "employer", "partner", "general"])
-    .default("general"),
-  topic: z
-    .enum([
-      "candidate_support",
-      "employer_sales",
-      "billing",
-      "privacy",
-      "accessibility",
-      "partnership",
-      "general",
-    ])
-    .default("general"),
-  subject: z.string().trim().max(160).optional().default(""),
-  message: z.string().trim().min(20).max(2_000),
-  sourcePath: z.string().trim().max(240).optional().default("/contact"),
-  website: z.string().trim().max(240).optional().default(""),
-});
+const contactSchema = z
+  .object({
+    name: z.string().trim().min(2).max(120),
+    email: z.string().trim().email().max(180),
+    company: z.string().trim().max(160).optional().default(""),
+    audience: z
+      .enum(["job_seeker", "employer", "partner", "general"])
+      .default("general"),
+    topic: z
+      .enum([
+        "candidate_support",
+        "employer_sales",
+        "billing",
+        "privacy",
+        "accessibility",
+        "partnership",
+        "general",
+      ])
+      .default("general"),
+    subject: z.string().trim().max(160).optional().default(""),
+    message: z.string().trim().min(20).max(2_000),
+    sourcePath: z.string().trim().max(240).optional().default("/contact"),
+    website: z.string().trim().max(240).optional().default(""),
+  })
+  .strict();
 
 function escapeHtml(value: string) {
   return value

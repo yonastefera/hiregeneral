@@ -84,4 +84,21 @@ describe("POST /api/auth/role", () => {
       redirectTo: "/admin/dashboard",
     });
   });
+
+  it("returns a safe error when atomic role assignment fails", async () => {
+    mocks.assignInitialRole.mockRejectedValue(
+      new Error("private database role detail"),
+    );
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    const response = await POST(request({ role: "recruiter" }));
+    const payload = await response.json();
+    expect(response.status).toBe(503);
+    expect(payload).toEqual({ error: "Could not save account role." });
+    expect(JSON.stringify(payload)).not.toContain(
+      "private database role detail",
+    );
+    consoleError.mockRestore();
+  });
 });

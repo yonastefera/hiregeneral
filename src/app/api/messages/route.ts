@@ -13,10 +13,12 @@ import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
-const messageSchema = z.object({
-  conversationId: z.string().uuid(),
-  body: z.string().trim().min(1).max(5_000),
-});
+const messageSchema = z
+  .object({
+    conversationId: z.string().uuid(),
+    body: z.string().trim().min(1).max(5_000),
+  })
+  .strict();
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
