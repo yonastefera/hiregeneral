@@ -18,10 +18,12 @@ import { enforceDuplicateCooldown } from "@/lib/security/abuse";
 
 export const runtime = "nodejs";
 
-const sendMessageSchema = z.object({
-  conversationId: z.string().uuid(),
-  body: z.string().trim().min(1).max(5000),
-});
+const sendMessageSchema = z
+  .object({
+    conversationId: z.string().uuid(),
+    body: z.string().trim().min(1).max(5000),
+  })
+  .strict();
 
 export async function GET(request: NextRequest) {
   const auth = await requireEmployerUser();

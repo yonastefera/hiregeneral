@@ -13,17 +13,19 @@ import { employerCompanyRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
-const companySchema = z.object({
-  id: z.string().uuid().nullable().optional(),
-  name: z.string().trim().min(2, "Company name is required.").max(120),
-  website: z.string().trim().max(240).optional().or(z.literal("")),
-  location: z.string().trim().max(120).optional().or(z.literal("")),
-  industry: z.string().trim().max(80).optional().or(z.literal("")),
-  size: z.string().trim().max(80).optional().or(z.literal("")),
-  tagline: z.string().trim().max(160).optional().or(z.literal("")),
-  description: z.string().trim().max(2000).optional().or(z.literal("")),
-  logoUrl: z.string().trim().url().nullable().optional().or(z.literal("")),
-});
+const companySchema = z
+  .object({
+    id: z.string().uuid().nullable().optional(),
+    name: z.string().trim().min(2, "Company name is required.").max(120),
+    website: z.string().trim().max(240).optional().or(z.literal("")),
+    location: z.string().trim().max(120).optional().or(z.literal("")),
+    industry: z.string().trim().max(80).optional().or(z.literal("")),
+    size: z.string().trim().max(80).optional().or(z.literal("")),
+    tagline: z.string().trim().max(160).optional().or(z.literal("")),
+    description: z.string().trim().max(2000).optional().or(z.literal("")),
+    logoUrl: z.string().trim().url().nullable().optional().or(z.literal("")),
+  })
+  .strict();
 
 function normalizeUrl(value: string | null | undefined) {
   const website = value?.trim();
@@ -119,6 +121,12 @@ export async function PUT(request: NextRequest) {
   const { data: savedCompany, error } = await mutation.select("id").single();
 
   if (error) {
+    if (companyId && error.code === "PGRST116") {
+      return NextResponse.json(
+        { error: "Company was not found." },
+        { status: 404 },
+      );
+    }
     logServerError("employer_company_save_failed", error);
     return safeServerError("Could not save the company profile.");
   }

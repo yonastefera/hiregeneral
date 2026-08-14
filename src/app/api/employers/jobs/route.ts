@@ -22,34 +22,38 @@ export const runtime = "nodejs";
 const jobStatusSchema = z.enum(["draft", "published"]);
 const boostSchema = z.enum(["none", "3", "5", "10", "20"]);
 
-const screeningQuestionSchema = z.object({
-  id: z.string().trim().min(1),
-  question: z.string().trim().min(3).max(240),
-  required: z.boolean().default(true),
-});
+const screeningQuestionSchema = z
+  .object({
+    id: z.string().trim().min(1),
+    question: z.string().trim().min(3).max(240),
+    required: z.boolean().default(true),
+  })
+  .strict();
 
-const postJobSchema = z.object({
-  id: z.string().uuid().optional(),
-  title: z.string().trim().min(2, "Job title is required."),
-  companyName: z.string().trim().min(2, "Hiring company is required."),
-  location: z.string().trim().min(2, "Job location is required."),
-  streetAddress: z.string().trim().optional().default(""),
-  remote: z.enum(["yes", "no"]).default("no"),
-  distance: z.coerce.number().int().min(10).max(200).default(50),
-  includeRelocation: z.boolean().default(true),
-  employmentType: z.string().trim().min(1).default("Full-time"),
-  description: z.string().trim().min(20, "Add a little more job detail."),
-  skills: z.string().trim().optional().default(""),
-  benefits: z.array(z.string().trim().min(1)).default([]),
-  salaryMin: z.coerce.number().int().nonnegative().nullable().default(null),
-  salaryMax: z.coerce.number().int().nonnegative().nullable().default(null),
-  salaryCurrency: z.string().trim().length(3).default("USD"),
-  payFrequency: z.string().trim().min(1).default("Per year"),
-  boostId: boostSchema.default("none"),
-  notificationEmail: z.string().trim().email().optional().or(z.literal("")),
-  screeningQuestions: z.array(screeningQuestionSchema).max(12).default([]),
-  status: jobStatusSchema.default("published"),
-});
+const postJobSchema = z
+  .object({
+    id: z.string().uuid().optional(),
+    title: z.string().trim().min(2, "Job title is required."),
+    companyName: z.string().trim().min(2, "Hiring company is required."),
+    location: z.string().trim().min(2, "Job location is required."),
+    streetAddress: z.string().trim().optional().default(""),
+    remote: z.enum(["yes", "no"]).default("no"),
+    distance: z.coerce.number().int().min(10).max(200).default(50),
+    includeRelocation: z.boolean().default(true),
+    employmentType: z.string().trim().min(1).default("Full-time"),
+    description: z.string().trim().min(20, "Add a little more job detail."),
+    skills: z.string().trim().optional().default(""),
+    benefits: z.array(z.string().trim().min(1)).default([]),
+    salaryMin: z.coerce.number().int().nonnegative().nullable().default(null),
+    salaryMax: z.coerce.number().int().nonnegative().nullable().default(null),
+    salaryCurrency: z.string().trim().length(3).default("USD"),
+    payFrequency: z.string().trim().min(1).default("Per year"),
+    boostId: boostSchema.default("none"),
+    notificationEmail: z.string().trim().email().optional().or(z.literal("")),
+    screeningQuestions: z.array(screeningQuestionSchema).max(12).default([]),
+    status: jobStatusSchema.default("published"),
+  })
+  .strict();
 
 function cleanNullableNumber(value: unknown) {
   if (value === "" || value === null || value === undefined) return null;

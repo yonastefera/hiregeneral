@@ -18,11 +18,13 @@ import { enforceDuplicateCooldown } from "@/lib/security/abuse";
 
 export const runtime = "nodejs";
 
-const inviteSchema = z.object({
-  candidateId: z.string().uuid(),
-  jobId: z.string().uuid(),
-  message: z.string().trim().min(10).max(1_200),
-});
+const inviteSchema = z
+  .object({
+    candidateId: z.string().uuid(),
+    jobId: z.string().uuid(),
+    message: z.string().trim().min(10).max(1_200),
+  })
+  .strict();
 
 export async function GET(request: NextRequest) {
   const auth = await requireEmployerUser();
