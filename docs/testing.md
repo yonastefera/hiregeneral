@@ -8,6 +8,7 @@ npm run lint
 npm run typecheck
 npm run test:unit
 npm run test:migrations
+npm run test:schema-bundle
 npm run build
 npm run test:e2e
 ```
@@ -64,9 +65,15 @@ refuses the known production Supabase project. It is deliberately opt-in:
 RUN_AUTHENTICATED_E2E=1 npm run test:e2e:authenticated
 ```
 
-It reads the ignored `.env.rls.test`, maps those credentials only into its
-build and server child processes, and runs tests serially. Authenticated specs
-must restore any fixture state they modify.
+Locally, it reads the ignored `.env.rls.test`. In CI, credentials are supplied
+directly by GitHub Actions secrets. The runner maps those credentials only into
+its build and server child processes and runs tests serially. Authenticated
+specs must restore any fixture state they modify.
+
+CI runs these journeys only when the repository variable
+`RUN_AUTHENTICATED_E2E` equals `1`. Configure the `SUPABASE_TEST_*` repository
+secrets listed above before enabling it. Failed runs retain Playwright traces
+and screenshots for seven days.
 
 ## Dependency scanning
 

@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5";
+    PostgrestVersion: "14.15";
   };
   public: {
     Tables: {
@@ -82,11 +82,128 @@ export type Database = {
           },
         ];
       };
+      auth_role_audit_log: {
+        Row: {
+          created_at: string;
+          effective_role: Database["public"]["Enums"]["app_role"];
+          event: string;
+          id: number;
+          requested_role: Database["public"]["Enums"]["app_role"];
+          source: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          effective_role: Database["public"]["Enums"]["app_role"];
+          event: string;
+          id?: never;
+          requested_role: Database["public"]["Enums"]["app_role"];
+          source: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          effective_role?: Database["public"]["Enums"]["app_role"];
+          event?: string;
+          id?: never;
+          requested_role?: Database["public"]["Enums"]["app_role"];
+          source?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      billing_events: {
+        Row: {
+          attempts: number;
+          claim_token: string | null;
+          event_type: string;
+          id: string;
+          last_attempt_at: string;
+          last_error: string | null;
+          processed_at: string | null;
+          status: string;
+          stripe_event_id: string;
+        };
+        Insert: {
+          attempts?: number;
+          claim_token?: string | null;
+          event_type: string;
+          id?: string;
+          last_attempt_at?: string;
+          last_error?: string | null;
+          processed_at?: string | null;
+          status?: string;
+          stripe_event_id: string;
+        };
+        Update: {
+          attempts?: number;
+          claim_token?: string | null;
+          event_type?: string;
+          id?: string;
+          last_attempt_at?: string;
+          last_error?: string | null;
+          processed_at?: string | null;
+          status?: string;
+          stripe_event_id?: string;
+        };
+        Relationships: [];
+      };
+      billing_receipts: {
+        Row: {
+          amount_paid_cents: number;
+          company_id: string;
+          created_at: string;
+          currency: string;
+          description: string | null;
+          hosted_invoice_url: string | null;
+          id: string;
+          invoice_number: string | null;
+          invoice_pdf_url: string | null;
+          paid_at: string | null;
+          stripe_invoice_id: string;
+        };
+        Insert: {
+          amount_paid_cents?: number;
+          company_id: string;
+          created_at?: string;
+          currency?: string;
+          description?: string | null;
+          hosted_invoice_url?: string | null;
+          id?: string;
+          invoice_number?: string | null;
+          invoice_pdf_url?: string | null;
+          paid_at?: string | null;
+          stripe_invoice_id: string;
+        };
+        Update: {
+          amount_paid_cents?: number;
+          company_id?: string;
+          created_at?: string;
+          currency?: string;
+          description?: string | null;
+          hosted_invoice_url?: string | null;
+          id?: string;
+          invoice_number?: string | null;
+          invoice_pdf_url?: string | null;
+          paid_at?: string | null;
+          stripe_invoice_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "billing_receipts_company_id_fkey";
+            columns: ["company_id"];
+            isOneToOne: false;
+            referencedRelation: "companies";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       companies: {
         Row: {
           account_credit_cents: number;
           active_job_limit: number;
           billing_email: string | null;
+          billing_last_event_created: number;
           billing_plan: string;
           boost_credits: number;
           created_at: string;
@@ -110,6 +227,7 @@ export type Database = {
           account_credit_cents?: number;
           active_job_limit?: number;
           billing_email?: string | null;
+          billing_last_event_created?: number;
           billing_plan?: string;
           boost_credits?: number;
           created_at?: string;
@@ -133,6 +251,7 @@ export type Database = {
           account_credit_cents?: number;
           active_job_limit?: number;
           billing_email?: string | null;
+          billing_last_event_created?: number;
           billing_plan?: string;
           boost_credits?: number;
           created_at?: string;
@@ -201,125 +320,6 @@ export type Database = {
           user_agent?: string | null;
         };
         Relationships: [];
-      };
-      billing_events: {
-        Row: {
-          attempts: number;
-          claim_token: string | null;
-          event_type: string;
-          id: string;
-          last_attempt_at: string;
-          last_error: string | null;
-          processed_at: string | null;
-          status: string;
-          stripe_event_id: string;
-        };
-        Insert: {
-          attempts?: number;
-          claim_token?: string | null;
-          event_type: string;
-          id?: string;
-          last_attempt_at?: string;
-          last_error?: string | null;
-          processed_at?: string | null;
-          status?: string;
-          stripe_event_id: string;
-        };
-        Update: {
-          attempts?: number;
-          claim_token?: string | null;
-          event_type?: string;
-          id?: string;
-          last_attempt_at?: string;
-          last_error?: string | null;
-          processed_at?: string | null;
-          status?: string;
-          stripe_event_id?: string;
-        };
-        Relationships: [];
-      };
-      security_audit_log: {
-        Row: {
-          action: string;
-          actor_id: string | null;
-          actor_role: string;
-          created_at: string;
-          id: string;
-          metadata: Json;
-          target_id: string | null;
-          target_type: string;
-        };
-        Insert: {
-          action: string;
-          actor_id?: string | null;
-          actor_role?: string;
-          created_at?: string;
-          id?: string;
-          metadata?: Json;
-          target_id?: string | null;
-          target_type: string;
-        };
-        Update: {
-          action?: string;
-          actor_id?: string | null;
-          actor_role?: string;
-          created_at?: string;
-          id?: string;
-          metadata?: Json;
-          target_id?: string | null;
-          target_type?: string;
-        };
-        Relationships: [];
-      };
-      billing_receipts: {
-        Row: {
-          amount_paid_cents: number;
-          company_id: string;
-          created_at: string;
-          currency: string;
-          description: string | null;
-          hosted_invoice_url: string | null;
-          id: string;
-          invoice_number: string | null;
-          invoice_pdf_url: string | null;
-          paid_at: string | null;
-          stripe_invoice_id: string;
-        };
-        Insert: {
-          amount_paid_cents?: number;
-          company_id: string;
-          created_at?: string;
-          currency?: string;
-          description?: string | null;
-          hosted_invoice_url?: string | null;
-          id?: string;
-          invoice_number?: string | null;
-          invoice_pdf_url?: string | null;
-          paid_at?: string | null;
-          stripe_invoice_id: string;
-        };
-        Update: {
-          amount_paid_cents?: number;
-          company_id?: string;
-          created_at?: string;
-          currency?: string;
-          description?: string | null;
-          hosted_invoice_url?: string | null;
-          id?: string;
-          invoice_number?: string | null;
-          invoice_pdf_url?: string | null;
-          paid_at?: string | null;
-          stripe_invoice_id?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "billing_receipts_company_id_fkey";
-            columns: ["company_id"];
-            isOneToOne: false;
-            referencedRelation: "companies";
-            referencedColumns: ["id"];
-          },
-        ];
       };
       conversations: {
         Row: {
@@ -433,6 +433,179 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      job_enrichments: {
+        Row: {
+          about_role: string;
+          benefits: string[];
+          confidence: number;
+          created_at: string;
+          display_location: string;
+          display_title: string;
+          enriched_at: string | null;
+          error_message: string | null;
+          id: string;
+          job_id: string;
+          location_count: number;
+          model: string;
+          prompt_version: string;
+          quality_flags: string[];
+          requirements: string[];
+          responsibilities: string[];
+          source_updated_at: string | null;
+          status: string;
+          summary: string;
+          updated_at: string;
+        };
+        Insert: {
+          about_role: string;
+          benefits?: string[];
+          confidence?: number;
+          created_at?: string;
+          display_location: string;
+          display_title: string;
+          enriched_at?: string | null;
+          error_message?: string | null;
+          id?: string;
+          job_id: string;
+          location_count?: number;
+          model: string;
+          prompt_version: string;
+          quality_flags?: string[];
+          requirements?: string[];
+          responsibilities?: string[];
+          source_updated_at?: string | null;
+          status?: string;
+          summary: string;
+          updated_at?: string;
+        };
+        Update: {
+          about_role?: string;
+          benefits?: string[];
+          confidence?: number;
+          created_at?: string;
+          display_location?: string;
+          display_title?: string;
+          enriched_at?: string | null;
+          error_message?: string | null;
+          id?: string;
+          job_id?: string;
+          location_count?: number;
+          model?: string;
+          prompt_version?: string;
+          quality_flags?: string[];
+          requirements?: string[];
+          responsibilities?: string[];
+          source_updated_at?: string | null;
+          status?: string;
+          summary?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "job_enrichments_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: true;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      job_ingestion_runs: {
+        Row: {
+          company_name: string;
+          created_at: string;
+          error_message: string | null;
+          expired_jobs: number;
+          fetched_jobs: number;
+          finished_at: string | null;
+          id: string;
+          rejected_jobs: number;
+          source_name: string;
+          source_slug: string;
+          started_at: string;
+          status: string;
+          upserted_jobs: number;
+          valid_jobs: number;
+        };
+        Insert: {
+          company_name: string;
+          created_at?: string;
+          error_message?: string | null;
+          expired_jobs?: number;
+          fetched_jobs?: number;
+          finished_at?: string | null;
+          id?: string;
+          rejected_jobs?: number;
+          source_name: string;
+          source_slug: string;
+          started_at?: string;
+          status?: string;
+          upserted_jobs?: number;
+          valid_jobs?: number;
+        };
+        Update: {
+          company_name?: string;
+          created_at?: string;
+          error_message?: string | null;
+          expired_jobs?: number;
+          fetched_jobs?: number;
+          finished_at?: string | null;
+          id?: string;
+          rejected_jobs?: number;
+          source_name?: string;
+          source_slug?: string;
+          started_at?: string;
+          status?: string;
+          upserted_jobs?: number;
+          valid_jobs?: number;
+        };
+        Relationships: [];
+      };
+      job_sources: {
+        Row: {
+          company_domain: string | null;
+          company_logo_url: string | null;
+          company_name: string;
+          created_at: string;
+          enabled: boolean;
+          id: string;
+          metadata: Json;
+          notes: string | null;
+          source_slug: string;
+          source_type: string;
+          source_url: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          company_domain?: string | null;
+          company_logo_url?: string | null;
+          company_name: string;
+          created_at?: string;
+          enabled?: boolean;
+          id?: string;
+          metadata?: Json;
+          notes?: string | null;
+          source_slug: string;
+          source_type: string;
+          source_url?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          company_domain?: string | null;
+          company_logo_url?: string | null;
+          company_name?: string;
+          created_at?: string;
+          enabled?: boolean;
+          id?: string;
+          metadata?: Json;
+          notes?: string | null;
+          source_slug?: string;
+          source_type?: string;
+          source_url?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
       };
       jobs: {
         Row: {
@@ -571,6 +744,36 @@ export type Database = {
           },
         ];
       };
+      locations: {
+        Row: {
+          city: string;
+          country: string;
+          created_at: string;
+          id: number;
+          popularity_rank: number;
+          state: string;
+          zip_code: string | null;
+        };
+        Insert: {
+          city: string;
+          country?: string;
+          created_at?: string;
+          id?: number;
+          popularity_rank?: number;
+          state: string;
+          zip_code?: string | null;
+        };
+        Update: {
+          city?: string;
+          country?: string;
+          created_at?: string;
+          id?: number;
+          popularity_rank?: number;
+          state?: string;
+          zip_code?: string | null;
+        };
+        Relationships: [];
+      };
       messages: {
         Row: {
           body: string;
@@ -683,112 +886,289 @@ export type Database = {
       };
       profiles: {
         Row: {
+          achievements: Json;
           additional_info: string | null;
+          avatar_file_name: string | null;
+          avatar_uploaded_at: string | null;
+          avatar_url: string | null;
+          city: string | null;
           created_at: string;
           deleted_at: string | null;
           deletion_requested_at: string | null;
           disability_status: string | null;
-          education: Json | null;
+          education: Json;
           email: string | null;
           ethnicity: string | null;
+          ethnicity_self_describe: string | null;
           executive_summary: string | null;
           full_name: string | null;
           gender: string | null;
-          highest_degree: string | null;
+          gender_self_describe: string | null;
           headline: string | null;
+          highest_degree: string | null;
           id: string;
           industry: string | null;
           level_of_experience: string | null;
+          licenses_certifications: Json;
           location: string | null;
           minimum_desired_pay: string | null;
           objective: string | null;
-          open_to_relocation: boolean | null;
+          open_to_relocation: boolean;
           phone: string | null;
-          profile_links: Json | null;
+          profile_links: Json;
           resume_file_name: string | null;
           resume_file_size: number | null;
           resume_scan_status: string | null;
           resume_uploaded_at: string | null;
           resume_url: string | null;
           skills: string[];
+          state: string | null;
           updated_at: string;
           user_id: string;
           user_type: Database["public"]["Enums"]["app_role"];
           veteran_status: string | null;
           visibility: Database["public"]["Enums"]["profile_visibility"];
-          work_experience: Json | null;
+          work_experience: Json;
+          zip_code: string | null;
         };
         Insert: {
+          achievements?: Json;
           additional_info?: string | null;
+          avatar_file_name?: string | null;
+          avatar_uploaded_at?: string | null;
+          avatar_url?: string | null;
+          city?: string | null;
           created_at?: string;
           deleted_at?: string | null;
           deletion_requested_at?: string | null;
           disability_status?: string | null;
-          education?: Json | null;
+          education?: Json;
           email?: string | null;
           ethnicity?: string | null;
+          ethnicity_self_describe?: string | null;
           executive_summary?: string | null;
           full_name?: string | null;
           gender?: string | null;
-          highest_degree?: string | null;
+          gender_self_describe?: string | null;
           headline?: string | null;
+          highest_degree?: string | null;
           id?: string;
           industry?: string | null;
           level_of_experience?: string | null;
+          licenses_certifications?: Json;
           location?: string | null;
           minimum_desired_pay?: string | null;
           objective?: string | null;
-          open_to_relocation?: boolean | null;
+          open_to_relocation?: boolean;
           phone?: string | null;
-          profile_links?: Json | null;
+          profile_links?: Json;
           resume_file_name?: string | null;
           resume_file_size?: number | null;
           resume_scan_status?: string | null;
           resume_uploaded_at?: string | null;
           resume_url?: string | null;
           skills?: string[];
+          state?: string | null;
           updated_at?: string;
           user_id: string;
           user_type?: Database["public"]["Enums"]["app_role"];
           veteran_status?: string | null;
           visibility?: Database["public"]["Enums"]["profile_visibility"];
-          work_experience?: Json | null;
+          work_experience?: Json;
+          zip_code?: string | null;
         };
         Update: {
+          achievements?: Json;
           additional_info?: string | null;
+          avatar_file_name?: string | null;
+          avatar_uploaded_at?: string | null;
+          avatar_url?: string | null;
+          city?: string | null;
           created_at?: string;
           deleted_at?: string | null;
           deletion_requested_at?: string | null;
           disability_status?: string | null;
-          education?: Json | null;
+          education?: Json;
           email?: string | null;
           ethnicity?: string | null;
+          ethnicity_self_describe?: string | null;
           executive_summary?: string | null;
           full_name?: string | null;
           gender?: string | null;
-          highest_degree?: string | null;
+          gender_self_describe?: string | null;
           headline?: string | null;
+          highest_degree?: string | null;
           id?: string;
           industry?: string | null;
           level_of_experience?: string | null;
+          licenses_certifications?: Json;
           location?: string | null;
           minimum_desired_pay?: string | null;
           objective?: string | null;
-          open_to_relocation?: boolean | null;
+          open_to_relocation?: boolean;
           phone?: string | null;
-          profile_links?: Json | null;
+          profile_links?: Json;
           resume_file_name?: string | null;
           resume_file_size?: number | null;
           resume_scan_status?: string | null;
           resume_uploaded_at?: string | null;
           resume_url?: string | null;
           skills?: string[];
+          state?: string | null;
           updated_at?: string;
           user_id?: string;
           user_type?: Database["public"]["Enums"]["app_role"];
           veteran_status?: string | null;
           visibility?: Database["public"]["Enums"]["profile_visibility"];
-          work_experience?: Json | null;
+          work_experience?: Json;
+          zip_code?: string | null;
+        };
+        Relationships: [];
+      };
+      salary_benchmarks: {
+        Row: {
+          annual_mean: number | null;
+          annual_median: number | null;
+          annual_p10: number | null;
+          annual_p25: number | null;
+          annual_p75: number | null;
+          annual_p90: number | null;
+          area_code: string;
+          area_name: string;
+          area_type: string;
+          created_at: string;
+          employment: number | null;
+          hourly_median: number | null;
+          id: string;
+          occupation_code: string;
+          occupation_name: string;
+          occupation_search_text: string | null;
+          release_period: string;
+          release_year: number;
+          source_name: string;
+          source_url: string;
+          state_code: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          annual_mean?: number | null;
+          annual_median?: number | null;
+          annual_p10?: number | null;
+          annual_p25?: number | null;
+          annual_p75?: number | null;
+          annual_p90?: number | null;
+          area_code: string;
+          area_name: string;
+          area_type: string;
+          created_at?: string;
+          employment?: number | null;
+          hourly_median?: number | null;
+          id?: string;
+          occupation_code: string;
+          occupation_name: string;
+          occupation_search_text?: string | null;
+          release_period: string;
+          release_year: number;
+          source_name?: string;
+          source_url?: string;
+          state_code?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          annual_mean?: number | null;
+          annual_median?: number | null;
+          annual_p10?: number | null;
+          annual_p25?: number | null;
+          annual_p75?: number | null;
+          annual_p90?: number | null;
+          area_code?: string;
+          area_name?: string;
+          area_type?: string;
+          created_at?: string;
+          employment?: number | null;
+          hourly_median?: number | null;
+          id?: string;
+          occupation_code?: string;
+          occupation_name?: string;
+          occupation_search_text?: string | null;
+          release_period?: string;
+          release_year?: number;
+          source_name?: string;
+          source_url?: string;
+          state_code?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      salary_bls_oews: {
+        Row: {
+          annual_mean: number | null;
+          annual_median: number | null;
+          annual_p10: number | null;
+          annual_p25: number | null;
+          annual_p75: number | null;
+          annual_p90: number | null;
+          area_code: string;
+          area_name: string;
+          area_type: string;
+          created_at: string;
+          employment: number | null;
+          hourly_median: number | null;
+          id: string;
+          occupation_code: string;
+          occupation_name: string;
+          occupation_search_text: string | null;
+          release_period: string;
+          release_year: number;
+          source_url: string;
+          state_code: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          annual_mean?: number | null;
+          annual_median?: number | null;
+          annual_p10?: number | null;
+          annual_p25?: number | null;
+          annual_p75?: number | null;
+          annual_p90?: number | null;
+          area_code: string;
+          area_name: string;
+          area_type: string;
+          created_at?: string;
+          employment?: number | null;
+          hourly_median?: number | null;
+          id?: string;
+          occupation_code: string;
+          occupation_name: string;
+          occupation_search_text?: string | null;
+          release_period: string;
+          release_year: number;
+          source_url?: string;
+          state_code?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          annual_mean?: number | null;
+          annual_median?: number | null;
+          annual_p10?: number | null;
+          annual_p25?: number | null;
+          annual_p75?: number | null;
+          annual_p90?: number | null;
+          area_code?: string;
+          area_name?: string;
+          area_type?: string;
+          created_at?: string;
+          employment?: number | null;
+          hourly_median?: number | null;
+          id?: string;
+          occupation_code?: string;
+          occupation_name?: string;
+          occupation_search_text?: string | null;
+          release_period?: string;
+          release_year?: number;
+          source_url?: string;
+          state_code?: string | null;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -820,6 +1200,72 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      schools: {
+        Row: {
+          city: string | null;
+          created_at: string;
+          id: string;
+          name: string;
+          popularity_rank: number;
+          source: string;
+          state: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          city?: string | null;
+          created_at?: string;
+          id: string;
+          name: string;
+          popularity_rank?: number;
+          source?: string;
+          state?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          city?: string | null;
+          created_at?: string;
+          id?: string;
+          name?: string;
+          popularity_rank?: number;
+          source?: string;
+          state?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      security_audit_log: {
+        Row: {
+          action: string;
+          actor_id: string | null;
+          actor_role: string;
+          created_at: string;
+          id: string;
+          metadata: Json;
+          target_id: string | null;
+          target_type: string;
+        };
+        Insert: {
+          action: string;
+          actor_id?: string | null;
+          actor_role?: string;
+          created_at?: string;
+          id?: string;
+          metadata?: Json;
+          target_id?: string | null;
+          target_type: string;
+        };
+        Update: {
+          action?: string;
+          actor_id?: string | null;
+          actor_role?: string;
+          created_at?: string;
+          id?: string;
+          metadata?: Json;
+          target_id?: string | null;
+          target_type?: string;
+        };
+        Relationships: [];
       };
       user_roles: {
         Row: {
@@ -861,19 +1307,6 @@ export type Database = {
       };
     };
     Functions: {
-      apply_company_billing_event: {
-        Args: {
-          p_active_job_limit: number | null;
-          p_company_id: string | null;
-          p_current_period_end: string | null;
-          p_customer_id: string | null;
-          p_event_created: number;
-          p_plan: string | null;
-          p_status: string | null;
-          p_subscription_id: string | null;
-        };
-        Returns: boolean;
-      };
       append_security_audit: {
         Args: {
           p_action: string;
@@ -883,22 +1316,28 @@ export type Database = {
         };
         Returns: undefined;
       };
+      apply_company_billing_event: {
+        Args: {
+          p_active_job_limit: number;
+          p_company_id: string;
+          p_current_period_end: string;
+          p_customer_id: string;
+          p_event_created: number;
+          p_plan: string;
+          p_status: string;
+          p_subscription_id: string;
+        };
+        Returns: boolean;
+      };
       assign_initial_role: {
         Args: {
-          p_email: string | null;
+          p_email: string;
           p_full_name: string;
           p_role: Database["public"]["Enums"]["app_role"];
           p_source: string;
           p_user_id: string;
         };
         Returns: Database["public"]["Enums"]["app_role"];
-      };
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"];
-          _user_id: string;
-        };
-        Returns: boolean;
       };
       claim_billing_event: {
         Args: { p_event_type: string; p_stripe_event_id: string };
@@ -913,6 +1352,17 @@ export type Database = {
         };
         Returns: boolean;
       };
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"];
+          _user_id: string;
+        };
+        Returns: boolean;
+      };
+      is_service_role: { Args: never; Returns: boolean };
+      prune_stale_operational_data: { Args: never; Returns: Json };
+      show_limit: { Args: never; Returns: number };
+      show_trgm: { Args: { "": string }; Returns: string[] };
     };
     Enums: {
       app_role: "admin" | "recruiter" | "job_seeker";

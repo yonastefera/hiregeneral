@@ -1,6 +1,6 @@
 import type { Job } from "@/lib/db/types";
 
-export const DEFAULT_POSTED = "60";
+export const DEFAULT_POSTED = "30";
 export const DEFAULT_DISTANCE = "100";
 export const DEFAULT_WORK_MODE = "";
 export const PAGE_SIZE = 20;
@@ -36,8 +36,7 @@ export const postedOptions = [
   { value: "3", label: "Last 3 days" },
   { value: "7", label: "Last 7 days" },
   { value: "14", label: "Last 14 days" },
-  { value: "30", label: "Last 30 days" },
-  { value: DEFAULT_POSTED, label: "Last 60 days" },
+  { value: DEFAULT_POSTED, label: "Last 30 days" },
   { value: "3650", label: "Any time" },
 ] as const;
 
@@ -108,7 +107,7 @@ export function buildJobsApiParams(state: JobsSearchState) {
     distance: state.distance,
 
     loadMode: hasKeywordSearch ? "pool" : "latest",
-    balance: "none",
+    balance: "company",
   });
 
   if (hasKeywordSearch) {

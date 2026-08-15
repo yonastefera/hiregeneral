@@ -54,6 +54,9 @@ jobs:
       - name: Validate migrations
         run: npm run test:migrations
 
+      - name: Build disposable test schema bundle
+        run: npm run test:schema-bundle
+
       - name: Build production application
         run: npm run build
 
@@ -100,3 +103,51 @@ jobs:
 
       - name: Verify RLS isolation
         run: npm run test:rls
+
+  authenticated-e2e:
+    name: Authenticated browser journeys
+    if: ${{ vars.RUN_AUTHENTICATED_E2E == '1' }}
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: "true"
+      RUN_AUTHENTICATED_E2E: "1"
+      SUPABASE_TEST_URL: ${{ secrets.SUPABASE_TEST_URL }}
+      SUPABASE_TEST_ANON_KEY: ${{ secrets.SUPABASE_TEST_ANON_KEY }}
+      SUPABASE_TEST_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_TEST_SERVICE_ROLE_KEY }}
+      SUPABASE_TEST_SEEKER_EMAIL: seeker@hiregeneral.test
+      SUPABASE_TEST_SEEKER_PASSWORD: ${{ secrets.SUPABASE_TEST_SEEKER_PASSWORD }}
+      SUPABASE_TEST_RECRUITER_A_EMAIL: recruiter-a@hiregeneral.test
+      SUPABASE_TEST_RECRUITER_A_PASSWORD: ${{ secrets.SUPABASE_TEST_RECRUITER_A_PASSWORD }}
+      SUPABASE_TEST_RECRUITER_B_EMAIL: recruiter-b@hiregeneral.test
+      SUPABASE_TEST_RECRUITER_B_PASSWORD: ${{ secrets.SUPABASE_TEST_RECRUITER_B_PASSWORD }}
+      SUPABASE_TEST_ADMIN_EMAIL: admin@hiregeneral.test
+      SUPABASE_TEST_ADMIN_PASSWORD: ${{ secrets.SUPABASE_TEST_ADMIN_PASSWORD }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Use Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run authenticated end-to-end journeys
+        run: npm run test:e2e:authenticated
+
+      - name: Upload Playwright failure artifacts
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: authenticated-playwright-failures
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7

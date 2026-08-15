@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { resolve } from "node:path";
 import process from "node:process";
 
@@ -6,7 +7,7 @@ import { config as loadEnv } from "dotenv";
 
 const loaded = loadEnv({ path: resolve(".env.rls.test"), quiet: true });
 
-if (loaded.error) {
+if (loaded.error && !process.env.CI) {
   throw new Error("Authenticated E2E requires the ignored .env.rls.test file.");
 }
 
@@ -20,6 +21,8 @@ const required = [
   "SUPABASE_TEST_RECRUITER_A_PASSWORD",
   "SUPABASE_TEST_RECRUITER_B_EMAIL",
   "SUPABASE_TEST_RECRUITER_B_PASSWORD",
+  "SUPABASE_TEST_ADMIN_EMAIL",
+  "SUPABASE_TEST_ADMIN_PASSWORD",
 ];
 
 for (const name of required) {
@@ -54,6 +57,8 @@ const childEnv = {
   NEXT_PUBLIC_SUPABASE_URL: process.env.SUPABASE_TEST_URL,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.SUPABASE_TEST_ANON_KEY,
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_TEST_SERVICE_ROLE_KEY,
+  INGEST_SECRET:
+    process.env.INGEST_SECRET ?? randomBytes(32).toString("base64url"),
 };
 
 function run(command, args) {

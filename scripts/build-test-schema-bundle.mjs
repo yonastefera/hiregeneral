@@ -1,5 +1,5 @@
 import { readFile, readdir, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 const migrationDirectory = resolve("src/lib/migrations");
 const outputPath =
@@ -8,6 +8,7 @@ const outputPath =
 
 const entries = await readdir(migrationDirectory, { withFileTypes: true });
 const legacy = entries
+  .filter((entry) => entry.isFile())
   .map((entry) => entry.name)
   .filter((name) => /^file\d+\.sql$/.test(name))
   .sort((left, right) => {
@@ -36,11 +37,35 @@ const dated = [
   "20260814_profile_schema_parity.sql",
 ];
 
+async function walk(path) {
+  const children = await readdir(path, { withFileTypes: true });
+  const files = await Promise.all(
+    children.map((child) => {
+      const childPath = join(path, child.name);
+      return child.isDirectory() ? walk(childPath) : [childPath];
+    }),
+  );
+  return files.flat();
+}
+
+const forward = (await walk(migrationDirectory))
+  .filter((path) => /(?:^|\/)\d{14}_[a-z0-9_]+\.sql$/.test(path))
+  .map((path) => relative(migrationDirectory, path).split(sep).join("/"))
+  .sort();
+
 if (legacy.length !== 98) {
   throw new Error(`Expected 98 legacy migrations, found ${legacy.length}.`);
 }
 
-const files = [...legacy, ...dated];
+const files = [...legacy, ...dated, ...forward];
+const discovered = (await walk(migrationDirectory)).filter((path) =>
+  path.endsWith(".sql"),
+);
+if (files.length !== discovered.length) {
+  throw new Error(
+    `Migration bundle inventory mismatch: selected ${files.length} of ${discovered.length} SQL files.`,
+  );
+}
 const sections = [];
 
 for (const file of files) {

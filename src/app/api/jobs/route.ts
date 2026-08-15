@@ -14,6 +14,10 @@ import {
   mapJobEnrichments,
 } from "@/lib/jobs/enrichment";
 import { shouldUseDirectJobsFallback } from "@/lib/jobs/search-fallback";
+import {
+  dedupeJobListings,
+  diversifyJobListings,
+} from "@/lib/jobs/result-diversity";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,14 +25,14 @@ export const dynamic = "force-dynamic";
 const supabasePublic = createSupabasePublicClient();
 
 const NEW_JOBS_WINDOW_DAYS = 7;
-const DEFAULT_COMPANY_BALANCE = "none";
-const DEFAULT_DAYS_AGO = 3650;
+const DEFAULT_COMPANY_BALANCE = "company";
+const DEFAULT_DAYS_AGO = 30;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 25;
 const EASY_APPLY_SCAN_PAGE_SIZE = 25;
 const EASY_APPLY_MAX_SCAN_PAGES = 40;
 
-const JOBS_API_CACHE_VERSION = process.env.JOBS_API_CACHE_VERSION ?? "4";
+const JOBS_API_CACHE_VERSION = process.env.JOBS_API_CACHE_VERSION ?? "5";
 const JOBS_BROWSE_CACHE_TTL_SECONDS = 60 * 3; // 3 minutes
 const JOBS_SEARCH_CACHE_TTL_SECONDS = 60; // 1 minute
 const JOBS_FILTER_CACHE_TTL_SECONDS = 60 * 2; // 2 minutes
@@ -527,18 +531,28 @@ async function searchJobsDirect(params: {
     request = request.or("apply_url.is.null,apply_url.eq.");
   }
 
-  const rangeEnd = start + params.pageSize - 1;
+  const shouldDiversify = params.balance === "company";
+  const rangeStart = shouldDiversify ? 0 : start;
+  const rangeEnd = shouldDiversify ? 999 : start + params.pageSize - 1;
 
   const { data, error, count } = await request
     .order("posted_at", { ascending: false })
-    .range(start, rangeEnd);
+    .range(rangeStart, rangeEnd);
 
   if (error) {
     throw error;
   }
 
-  const total = count ?? data?.length ?? 0;
-  const pageRows = (data ?? []) as JobCandidateRow[];
+  const candidateRows = (data ?? []) as JobCandidateRow[];
+  const uniqueRows = shouldDiversify
+    ? diversifyJobListings(candidateRows)
+    : dedupeJobListings(candidateRows);
+  const total = shouldDiversify
+    ? uniqueRows.length
+    : (count ?? uniqueRows.length);
+  const pageRows = shouldDiversify
+    ? uniqueRows.slice(start, start + params.pageSize)
+    : uniqueRows;
 
   const rows = pageRows.map((job) => ({
     ...job,
@@ -776,6 +790,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    rows = dedupeJobListings(rows);
     const pageCandidates = toJobCandidateRows(rows);
     const pageJobs = await hydrateJobDetails(pageCandidates);
     const isCompanyBalanced = balance === "company";

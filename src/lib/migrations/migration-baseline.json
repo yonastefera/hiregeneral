@@ -1,0 +1,6 @@
+{
+  "establishedAt": "2026-08-15",
+  "historicalFileCount": 115,
+  "historicalSha256": "5be3ecbf3fbd76391da7ecfeead4ed0da8a9bdd003fda1b24984b2fe55341ef6",
+  "lastHistoricalMigration": "20260814_profile_schema_parity.sql"
+}
