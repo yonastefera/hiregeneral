@@ -1,0 +1,22 @@
+-- Keep the persisted profiles table aligned with the job-seeker profile editor.
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS city TEXT,
+  ADD COLUMN IF NOT EXISTS state TEXT,
+  ADD COLUMN IF NOT EXISTS zip_code TEXT,
+  ADD COLUMN IF NOT EXISTS avatar_url TEXT,
+  ADD COLUMN IF NOT EXISTS avatar_file_name TEXT,
+  ADD COLUMN IF NOT EXISTS avatar_uploaded_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS work_experience JSONB NOT NULL DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS profile_links JSONB NOT NULL DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS education JSONB NOT NULL DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS achievements JSONB NOT NULL DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS licenses_certifications JSONB NOT NULL DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS executive_summary TEXT,
+  ADD COLUMN IF NOT EXISTS objective TEXT,
+  ADD COLUMN IF NOT EXISTS open_to_relocation BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS minimum_desired_pay TEXT,
+  ADD COLUMN IF NOT EXISTS level_of_experience TEXT,
+  ADD COLUMN IF NOT EXISTS highest_degree TEXT,
+  ADD COLUMN IF NOT EXISTS industry TEXT,
+  ADD COLUMN IF NOT EXISTS gender_self_describe TEXT,
+  ADD COLUMN IF NOT EXISTS ethnicity_self_describe TEXT;
