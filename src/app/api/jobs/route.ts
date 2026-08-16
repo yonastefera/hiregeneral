@@ -493,14 +493,7 @@ async function searchJobsDirect(params: {
   const company = params.company.trim();
   if (query) {
     const pattern = toIlikePattern(query);
-    request = request.or(
-      [
-        `title.ilike.${pattern}`,
-        `company_name.ilike.${pattern}`,
-        `description.ilike.${pattern}`,
-        `category.ilike.${pattern}`,
-      ].join(","),
-    );
+    request = request.ilike("search_text", pattern);
   }
 
   if (location) {

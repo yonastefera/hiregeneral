@@ -640,6 +640,7 @@ export type Database = {
           salary_max: number | null;
           salary_min: number | null;
           screening_questions: Json;
+          search_text: string | null;
           skills: string[];
           slug: string | null;
           source_id: string | null;
@@ -682,6 +683,7 @@ export type Database = {
           salary_max?: number | null;
           salary_min?: number | null;
           screening_questions?: Json;
+          search_text?: string | null;
           skills?: string[];
           slug?: string | null;
           source_id?: string | null;
@@ -724,6 +726,7 @@ export type Database = {
           salary_max?: number | null;
           salary_min?: number | null;
           screening_questions?: Json;
+          search_text?: string | null;
           skills?: string[];
           slug?: string | null;
           source_id?: string | null;

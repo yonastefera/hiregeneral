@@ -13,6 +13,7 @@ import {
   US_STATE_NAMES_BY_ABBR,
   normalizeUsStateRegion,
 } from "@/lib/location/us-states";
+import { buildBenchmarkLocationConstraint } from "@/lib/salary/benchmark-location-filter";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -556,6 +557,10 @@ async function findBlsSalary(career: string, location: string) {
 
   const codes = occupationCodesForCareer(career);
   const tokens = searchTokens(career);
+  const locationConstraint = buildBenchmarkLocationConstraint({
+    location,
+    ...parseLocation(location),
+  });
 
   let query = supabasePublic
     .from("salary_benchmarks")
@@ -576,6 +581,12 @@ async function findBlsSalary(career: string, location: string) {
         )
         .join(","),
     );
+  }
+
+  if (locationConstraint.kind === "national") {
+    query = query.eq("area_type", "N");
+  } else {
+    query = query.or(locationConstraint.filter);
   }
 
   const { data, error } = await query;
