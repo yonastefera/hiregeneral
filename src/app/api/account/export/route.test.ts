@@ -56,6 +56,10 @@ function createSupabase(options?: {
       data: options?.profileError ? null : { id: "profile-1", user_id: userId },
       error: options?.profileError ?? null,
     },
+    profile_demographics: {
+      data: { profile_id: "profile-1", user_id: userId, gender: null },
+      error: null,
+    },
     user_roles: { data: [{ role: "job_seeker" }], error: null },
     applications: { data: [{ id: "application-1" }], error: null },
     saved_jobs: { data: [], error: null },
@@ -153,6 +157,9 @@ describe("GET /api/account/export", () => {
     );
     expect(payload.profile).toEqual(
       expect.objectContaining({ user_id: userId }),
+    );
+    expect(payload.demographics).toEqual(
+      expect.objectContaining({ profile_id: "profile-1", user_id: userId }),
     );
     expect(payload.applications).toEqual([{ id: "application-1" }]);
     expect(payload.messages).toEqual([{ id: "message-1" }]);

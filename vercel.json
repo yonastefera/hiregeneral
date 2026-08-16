@@ -3,6 +3,10 @@
     {
       "path": "/api/ingest/jobs",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/internal/account-deletions",
+      "schedule": "30 5 * * *"
     }
   ]
 }

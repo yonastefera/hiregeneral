@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { loadEmployerEntitlements } from "@/lib/billing/entitlements";
 import type {
   EducationItem,
   ProfileLink,
@@ -428,7 +429,6 @@ async function loadEmployerJobs(
 }
 
 async function loadCandidateProfiles(
-  supabase: SupabaseServerClient,
   recruiterId: string,
   params: {
     resumeOnly?: boolean;
@@ -437,8 +437,10 @@ async function loadCandidateProfiles(
     limit: number;
   },
 ) {
+  const admin = createSupabaseAdminClient();
+
   async function runQuery(selectColumns: string) {
-    let query = supabase
+    let query = admin
       .from("profiles")
       .select(selectColumns, { count: "exact" })
       .is("deleted_at", null);
@@ -503,6 +505,17 @@ export async function getEmployerResumeDatabaseData(
     };
   }
 
+  const entitlements = await loadEmployerEntitlements(supabase);
+
+  if (!entitlements.candidateDatabase) {
+    return {
+      jobs: [],
+      selectedJobId: null,
+      candidates: [],
+      totalCandidates: 0,
+    };
+  }
+
   const jobs = await loadEmployerJobs(supabase, recruiterId);
   const selectedJob =
     jobs.find((job) => job.id === params.jobId) ?? jobs[0] ?? null;
@@ -520,7 +533,7 @@ export async function getEmployerResumeDatabaseData(
 
   const profileLimit = searchTerm ? 500 : 250;
   const [initialProfileResult, inviteResult] = await Promise.all([
-    loadCandidateProfiles(supabase, recruiterId, {
+    loadCandidateProfiles(recruiterId, {
       resumeOnly,
       includeRecruiter: false,
       publicOnly: true,
@@ -535,7 +548,7 @@ export async function getEmployerResumeDatabaseData(
     profileResult.data.length === 0 &&
     process.env.NODE_ENV !== "production"
   ) {
-    profileResult = await loadCandidateProfiles(supabase, recruiterId, {
+    profileResult = await loadCandidateProfiles(recruiterId, {
       resumeOnly,
       includeRecruiter: true,
       publicOnly: true,

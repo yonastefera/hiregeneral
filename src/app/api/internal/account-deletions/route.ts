@@ -3,6 +3,10 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { logServerError } from "@/lib/http/api-security";
+import {
+  cancelStripeSubscription,
+  isStripeNotFoundError,
+} from "@/lib/stripe/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -14,6 +18,12 @@ const STORAGE_BUCKETS = ["resumes", "avatars"] as const;
 type EligibleProfile = {
   user_id: string;
   email: string | null;
+};
+
+type EmployerCompany = {
+  id: string;
+  stripe_subscription_id: string | null;
+  subscription_status: string;
 };
 
 function authorized(request: Request) {
@@ -62,10 +72,48 @@ async function removeUserStorage(
   }
 }
 
+async function cancelEmployerSubscriptions(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  userId: string,
+) {
+  const { data, error } = await admin
+    .from("companies")
+    .select("id, stripe_subscription_id, subscription_status")
+    .eq("owner_id", userId);
+
+  if (error) throw error;
+
+  for (const company of (data ?? []) as EmployerCompany[]) {
+    const subscriptionId = company.stripe_subscription_id?.trim();
+    const status = company.subscription_status.toLowerCase();
+
+    if (!subscriptionId || ["canceled", "inactive"].includes(status)) continue;
+
+    try {
+      await cancelStripeSubscription(subscriptionId);
+    } catch (stripeError) {
+      if (!isStripeNotFoundError(stripeError)) throw stripeError;
+    }
+
+    const { error: updateError } = await admin
+      .from("companies")
+      .update({
+        subscription_status: "canceled",
+        current_period_end: new Date().toISOString(),
+      })
+      .eq("id", company.id)
+      .eq("owner_id", userId);
+
+    if (updateError) throw updateError;
+  }
+}
+
 async function executeDeletion(
   admin: ReturnType<typeof createSupabaseAdminClient>,
   profile: EligibleProfile,
 ) {
+  await cancelEmployerSubscriptions(admin, profile.user_id);
+
   if (profile.email) {
     const { error } = await admin
       .from("contact_messages")

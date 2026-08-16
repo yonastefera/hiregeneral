@@ -2,10 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   createAdmin: vi.fn(),
+  cancelSubscription: vi.fn(),
+  isStripeNotFound: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/admin", () => ({
   createSupabaseAdminClient: mocks.createAdmin,
+}));
+vi.mock("@/lib/stripe/server", () => ({
+  cancelStripeSubscription: mocks.cancelSubscription,
+  isStripeNotFoundError: mocks.isStripeNotFound,
 }));
 
 import { GET } from "@/app/api/internal/account-deletions/route";
@@ -26,6 +32,11 @@ function createAdmin(options?: {
   storageError?: object | null;
   authError?: { message?: string; status?: number } | null;
   completeError?: object | null;
+  companies?: Array<{
+    id: string;
+    stripe_subscription_id: string | null;
+    subscription_status: string;
+  }>;
 }) {
   const operations: string[] = [];
   const profileQuery: Record<string, ReturnType<typeof vi.fn>> = {};
@@ -46,6 +57,25 @@ function createAdmin(options?: {
   };
   contactQuery.delete.mockReturnValue(contactQuery);
 
+  const companySelection = {
+    select: vi.fn(),
+    eq: vi.fn().mockResolvedValue({
+      data: options?.companies ?? [],
+      error: null,
+    }),
+  };
+  companySelection.select.mockReturnValue(companySelection);
+  const companyUpdate = {
+    eq: vi.fn(),
+  };
+  companyUpdate.eq
+    .mockReturnValueOnce(companyUpdate)
+    .mockResolvedValue({ error: null });
+  const companyQuery = {
+    select: companySelection.select,
+    update: vi.fn().mockReturnValue(companyUpdate),
+  };
+
   const storage = {
     list: vi.fn().mockImplementation(async () => {
       operations.push("storage-list");
@@ -60,9 +90,11 @@ function createAdmin(options?: {
   };
 
   const admin = {
-    from: vi.fn((table: string) =>
-      table === "profiles" ? profileQuery : contactQuery,
-    ),
+    from: vi.fn((table: string) => {
+      if (table === "profiles") return profileQuery;
+      if (table === "companies") return companyQuery;
+      return contactQuery;
+    }),
     rpc: vi.fn().mockImplementation(async (name: string) => {
       operations.push(name);
       return {
@@ -83,6 +115,8 @@ function createAdmin(options?: {
     },
     profileQuery,
     contactQuery,
+    companyQuery,
+    companyUpdate,
     storageClient: storage,
     operations,
   };
@@ -94,6 +128,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   process.env.CRON_SECRET = secret;
   process.env.ACCOUNT_DELETION_EXECUTION_ENABLED = "false";
+  mocks.cancelSubscription.mockResolvedValue({
+    id: "sub_test",
+    status: "canceled",
+  });
+  mocks.isStripeNotFound.mockReturnValue(false);
 });
 
 afterEach(() => {
@@ -129,6 +168,13 @@ describe("internal account-deletion worker", () => {
     process.env.ACCOUNT_DELETION_EXECUTION_ENABLED = "true";
     const admin = createAdmin({
       profiles: [{ user_id: userId, email: "person@example.test" }],
+      companies: [
+        {
+          id: "company-id",
+          stripe_subscription_id: "sub_test",
+          subscription_status: "active",
+        },
+      ],
     });
     mocks.createAdmin.mockReturnValue(admin);
 
@@ -155,6 +201,39 @@ describe("internal account-deletion worker", () => {
     expect(admin.storageClient.remove).toHaveBeenCalledWith([
       `${userId}/resume.pdf`,
     ]);
+    expect(mocks.cancelSubscription).toHaveBeenCalledWith("sub_test");
+    expect(admin.companyQuery.update).toHaveBeenCalledWith({
+      subscription_status: "canceled",
+      current_period_end: expect.any(String),
+    });
+  });
+
+  it("stops before anonymization when Stripe cancellation fails", async () => {
+    process.env.ACCOUNT_DELETION_EXECUTION_ENABLED = "true";
+    mocks.cancelSubscription.mockRejectedValue(
+      new Error("private Stripe detail"),
+    );
+    const admin = createAdmin({
+      profiles: [{ user_id: userId, email: null }],
+      companies: [
+        {
+          id: "company-id",
+          stripe_subscription_id: "sub_active",
+          subscription_status: "active",
+        },
+      ],
+    });
+    mocks.createAdmin.mockReturnValue(admin);
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    const response = await GET(request());
+
+    expect(response.status).toBe(500);
+    expect(admin.rpc).not.toHaveBeenCalled();
+    expect(admin.auth.admin.deleteUser).not.toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 
   it("returns only safe aggregate failure information", async () => {

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 import type { EmployerMessagesData } from "./messages-content";
 
@@ -26,7 +27,6 @@ type ProfileRow = {
   user_id: string;
   full_name: string | null;
   headline: string | null;
-  email: string | null;
 };
 
 type JobRow = {
@@ -73,11 +73,7 @@ function formatMessageTime(value: string) {
 }
 
 function getProfileLabel(profile: ProfileRow | undefined, userId: string) {
-  return (
-    profile?.full_name?.trim() ||
-    profile?.email ||
-    `Candidate ${userId.slice(0, 6)}`
-  );
+  return profile?.full_name?.trim() || `Candidate ${userId.slice(0, 6)}`;
 }
 
 export async function getEmployerMessagesData(params: {
@@ -138,9 +134,9 @@ export async function getEmployerMessagesData(params: {
 
   const [profilesResult, jobsResult, recentMessagesResult] = await Promise.all([
     participantIds.length > 0
-      ? supabase
+      ? createSupabaseAdminClient()
           .from("profiles")
-          .select("user_id, full_name, headline, email")
+          .select("user_id, full_name, headline")
           .in("user_id", participantIds)
       : Promise.resolve({ data: [], error: null }),
     jobIds.length > 0

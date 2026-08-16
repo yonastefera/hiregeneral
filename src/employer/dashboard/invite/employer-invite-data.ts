@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { loadEmployerEntitlements } from "@/lib/billing/entitlements";
 
 import type { InvitePageData, RecommendedCandidate } from "./invite-content";
 
@@ -100,6 +102,16 @@ export async function getEmployerInviteData(
     };
   }
 
+  const entitlements = await loadEmployerEntitlements(supabase);
+
+  if (!entitlements.candidateDatabase) {
+    return {
+      jobs: [],
+      selectedJobId: null,
+      recommendedCandidates: [],
+    };
+  }
+
   const { data: jobRows, error: jobsError } = await supabase
     .from("jobs")
     .select("id, title, skills")
@@ -138,7 +150,7 @@ export async function getEmployerInviteData(
   }
 
   const [profileResult, inviteResult] = await Promise.all([
-    supabase
+    createSupabaseAdminClient()
       .from("profiles")
       .select("id, user_id, full_name, headline, location, skills")
       .eq("visibility", "public")

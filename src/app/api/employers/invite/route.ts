@@ -15,6 +15,7 @@ import {
 } from "@/lib/http/api-security";
 import { employerInviteRateLimit } from "@/lib/rate-limit";
 import { enforceDuplicateCooldown } from "@/lib/security/abuse";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
@@ -130,12 +131,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("id", candidateId)
-    .eq("visibility", "public")
-    .maybeSingle();
+  const { data: profile, error: profileError } =
+    await createSupabaseAdminClient()
+      .from("profiles")
+      .select("id")
+      .eq("id", candidateId)
+      .eq("visibility", "public")
+      .maybeSingle();
 
   if (profileError) {
     logServerError("employer_invite_profile_lookup_failed", profileError);

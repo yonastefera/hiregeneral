@@ -8,6 +8,16 @@ const WEBHOOK_TOLERANCE_SECONDS = 300;
 type StripeFormValue = string | number | boolean | null | undefined;
 type StripeFormFields = Record<string, StripeFormValue>;
 
+export class StripeRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "StripeRequestError";
+  }
+}
+
 export type StripeCheckoutSession = {
   id: string;
   url: string | null;
@@ -68,7 +78,7 @@ function encodeForm(fields: StripeFormFields) {
 async function stripeRequest<T>(
   path: string,
   options: {
-    method?: "GET" | "POST";
+    method?: "DELETE" | "GET" | "POST";
     fields?: StripeFormFields;
   } = {},
 ) {
@@ -107,12 +117,17 @@ async function stripeRequest<T>(
         ? payload.error?.message
         : `Stripe request failed with ${response.status}.`;
 
-    throw new Error(
+    throw new StripeRequestError(
       message || `Stripe request failed with ${response.status}.`,
+      response.status,
     );
   }
 
   return payload as T;
+}
+
+export function isStripeNotFoundError(error: unknown) {
+  return error instanceof StripeRequestError && error.status === 404;
 }
 
 export async function createStripeCustomer(params: {
@@ -172,6 +187,13 @@ export async function createStripePortalSession(params: {
         return_url: params.returnUrl,
       },
     },
+  );
+}
+
+export async function cancelStripeSubscription(subscriptionId: string) {
+  return stripeRequest<{ id: string; status: string }>(
+    `/subscriptions/${encodeURIComponent(subscriptionId)}`,
+    { method: "DELETE" },
   );
 }
 

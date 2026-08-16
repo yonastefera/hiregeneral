@@ -887,6 +887,53 @@ export type Database = {
         };
         Relationships: [];
       };
+      profile_demographics: {
+        Row: {
+          created_at: string;
+          disability_status: string | null;
+          ethnicity: string | null;
+          ethnicity_self_describe: string | null;
+          gender: string | null;
+          gender_self_describe: string | null;
+          profile_id: string;
+          updated_at: string;
+          user_id: string;
+          veteran_status: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          disability_status?: string | null;
+          ethnicity?: string | null;
+          ethnicity_self_describe?: string | null;
+          gender?: string | null;
+          gender_self_describe?: string | null;
+          profile_id: string;
+          updated_at?: string;
+          user_id: string;
+          veteran_status?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          disability_status?: string | null;
+          ethnicity?: string | null;
+          ethnicity_self_describe?: string | null;
+          gender?: string | null;
+          gender_self_describe?: string | null;
+          profile_id?: string;
+          updated_at?: string;
+          user_id?: string;
+          veteran_status?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "profile_demographics_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profiles: {
         Row: {
           achievements: Json;
@@ -898,15 +945,10 @@ export type Database = {
           created_at: string;
           deleted_at: string | null;
           deletion_requested_at: string | null;
-          disability_status: string | null;
           education: Json;
           email: string | null;
-          ethnicity: string | null;
-          ethnicity_self_describe: string | null;
           executive_summary: string | null;
           full_name: string | null;
-          gender: string | null;
-          gender_self_describe: string | null;
           headline: string | null;
           highest_degree: string | null;
           id: string;
@@ -929,7 +971,6 @@ export type Database = {
           updated_at: string;
           user_id: string;
           user_type: Database["public"]["Enums"]["app_role"];
-          veteran_status: string | null;
           visibility: Database["public"]["Enums"]["profile_visibility"];
           work_experience: Json;
           zip_code: string | null;
@@ -944,15 +985,10 @@ export type Database = {
           created_at?: string;
           deleted_at?: string | null;
           deletion_requested_at?: string | null;
-          disability_status?: string | null;
           education?: Json;
           email?: string | null;
-          ethnicity?: string | null;
-          ethnicity_self_describe?: string | null;
           executive_summary?: string | null;
           full_name?: string | null;
-          gender?: string | null;
-          gender_self_describe?: string | null;
           headline?: string | null;
           highest_degree?: string | null;
           id?: string;
@@ -975,7 +1011,6 @@ export type Database = {
           updated_at?: string;
           user_id: string;
           user_type?: Database["public"]["Enums"]["app_role"];
-          veteran_status?: string | null;
           visibility?: Database["public"]["Enums"]["profile_visibility"];
           work_experience?: Json;
           zip_code?: string | null;
@@ -990,15 +1025,10 @@ export type Database = {
           created_at?: string;
           deleted_at?: string | null;
           deletion_requested_at?: string | null;
-          disability_status?: string | null;
           education?: Json;
           email?: string | null;
-          ethnicity?: string | null;
-          ethnicity_self_describe?: string | null;
           executive_summary?: string | null;
           full_name?: string | null;
-          gender?: string | null;
-          gender_self_describe?: string | null;
           headline?: string | null;
           highest_degree?: string | null;
           id?: string;
@@ -1021,7 +1051,6 @@ export type Database = {
           updated_at?: string;
           user_id?: string;
           user_type?: Database["public"]["Enums"]["app_role"];
-          veteran_status?: string | null;
           visibility?: Database["public"]["Enums"]["profile_visibility"];
           work_experience?: Json;
           zip_code?: string | null;

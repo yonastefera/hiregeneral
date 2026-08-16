@@ -16,8 +16,8 @@ export const privacyPolicyContent: LegalDocument = {
   eyebrow: "Privacy",
   title: "Privacy Policy",
   description:
-    "This sample Privacy Policy explains how HireGeneral may collect, use, disclose, and protect information from job seekers, employers, recruiters, and visitors.",
-  effectiveDate: "May 17, 2026",
+    "This Privacy Policy explains how HireGeneral collects, uses, discloses, retains, and protects information from job seekers, employers, recruiters, and visitors.",
+  effectiveDate: "August 16, 2026",
   sections: [
     {
       title: "1. Information we collect",
@@ -61,7 +61,8 @@ export const privacyPolicyContent: LegalDocument = {
         "We may disclose information when necessary to operate HireGeneral, provide requested services, support hiring activity, or comply with legal obligations.",
       ],
       bullets: [
-        "With employers when a job seeker applies to a role, shares a profile, or interacts with an employer-controlled job post",
+        "With the employer responsible for a role when a job seeker submits an application, including the application fields and resume selected for that application",
+        "With entitled employers when a job seeker makes a profile public and discoverable in the candidate database; private profiles are not generally searchable by employers",
         "With job seekers when an employer publishes public job posts, company pages, or recruiter-facing information",
         "With service providers that help us operate hosting, analytics, security, payments, communications, customer support, and product functionality",
         "With business partners or integrations when you choose to connect third-party tools or services",
@@ -79,7 +80,9 @@ export const privacyPolicyContent: LegalDocument = {
     {
       title: "7. Your choices and rights",
       body: [
-        "You may have choices regarding the personal information associated with your HireGeneral account. These choices may include updating profile information, changing communication preferences, adjusting candidate visibility, deleting your account, or requesting access, correction, or deletion of certain information.",
+        "You can update profile information, change communication preferences, control candidate visibility, delete an uploaded resume, download a JSON export of your account data, or request account deletion through account settings.",
+        "Changing a profile from public to private prevents general candidate-database discovery, but it does not retract application materials already submitted to an employer. Resume access is provided through short-lived, server-authorized links.",
+        "An account-deletion request has a 14-day grace period during which it can be cancelled. After that period, HireGeneral removes or anonymizes covered account data and closes employer jobs. Active employer subscriptions are cancelled before final deletion.",
         "Some information may be retained where necessary to provide services, complete transactions, protect security, comply with legal obligations, resolve disputes, or enforce agreements.",
       ],
     },
@@ -123,9 +126,9 @@ export const privacyPolicyContent: LegalDocument = {
     {
       title: "13. Retention of information",
       body: [
-        "We generally retain personal information for as long as reasonably necessary to provide the platform, support hiring activity, comply with legal obligations, resolve disputes, maintain security, and enforce agreements.",
-        "Retention periods may vary depending on the type of information, sensitivity of the information, user settings, account status, legal requirements, and operational needs.",
-        "When information is no longer needed, we may delete it, anonymize it, aggregate it, or take other appropriate steps. Backup copies may persist for a limited period for business continuity and security purposes.",
+        "Our current operational schedule retains contact submissions for up to 12 months, read notifications for up to 180 days, and closed applications, inactive conversations, security audit events, and role audit events for up to 24 months, unless a shorter period is required or a legal, billing, fraud-prevention, dispute, or security hold applies.",
+        "Account deletion begins after the 14-day cancellation period. Application or billing information already provided to an employer or payment provider may also be retained independently by that recipient under its own obligations and privacy practices.",
+        "When information is no longer needed, we delete or anonymize it. Encrypted backup copies may remain inaccessible until the provider's rotating backup window expires. If a backup is restored, outstanding deletion records must be reapplied before the restored system serves users.",
       ],
     },
     {
@@ -144,7 +147,8 @@ export const privacyPolicyContent: LegalDocument = {
       title: "15. Sensitive personal information",
       body: [
         "HireGeneral asks users not to include sensitive information in resumes, job applications, messages, or profile materials unless it is necessary for the hiring process and you choose to provide it.",
-        "Where we process sensitive information, we use it only for disclosed and permitted purposes, such as account security, authentication, service delivery, compliance, or other purposes allowed by applicable law.",
+        "Optional gender, ethnicity, veteran-status, and disability-status responses are not provided through employer candidate lists or the resume database and are not used for candidate search, ranking, matching, recommendations, applicant review, or hiring decisions.",
+        "Where we process sensitive information, we limit access and use it only for disclosed and permitted purposes, such as account security, authentication, service delivery, compliance, or other purposes allowed by applicable law.",
       ],
     },
     {
@@ -165,7 +169,6 @@ export const privacyPolicyContent: LegalDocument = {
       title: "18. Contact us",
       body: [
         "For privacy questions, requests, or complaints, contact HireGeneral at privacy@hiregeneral.com.",
-        "This is placeholder contact information for now. Replace it with the final company legal contact, mailing address, and support email before launch.",
       ],
     },
   ],

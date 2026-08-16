@@ -39,6 +39,7 @@ export async function GET() {
 
   const [
     profileResult,
+    demographicsResult,
     rolesResult,
     applicationsResult,
     savedJobsResult,
@@ -49,6 +50,11 @@ export async function GET() {
     recruiterInvitesResult,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle(),
+    supabase
+      .from("profile_demographics")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle(),
     supabase.from("user_roles").select("*").eq("user_id", user.id),
     supabase
       .from("applications")
@@ -85,6 +91,7 @@ export async function GET() {
 
   const initialResults = [
     profileResult,
+    demographicsResult,
     rolesResult,
     applicationsResult,
     savedJobsResult,
@@ -157,6 +164,7 @@ export async function GET() {
       last_sign_in_at: user.last_sign_in_at ?? null,
     },
     profile,
+    demographics: demographicsResult.data,
     roles: rolesResult.data ?? [],
     applications: applicationsResult.data ?? [],
     saved_jobs: savedJobsResult.data ?? [],

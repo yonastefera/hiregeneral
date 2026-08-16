@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { jsonRequest } from "@/test/api-request";
 
 const mocks = vi.hoisted(() => ({
+  createAdmin: vi.fn(),
   duplicate: vi.fn(),
   limit: vi.fn(),
   loadEntitlements: vi.fn(),
@@ -12,6 +13,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/auth/require-employer-user", () => ({
   requireEmployerUser: mocks.requireEmployer,
+}));
+vi.mock("@/lib/supabase/admin", () => ({
+  createSupabaseAdminClient: mocks.createAdmin,
 }));
 vi.mock("@/lib/rate-limit", () => ({
   employerInviteRateLimit: { limit: mocks.limit },
@@ -79,7 +83,7 @@ function createSupabase(options?: {
       : { id: "invite-id", status: "sent", created_at: "2026-08-14" },
     error: options?.inviteError ?? null,
   });
-  return {
+  const supabase = {
     from: vi.fn((table: string) => {
       if (table === "jobs") return job;
       if (table === "profiles") return profile;
@@ -89,6 +93,8 @@ function createSupabase(options?: {
     profile,
     invite,
   };
+  mocks.createAdmin.mockReturnValue(supabase);
+  return supabase;
 }
 
 beforeEach(() => {

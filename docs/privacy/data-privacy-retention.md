@@ -28,6 +28,9 @@ collection requires a documented business purpose and legal review. If that
 purpose is not approved before launch, remove these questions and delete the
 stored values.
 
+These responses are stored separately from general profiles in an owner-only
+table. General profile rows do not contain demographic columns.
+
 Application notes must never be placed in analytics events or ordinary logs.
 Resumes, phone numbers, email addresses, employment history, and demographic
 responses are sensitive values and must be removed or masked by the structured
@@ -81,6 +84,9 @@ The internal deletion worker uses `CRON_SECRET` authentication and processes at
 most ten accounts per invocation. It remains report-only unless
 `ACCOUNT_DELETION_EXECUTION_ENABLED=true`. Responses contain aggregate counts
 only; they never expose user identifiers, emails, or storage paths.
+The production scheduler invokes it daily at 05:30 UTC. Active Stripe
+subscriptions are cancelled before any database anonymization; a Stripe failure
+stops that account and leaves it eligible for a later retry.
 
 ## Backups and deletion propagation
 
