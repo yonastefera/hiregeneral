@@ -2,7 +2,14 @@
 
 import { useState, type ComponentType, type ReactNode } from "react";
 import Link from "next/link";
-import { AlertTriangle, Bell, Mail, Shield, UserRound } from "lucide-react";
+import {
+  AlertTriangle,
+  Bell,
+  Download,
+  Mail,
+  Shield,
+  UserRound,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -61,6 +68,7 @@ export default function AccountSettings() {
   const [confirm, setConfirm] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const email = user?.email ?? "Not available";
   const canDelete = Boolean(user) && confirm === "DELETE" && !deleting;
@@ -96,6 +104,43 @@ export default function AccountSettings() {
       toast.error("Something went wrong. Please try again.");
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleExport = async () => {
+    if (!user || exporting) return;
+
+    setExporting(true);
+
+    try {
+      const response = await fetch("/api/account/export", {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        toast.error("Could not prepare your data export. Please try again.");
+        return;
+      }
+
+      const blob = await response.blob();
+      const href = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      const disposition = response.headers.get("content-disposition") ?? "";
+      const fileName =
+        disposition.match(/filename="([^"]+)"/)?.[1] ?? "hiregeneral-data.json";
+
+      anchor.href = href;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(href);
+      toast.success("Your data export was downloaded.");
+    } catch {
+      toast.error("Could not prepare your data export. Please try again.");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -135,6 +180,36 @@ export default function AccountSettings() {
               Change email
             </Button>
           </SettingsCard>
+
+          <SettingsCard
+            icon={Download}
+            title="Download your data"
+            description="Export your profile, applications, saved jobs, messages, employer activity, and support requests as JSON."
+          >
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!user || exporting}
+              onClick={handleExport}
+            >
+              {exporting ? "Preparing…" : "Download data"}
+            </Button>
+          </SettingsCard>
+
+          <section className="rounded-lg border border-border bg-card p-6">
+            <h2 className="text-base font-semibold text-foreground">
+              Resume and employer access
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Your profile is private unless you make it discoverable. Employers
+              may access your resume when you apply to their job, or when your
+              public profile and their plan permit resume-database access.
+              Resume links are temporary and access-controlled. You can hide
+              your profile or delete your current resume from your profile at
+              any time; copies submitted with earlier applications may be
+              retained for the application-retention period.
+            </p>
+          </section>
 
           <section
             aria-labelledby="delete-account-heading"

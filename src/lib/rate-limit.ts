@@ -112,5 +112,10 @@ export const accountDeletionRateLimit = mutationLimiter(
   "24 h",
   "account-deletion",
 );
+export const accountExportRateLimit = mutationLimiter(
+  5,
+  "24 h",
+  "account-export",
+);
 
 export { redis };
