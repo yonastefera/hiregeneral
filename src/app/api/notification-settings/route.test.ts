@@ -5,6 +5,7 @@ import { jsonRequest } from "@/test/api-request";
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   limit: vi.fn(),
+  audit: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -12,6 +13,9 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 vi.mock("@/lib/rate-limit", () => ({
   notificationSettingsRateLimit: { limit: mocks.limit },
+}));
+vi.mock("@/lib/security/audit", () => ({
+  recordPrivilegedAction: mocks.audit,
 }));
 
 import { PATCH } from "@/app/api/notification-settings/route";
@@ -107,6 +111,18 @@ describe("PATCH /api/notification-settings", () => {
       notification_preferences: preferences,
     });
     expect(supabase.profileQuery.eq).toHaveBeenCalledWith("user_id", userId);
+    expect(mocks.audit).toHaveBeenCalledWith({
+      action: "account.communication_preferences_updated",
+      targetType: "user",
+      targetId: userId,
+      metadata: {
+        source: "account_settings",
+        job_alerts: true,
+        application_updates: false,
+        saved_job_reminders: true,
+        marketing_emails: false,
+      },
+    });
   });
 
   it("returns a safe error when the database update fails", async () => {
@@ -125,6 +141,7 @@ describe("PATCH /api/notification-settings", () => {
     expect(response.status).toBe(500);
     expect(payload).toEqual({ error: "Could not save notification settings." });
     expect(JSON.stringify(payload)).not.toContain("private database detail");
+    expect(mocks.audit).not.toHaveBeenCalled();
     consoleError.mockRestore();
   });
 });

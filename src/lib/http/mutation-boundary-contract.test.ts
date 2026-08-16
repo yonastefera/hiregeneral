@@ -160,6 +160,16 @@ const contracts: Record<string, Boundary> = {
     abuseControl: ["ingestionRateLimit", "enforceRateLimit({"],
     safeError: ['safeServerError("Job ingestion failed.")'],
   },
+  "app/api/internal/account-deletions/route.ts": {
+    authentication: ["process.env.CRON_SECRET", "timingSafeEqual"],
+    authorization: ["prepare_account_deletion", "complete_account_deletion"],
+    validation: [
+      '.lte("deletion_requested_at", cutoff)',
+      '.is("deletion_completed_at", null)',
+    ],
+    abuseControl: ["const BATCH_SIZE = 10", ".limit(BATCH_SIZE)"],
+    safeError: ['error: "Could not process account deletions."'],
+  },
   "app/api/messages/route.ts": {
     authentication: ["supabase.auth.getUser()", "status: 401"],
     authorization: ["participant_one.eq.${user.id}", "sender_id: user.id"],

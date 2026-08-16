@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -69,9 +69,41 @@ export default function AccountSettings() {
   const [deleting, setDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [deletionRequestedAt, setDeletionRequestedAt] = useState<string | null>(
+    null,
+  );
+  const [deletionScheduledFor, setDeletionScheduledFor] = useState<
+    string | null
+  >(null);
+  const [cancellingDeletion, setCancellingDeletion] = useState(false);
 
   const email = user?.email ?? "Not available";
   const canDelete = Boolean(user) && confirm === "DELETE" && !deleting;
+
+  useEffect(() => {
+    if (!user) return;
+
+    let active = true;
+
+    fetch("/api/account/deletion", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) return null;
+        return (await response.json()) as {
+          requested_at?: string | null;
+          scheduled_for?: string | null;
+        };
+      })
+      .then((status) => {
+        if (!active || !status) return;
+        setDeletionRequestedAt(status.requested_at ?? null);
+        setDeletionScheduledFor(status.scheduled_for ?? null);
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, [user]);
 
   const handleDelete = async () => {
     if (!user || deleting) return;
@@ -141,6 +173,31 @@ export default function AccountSettings() {
       toast.error("Could not prepare your data export. Please try again.");
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleCancelDeletion = async () => {
+    if (!user || cancellingDeletion) return;
+
+    setCancellingDeletion(true);
+
+    try {
+      const response = await fetch("/api/account/deletion", {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        toast.error("Could not cancel account deletion. Please try again.");
+        return;
+      }
+
+      setDeletionRequestedAt(null);
+      setDeletionScheduledFor(null);
+      toast.success("Account deletion was cancelled.");
+    } catch {
+      toast.error("Could not cancel account deletion. Please try again.");
+    } finally {
+      setCancellingDeletion(false);
     }
   };
 
@@ -230,88 +287,105 @@ export default function AccountSettings() {
                 </h2>
 
                 <p className="mt-1 text-sm text-muted-foreground">
-                  This signs you out immediately and submits your account for
-                  deletion. An admin reviews and permanently removes your data
-                  within 14 days. This action is irreversible after admin
-                  approval.
+                  {deletionRequestedAt
+                    ? `Deletion was requested. Permanent deletion cannot begin before ${new Date(
+                        deletionScheduledFor ?? deletionRequestedAt,
+                      ).toLocaleDateString()}. You can cancel during this grace period.`
+                    : "This signs you out immediately and starts a 14-day grace period. You can sign back in and cancel during that period. After it ends, permanent deletion and backup propagation can begin."}
                 </p>
 
-                <AlertDialog
-                  open={deleteDialogOpen}
-                  onOpenChange={(open) => {
-                    setDeleteDialogOpen(open);
+                {deletionRequestedAt ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-4"
+                    disabled={cancellingDeletion}
+                    onClick={handleCancelDeletion}
+                  >
+                    {cancellingDeletion
+                      ? "Cancelling…"
+                      : "Cancel account deletion"}
+                  </Button>
+                ) : (
+                  <AlertDialog
+                    open={deleteDialogOpen}
+                    onOpenChange={(open) => {
+                      setDeleteDialogOpen(open);
 
-                    if (!open) {
-                      setConfirm("");
-                    }
-                  }}
-                >
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      className="mt-4"
-                      disabled={!user}
-                    >
-                      Delete my account
-                    </Button>
-                  </AlertDialogTrigger>
-
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>
-                        Confirm account deletion
-                      </AlertDialogTitle>
-
-                      <AlertDialogDescription>
-                        Type{" "}
-                        <span className="font-mono font-semibold">DELETE</span>{" "}
-                        below to confirm. You&apos;ll be signed out and an admin
-                        will review your request.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-
-                    <div className="space-y-2">
-                      <label
-                        htmlFor="delete-confirmation"
-                        className="text-sm font-medium text-foreground"
-                      >
-                        Confirmation text
-                      </label>
-
-                      <Input
-                        id="delete-confirmation"
-                        value={confirm}
-                        onChange={(event) => setConfirm(event.target.value)}
-                        placeholder="Type DELETE"
-                        autoComplete="off"
-                        disabled={deleting}
-                      />
-                    </div>
-
-                    <AlertDialogFooter>
-                      <AlertDialogCancel
+                      if (!open) {
+                        setConfirm("");
+                      }
+                    }}
+                  >
+                    <AlertDialogTrigger asChild>
+                      <Button
                         type="button"
-                        disabled={deleting}
-                        onClick={() => setConfirm("")}
+                        variant="destructive"
+                        className="mt-4"
+                        disabled={!user}
                       >
-                        Cancel
-                      </AlertDialogCancel>
+                        Delete my account
+                      </Button>
+                    </AlertDialogTrigger>
 
-                      <AlertDialogAction
-                        type="button"
-                        disabled={!canDelete}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          handleDelete();
-                        }}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
-                        {deleting ? "Submitting…" : "Delete account"}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          Confirm account deletion
+                        </AlertDialogTitle>
+
+                        <AlertDialogDescription>
+                          Type{" "}
+                          <span className="font-mono font-semibold">
+                            DELETE
+                          </span>{" "}
+                          below to confirm. You&apos;ll be signed out and an
+                          admin will review your request.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+
+                      <div className="space-y-2">
+                        <label
+                          htmlFor="delete-confirmation"
+                          className="text-sm font-medium text-foreground"
+                        >
+                          Confirmation text
+                        </label>
+
+                        <Input
+                          id="delete-confirmation"
+                          value={confirm}
+                          onChange={(event) => setConfirm(event.target.value)}
+                          placeholder="Type DELETE"
+                          autoComplete="off"
+                          disabled={deleting}
+                        />
+                      </div>
+
+                      <AlertDialogFooter>
+                        <AlertDialogCancel
+                          type="button"
+                          disabled={deleting}
+                          onClick={() => setConfirm("")}
+                        >
+                          Cancel
+                        </AlertDialogCancel>
+
+                        <AlertDialogAction
+                          type="button"
+                          disabled={!canDelete}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            handleDelete();
+                          }}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          {deleting ? "Submitting…" : "Delete account"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
               </div>
             </div>
           </section>

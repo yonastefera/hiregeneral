@@ -7,6 +7,7 @@ import {
   logServerError,
 } from "@/lib/http/api-security";
 import { notificationSettingsRateLimit } from "@/lib/rate-limit";
+import { recordPrivilegedAction } from "@/lib/security/audit";
 import { createClient } from "@/lib/supabase/server";
 
 type NotificationPreferenceKey =
@@ -140,6 +141,19 @@ export async function PATCH(request: Request) {
       { status: 500 },
     );
   }
+
+  await recordPrivilegedAction({
+    action: "account.communication_preferences_updated",
+    targetType: "user",
+    targetId: user.id,
+    metadata: {
+      source: "account_settings",
+      job_alerts: preferences.jobAlerts,
+      application_updates: preferences.applicationUpdates,
+      saved_job_reminders: preferences.savedJobReminders,
+      marketing_emails: preferences.marketingEmails,
+    },
+  });
 
   return NextResponse.json({
     data: preferences,
