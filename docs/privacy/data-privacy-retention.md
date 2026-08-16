@@ -6,18 +6,23 @@ before launch and whenever the product enters a new jurisdiction.
 
 ## Access and visibility
 
-| Data                                 | Default access                                   | Additional authorized access                                                                                  |
-| ------------------------------------ | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| Candidate profile                    | Candidate only; new profiles are private         | Recruiters with an eligible application, or recruiters entitled to search a profile the candidate made public |
-| Resume                               | Candidate only in private storage                | A five-minute signed link after the server verifies application or candidate-database access                  |
-| Application and its submitted resume | Candidate and recruiter responsible for that job | Administrators only for documented support, security, or legal work                                           |
-| Messages                             | Conversation participants                        | Administrators only for documented support, security, or legal work                                           |
-| Contact submissions                  | Authorized support/admin workflows               | No public or recruiter access                                                                                 |
-| Demographic responses                | Candidate only                                   | No recruiter, employer candidate-list, resume-database, ranking, matching, or hiring-decision access          |
+| Data                                 | Default access                                   | Additional authorized access                                                                                      |
+| ------------------------------------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| Candidate profile                    | Candidate only; new profiles are private         | Authenticated recruiters with an eligible paid plan after the candidate explicitly enables employer access        |
+| Resume                               | Candidate only in private storage                | A five-minute signed link after the server verifies paid candidate-database access and explicit candidate consent |
+| Application and its submitted resume | Candidate and recruiter responsible for that job | Administrators only for documented support, security, or legal work                                               |
+| Messages                             | Conversation participants                        | Administrators only for documented support, security, or legal work                                               |
+| Contact submissions                  | Authorized support/admin workflows               | No public or recruiter access                                                                                     |
+| Demographic responses                | Candidate only                                   | No recruiter, employer candidate-list, resume-database, ranking, matching, or hiring-decision access              |
 
 Changing profile visibility does not erase an application already delivered to
 an employer. The account settings page must explain this distinction before a
 candidate makes a profile discoverable.
+
+Employer access is opt-in. `visibility = 'public'` is valid only when
+`employer_access_consent_at` is present. Legacy public visibility is reset to
+private rather than interpreted as consent. Revocation sets the profile private
+and clears the consent timestamp immediately; account deletion does the same.
 
 ## Data minimization
 
@@ -40,6 +45,9 @@ logger's redactor.
 
 - Users can download a no-cache JSON export of their account data.
 - Users can delete an uploaded resume independently of their account.
+- Users can grant or revoke employer discovery from Account Settings. Each
+  successful change records a redacted `profile.employer_access_granted` or
+  `profile.employer_access_revoked` audit event.
 - Account deletion has a 14-day cancellation grace period. Final deletion must
   not run before `deletion_requested_at + 14 days`.
 - Notification preferences record consent state, including global unsubscribe.

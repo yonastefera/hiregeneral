@@ -137,6 +137,7 @@ export async function POST(request: NextRequest) {
       .select("id")
       .eq("id", candidateId)
       .eq("visibility", "public")
+      .not("employer_access_consent_at", "is", null)
       .maybeSingle();
 
   if (profileError) {

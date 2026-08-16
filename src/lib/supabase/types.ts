@@ -947,6 +947,7 @@ export type Database = {
           deletion_requested_at: string | null;
           education: Json;
           email: string | null;
+          employer_access_consent_at: string | null;
           executive_summary: string | null;
           full_name: string | null;
           headline: string | null;
@@ -987,6 +988,7 @@ export type Database = {
           deletion_requested_at?: string | null;
           education?: Json;
           email?: string | null;
+          employer_access_consent_at?: string | null;
           executive_summary?: string | null;
           full_name?: string | null;
           headline?: string | null;
@@ -1027,6 +1029,7 @@ export type Database = {
           deletion_requested_at?: string | null;
           education?: Json;
           email?: string | null;
+          employer_access_consent_at?: string | null;
           executive_summary?: string | null;
           full_name?: string | null;
           headline?: string | null;
@@ -1383,6 +1386,19 @@ export type Database = {
           p_stripe_event_id: string;
         };
         Returns: boolean;
+      };
+      get_hiring_companies_this_week: {
+        Args: { p_limit?: number };
+        Returns: {
+          company_logo_url: string | null;
+          company_name: string | null;
+          company_size: string | null;
+          company_website: string | null;
+          has_remote: boolean | null;
+          industry: string | null;
+          new_roles: number;
+          roles: number;
+        }[];
       };
       has_role: {
         Args: {

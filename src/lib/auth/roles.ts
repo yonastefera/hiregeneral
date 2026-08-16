@@ -3,7 +3,7 @@ export type AppRole = "admin" | "recruiter" | "job_seeker";
 export const ROLE_ROUTES: Record<AppRole, string> = {
   admin: "/admin/dashboard",
   recruiter: "/employers/dashboard",
-  job_seeker: "/job-seeker/dashboard",
+  job_seeker: "/jobs",
 };
 
 export function routeForRole(role: AppRole | null | undefined) {

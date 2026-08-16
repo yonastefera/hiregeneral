@@ -10,7 +10,7 @@ export function contentSecurityPolicy(nodeEnv: string = process.env.NODE_ENV) {
     img-src 'self' data: blob: https://img.logo.dev https://*.supabase.co https://*.clarity.ms https://www.google-analytics.com https://*.google-analytics.com https://c.bing.com;
     font-src 'self' data:;
     connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.clarity.ms https://www.google-analytics.com https://*.google-analytics.com https://c.bing.com;
-    frame-src 'self' https://js.stripe.com https://hooks.stripe.com;
+    frame-src 'self' https://*.supabase.co https://js.stripe.com https://hooks.stripe.com;
     worker-src 'self' blob:;
     object-src 'none';
     base-uri 'self';

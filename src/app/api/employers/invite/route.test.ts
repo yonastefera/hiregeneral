@@ -52,12 +52,14 @@ function query(result: { data: unknown; error: unknown }) {
   const value = {
     select: vi.fn(),
     eq: vi.fn(),
+    not: vi.fn(),
     maybeSingle: vi.fn().mockResolvedValue(result),
     upsert: vi.fn(),
     single: vi.fn().mockResolvedValue(result),
   };
   value.select.mockReturnValue(value);
   value.eq.mockReturnValue(value);
+  value.not.mockReturnValue(value);
   value.upsert.mockReturnValue(value);
   return value;
 }

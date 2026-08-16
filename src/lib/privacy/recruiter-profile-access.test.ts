@@ -42,6 +42,7 @@ describe("recruiter profile privacy boundary", () => {
       const source = fs.readFileSync(path.resolve(sourcePath), "utf8");
       expect(source).toContain("loadEmployerEntitlements");
       expect(source).toContain("candidateDatabase");
+      expect(source).toContain("employer_access_consent_at");
     }
   });
 });

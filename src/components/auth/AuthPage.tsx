@@ -117,7 +117,8 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
         ? roleRoute
         : fallback || roleRoute;
 
-    router.push(target);
+    router.replace(target);
+    router.refresh();
   };
 
   const handleGoogle = async () => {

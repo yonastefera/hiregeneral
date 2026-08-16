@@ -23,6 +23,8 @@ function mutationRoutes(directory = apiRoot): string[] {
 
 const behavioralCoverage: Record<string, string> = {
   "app/api/account/deletion/route.ts": "app/api/account/deletion/route.test.ts",
+  "app/api/account/employer-access/route.ts":
+    "app/api/account/employer-access/route.test.ts",
   "app/api/admin/seed-schools/route.ts":
     "app/api/admin/seed-schools/route.test.ts",
   "app/api/applications/route.ts": "app/api/applications/route.test.ts",

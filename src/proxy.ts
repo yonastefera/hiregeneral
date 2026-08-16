@@ -135,7 +135,7 @@ export async function proxy(req: NextRequest) {
       if (primaryRole === "admin") return redirect(req, "/admin/dashboard");
       if (primaryRole === "recruiter")
         return redirect(req, "/employers/dashboard");
-      return redirect(req, "/job-seeker/dashboard");
+      return redirect(req, "/jobs");
     }
 
     if (isAdminRoute && primaryRole !== "admin") {

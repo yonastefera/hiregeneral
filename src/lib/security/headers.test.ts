@@ -52,4 +52,14 @@ describe("Phase 2 security headers", () => {
     expect(policy).toContain("upgrade-insecure-requests");
     expect(policy).not.toContain("'unsafe-eval'");
   });
+
+  it("allows private Supabase resume previews in frames", () => {
+    const policy = contentSecurityPolicy("production");
+    const frameDirective = policy
+      .split(";")
+      .find((directive) => directive.trim().startsWith("frame-src"));
+
+    expect(frameDirective).toContain("https://*.supabase.co");
+    expect(frameDirective).toContain("https://js.stripe.com");
+  });
 });

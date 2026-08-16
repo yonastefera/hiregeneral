@@ -4,7 +4,7 @@ import { routeForRole } from "@/lib/auth/roles";
 
 describe("role routing", () => {
   it.each([
-    ["job_seeker", "/job-seeker/dashboard"],
+    ["job_seeker", "/jobs"],
     ["recruiter", "/employers/dashboard"],
     ["admin", "/admin/dashboard"],
   ] as const)("routes %s to %s", (role, route) => {

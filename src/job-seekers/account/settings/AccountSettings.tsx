@@ -26,6 +26,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { supabase } from "@/lib/supabase/client";
 
@@ -76,6 +77,10 @@ export default function AccountSettings() {
     string | null
   >(null);
   const [cancellingDeletion, setCancellingDeletion] = useState(false);
+  const [employerAccessEnabled, setEmployerAccessEnabled] = useState(false);
+  const [employerAccessLoaded, setEmployerAccessLoaded] = useState(false);
+  const [savingEmployerAccess, setSavingEmployerAccess] = useState(false);
+  const [hasResume, setHasResume] = useState(false);
 
   const email = user?.email ?? "Not available";
   const canDelete = Boolean(user) && confirm === "DELETE" && !deleting;
@@ -104,6 +109,64 @@ export default function AccountSettings() {
       active = false;
     };
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    let active = true;
+    fetch("/api/account/employer-access", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Could not load privacy settings.");
+        return (await response.json()) as {
+          enabled: boolean;
+          hasResume: boolean;
+        };
+      })
+      .then((data) => {
+        if (!active) return;
+        setEmployerAccessEnabled(data.enabled);
+        setHasResume(data.hasResume);
+      })
+      .catch(() => {
+        if (active) toast.error("Could not load employer-access settings.");
+      })
+      .finally(() => {
+        if (active) setEmployerAccessLoaded(true);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [user]);
+
+  const handleEmployerAccessChange = async (enabled: boolean) => {
+    if (!user || savingEmployerAccess) return;
+
+    const previous = employerAccessEnabled;
+    setEmployerAccessEnabled(enabled);
+    setSavingEmployerAccess(true);
+
+    try {
+      const response = await fetch("/api/account/employer-access", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+
+      if (!response.ok) throw new Error("Could not save privacy settings.");
+
+      const data = (await response.json()) as { enabled: boolean };
+      setEmployerAccessEnabled(data.enabled);
+      toast.success(
+        data.enabled ? "Employer access enabled." : "Employer access revoked.",
+      );
+    } catch {
+      setEmployerAccessEnabled(previous);
+      toast.error("Could not save employer-access settings.");
+    } finally {
+      setSavingEmployerAccess(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!user || deleting) return;
@@ -254,17 +317,42 @@ export default function AccountSettings() {
           </SettingsCard>
 
           <section className="rounded-lg border border-border bg-card p-6">
-            <h2 className="text-base font-semibold text-foreground">
-              Resume and employer access
-            </h2>
+            <div className="flex items-start justify-between gap-5">
+              <div>
+                <h2 className="text-base font-semibold text-foreground">
+                  Resume and employer access
+                </h2>
+                <p className="mt-1 text-sm font-medium text-foreground">
+                  {employerAccessEnabled
+                    ? "Your profile is discoverable"
+                    : "Your profile is private"}
+                </p>
+              </div>
+              <Switch
+                aria-label="Allow authorized employers to discover my profile"
+                checked={employerAccessEnabled}
+                disabled={!employerAccessLoaded || savingEmployerAccess}
+                onCheckedChange={handleEmployerAccessChange}
+              />
+            </div>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Your profile is private unless you make it discoverable. Employers
-              may access your resume when you apply to their job, or when your
-              public profile and their plan permit resume-database access.
-              Resume links are temporary and access-controlled. You can hide
-              your profile or delete your current resume from your profile at
-              any time; copies submitted with earlier applications may be
-              retained for the application-retention period.
+              When enabled, authenticated employers with an eligible paid plan
+              can discover your profile and review your name, contact details,
+              skills, work and education history, profile links, and uploaded
+              resume. Resume links expire after a short period. Turning this off
+              immediately removes you from employer discovery.
+            </p>
+            {!hasResume && (
+              <p className="mt-3 text-sm text-muted-foreground">
+                You do not currently have a resume uploaded. You can still set
+                your preference now, but resume-only searches will not display
+                your profile until you upload one.
+              </p>
+            )}
+            <p className="mt-3 text-xs leading-5 text-muted-foreground">
+              Employers can also retain information you deliberately submit in
+              an application according to the application-retention period, even
+              when discovery is disabled later.
             </p>
           </section>
 

@@ -117,5 +117,10 @@ export const accountExportRateLimit = mutationLimiter(
   "24 h",
   "account-export",
 );
+export const accountPrivacyRateLimit = mutationLimiter(
+  20,
+  "1 h",
+  "account-privacy",
+);
 
 export { redis };

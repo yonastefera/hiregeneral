@@ -36,6 +36,16 @@ const contracts: Record<string, Boundary> = {
     abuseControl: ["accountDeletionRateLimit", "enforceRateLimit({"],
     safeError: ['safeServerError("Could not request account deletion.")'],
   },
+  "app/api/account/employer-access/route.ts": {
+    authentication: ["supabase.auth.getUser()", "status: 401"],
+    authorization: [
+      '.eq("user_id", user.id)',
+      '.eq("user_type", "job_seeker")',
+    ],
+    validation: ["boundedJsonBody(request)", "updateSchema.safeParse"],
+    abuseControl: ["accountPrivacyRateLimit", "enforceRateLimit({"],
+    safeError: ['safeServerError("Could not save employer-access settings.")'],
+  },
   "app/api/admin/seed-schools/route.ts": {
     authentication: [
       'request.headers.get("x-admin-seed-secret")',

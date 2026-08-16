@@ -446,7 +446,9 @@ async function loadCandidateProfiles(
       .is("deleted_at", null);
 
     if (params.publicOnly) {
-      query = query.eq("visibility", "public");
+      query = query
+        .eq("visibility", "public")
+        .not("employer_access_consent_at", "is", null);
     }
 
     if (!params.includeRecruiter) {

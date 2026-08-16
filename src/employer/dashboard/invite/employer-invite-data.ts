@@ -154,6 +154,7 @@ export async function getEmployerInviteData(
       .from("profiles")
       .select("id, user_id, full_name, headline, location, skills")
       .eq("visibility", "public")
+      .not("employer_access_consent_at", "is", null)
       .neq("user_id", recruiterId)
       .order("updated_at", { ascending: false })
       .limit(80),

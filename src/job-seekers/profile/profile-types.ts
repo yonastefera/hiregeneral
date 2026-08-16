@@ -16,6 +16,7 @@ export type JobSeekerProfile = {
 
   phone: string | null;
   email: string | null;
+  employer_access_consent_at?: string | null;
 
   resume_url: string | null;
   resume_file_name?: string | null;
