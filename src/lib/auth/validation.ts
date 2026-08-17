@@ -28,6 +28,18 @@ export const signupSchema = z
 
 export const passwordResetSchema = z.object({ email: emailSchema }).strict();
 
+export const emailOtpRequestSchema = z.object({ email: emailSchema }).strict();
+
+export const emailOtpVerifySchema = z
+  .object({
+    email: emailSchema,
+    token: z
+      .string()
+      .trim()
+      .regex(/^\d{6}$/),
+  })
+  .strict();
+
 export const roleSelectionSchema = z
   .object({
     role: publicRoleSchema,

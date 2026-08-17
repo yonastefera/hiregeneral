@@ -84,6 +84,20 @@ const contracts: Record<string, Boundary> = {
     abuseControl: ["passwordUpdateRateLimit", "enforceRateLimit({"],
     safeError: ["Could not update password. Request a new link and try again."],
   },
+  "app/api/auth/otp/request/route.ts": {
+    authentication: ["auth.signInWithOtp({", "shouldCreateUser: true"],
+    authorization: ["authRateLimitKeys(request, email)", "content: email"],
+    validation: ["boundedJsonBody(request)", "emailOtpRequestSchema.safeParse"],
+    abuseControl: ["emailOtpRequestRateLimit", "enforceDuplicateCooldown({"],
+    safeError: ["OTP_MESSAGE", "message: OTP_MESSAGE"],
+  },
+  "app/api/auth/otp/verify/route.ts": {
+    authentication: ["auth.verifyOtp({", 'type: "email"'],
+    authorization: ['.from("user_roles")', "routeForRole(role)"],
+    validation: ["boundedJsonBody(request)", "emailOtpVerifySchema.safeParse"],
+    abuseControl: ["emailOtpVerifyRateLimit", "enforceRateLimit({"],
+    safeError: ["That code is invalid or expired. Request a new code."],
+  },
   "app/api/auth/role/route.ts": {
     authentication: ["getCurrentUser()", "status: 401"],
     authorization: ["assignInitialRole({", 'source: "role_selection"'],

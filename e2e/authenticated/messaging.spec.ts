@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { expect, test } from "@playwright/test";
 
+import { signInTestUser } from "../support/auth";
+
 test("seeker and owning recruiter exchange isolated messages", async ({
   browser,
   page,
@@ -57,10 +59,11 @@ test("seeker and owning recruiter exchange isolated messages", async ({
   const recruiterReply = `Recruiter E2E ${Date.now()}`;
 
   try {
-    await page.goto(`/signin?next=${encodeURIComponent("/messages")}`);
-    await page.getByLabel("Email").fill(seekerEmail);
-    await page.getByLabel("Password").fill(seekerPassword);
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await signInTestUser(
+      page,
+      { email: seekerEmail, password: seekerPassword },
+      "/messages",
+    );
     await expect(page).toHaveURL(/\/messages/);
     await expect(page.getByRole("heading", { name: "Messages" })).toBeVisible();
 
@@ -97,14 +100,11 @@ test("seeker and owning recruiter exchange isolated messages", async ({
     const recruiterAContext = await browser.newContext({ baseURL });
     try {
       const recruiterAPage = await recruiterAContext.newPage();
-      await recruiterAPage.goto(
-        `/signin?next=${encodeURIComponent("/employers/dashboard/messages")}&role=employer`,
+      await signInTestUser(
+        recruiterAPage,
+        { email: recruiterAEmail, password: recruiterAPassword },
+        "/employers/dashboard/messages",
       );
-      await recruiterAPage.getByLabel("Email").fill(recruiterAEmail);
-      await recruiterAPage.getByLabel("Password").fill(recruiterAPassword);
-      await recruiterAPage
-        .getByRole("button", { name: "Sign in to employer tools" })
-        .click();
       await expect(recruiterAPage).toHaveURL(
         /\/employers\/dashboard\/messages/,
       );
@@ -142,14 +142,11 @@ test("seeker and owning recruiter exchange isolated messages", async ({
     const recruiterBContext = await browser.newContext({ baseURL });
     try {
       const recruiterBPage = await recruiterBContext.newPage();
-      await recruiterBPage.goto(
-        `/signin?next=${encodeURIComponent("/employers/dashboard/messages")}&role=employer`,
+      await signInTestUser(
+        recruiterBPage,
+        { email: recruiterBEmail, password: recruiterBPassword },
+        "/employers/dashboard/messages",
       );
-      await recruiterBPage.getByLabel("Email").fill(recruiterBEmail);
-      await recruiterBPage.getByLabel("Password").fill(recruiterBPassword);
-      await recruiterBPage
-        .getByRole("button", { name: "Sign in to employer tools" })
-        .click();
       await expect(recruiterBPage).toHaveURL(
         /\/employers\/dashboard\/messages/,
       );

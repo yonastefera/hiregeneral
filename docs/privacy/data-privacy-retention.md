@@ -104,6 +104,10 @@ provider's backup-retention window expires. A restored backup must replay the
 deletion ledger before serving traffic. Document the actual Supabase backup
 window and every subprocessor's deletion SLA in the production runbook.
 
+The operational gates, provider inventory, and restore replay procedure are in
+[`production-privacy-runbook.md`](./production-privacy-runbook.md). Pending
+fields in that runbook are launch blockers, not assumed provider guarantees.
+
 ## Verification requirements
 
 - Regression tests prevent protected demographic columns from entering

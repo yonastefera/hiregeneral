@@ -1,90 +1,101 @@
 import { expect, test } from "@playwright/test";
 
-const password = "correct-horse-battery-staple";
+test("email sign-in requests a code and verifies it", async ({ page }) => {
+  const requests: unknown[] = [];
 
-test("seeker submits registration and receives confirmation guidance", async ({
-  page,
-}) => {
-  let submittedBody: unknown;
-  await page.route("**/api/auth/signup", async (route) => {
-    submittedBody = route.request().postDataJSON();
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        ok: true,
-        message: "If the address is eligible, an email will arrive shortly.",
-      }),
-    });
-  });
-
-  await page.goto("/signup?next=%2Fjobs");
-  await page.getByLabel("Email").fill(" seeker@example.com ");
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Create account" }).click();
-
-  await expect(
-    page.getByText("Check your email to confirm your account."),
-  ).toBeVisible();
-  await expect(page).toHaveURL(/\/signin\?next=%2Fjobs/);
-  expect(submittedBody).toEqual({
-    email: "seeker@example.com",
-    password,
-    role: "job_seeker",
-  });
-});
-
-test("employer registration submits only the selected public role", async ({
-  page,
-}) => {
-  let submittedBody: unknown;
-  await page.route("**/api/auth/signup", async (route) => {
-    submittedBody = route.request().postDataJSON();
+  await page.route("**/api/auth/otp/request", async (route) => {
+    requests.push(route.request().postDataJSON());
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({ ok: true }),
     });
   });
-
-  await page.goto("/signup?next=%2Femployers%2Fdashboard&role=employer");
-  await expect(
-    page.getByRole("heading", { name: "Create an employer account." }),
-  ).toBeVisible();
-  await page.getByLabel("Email").fill("employer@example.com");
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Create account" }).click();
-
-  expect(submittedBody).toEqual({
-    email: "employer@example.com",
-    password,
-    role: "recruiter",
-  });
-  expect(JSON.stringify(submittedBody)).not.toContain("admin");
-});
-
-test("password reset shows the same response for every eligible address", async ({
-  page,
-}) => {
-  let submittedBody: unknown;
-  await page.route("**/api/auth/password-reset", async (route) => {
-    submittedBody = route.request().postDataJSON();
+  await page.route("**/api/auth/otp/verify", async (route) => {
+    requests.push(route.request().postDataJSON());
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({
-        ok: true,
-        message: "If the address is eligible, an email will arrive shortly.",
-      }),
+      body: JSON.stringify({ role: "job_seeker", redirectTo: "/jobs" }),
+    });
+  });
+
+  await page.goto("/signin?next=%2Fjobs");
+  await page.getByLabel("Email").fill(" seeker@example.com ");
+  await page.getByRole("button", { name: "Continue with email" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "Check your email." }),
+  ).toBeVisible();
+  await expect(page.getByText(/six-digit code sent to/)).toContainText(
+    "seeker@example.com",
+  );
+  await page.locator('input[autocomplete="one-time-code"]').fill("123456");
+  await page.getByRole("button", { name: "Verify and continue" }).click();
+
+  await expect(page).toHaveURL(/\/jobs$/);
+  expect(requests).toEqual([
+    { email: "seeker@example.com" },
+    { email: "seeker@example.com", token: "123456" },
+  ]);
+});
+
+test("new employer intent chooses a workspace after verification", async ({
+  page,
+}) => {
+  await page.route("**/api/auth/otp/request", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true }),
+    });
+  });
+  await page.route("**/api/auth/otp/verify", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ role: null, redirectTo: "/auth/choose-role" }),
+    });
+  });
+
+  await page.goto("/signup?next=%2Femployers%2Fdashboard&role=employer");
+  await expect(
+    page.getByRole("heading", { name: "Continue to employer tools." }),
+  ).toBeVisible();
+  await page.getByLabel("Email").fill("new-employer@example.com");
+  await page.getByRole("button", { name: "Continue with email" }).click();
+  await page.locator('input[autocomplete="one-time-code"]').fill("654321");
+  await page.getByRole("button", { name: "Verify and continue" }).click();
+
+  await expect(page).toHaveURL(
+    /\/auth\/choose-role\?next=%2Femployers%2Fdashboard$/,
+  );
+});
+
+test("invalid codes receive a safe, non-diagnostic error", async ({ page }) => {
+  await page.route("**/api/auth/otp/request", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true }),
+    });
+  });
+  await page.route("**/api/auth/otp/verify", async (route) => {
+    await route.fulfill({
+      status: 401,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "That code is invalid or expired." }),
     });
   });
 
   await page.goto("/forgot-password");
   await page.getByLabel("Email").fill("missing@example.com");
-  await page.getByRole("button", { name: "Send reset link" }).click();
+  await page.getByRole("button", { name: "Continue with email" }).click();
+  await page.locator('input[autocomplete="one-time-code"]').fill("000000");
+  await page.getByRole("button", { name: "Verify and continue" }).click();
 
   await expect(
-    page.getByText("If an account exists, a password reset link will be sent."),
+    page.getByText("That code is invalid or expired."),
   ).toBeVisible();
-  expect(submittedBody).toEqual({ email: "missing@example.com" });
+  await expect(page).toHaveURL(/\/forgot-password$/);
 });

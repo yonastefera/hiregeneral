@@ -1,37 +1,18 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test, type Browser } from "@playwright/test";
 
-async function signIn(
-  page: Page,
-  email: string,
-  password: string,
-  options: { employer?: boolean; next: string },
-) {
-  const role = options.employer ? "&role=employer" : "";
-  await page.goto(`/signin?next=${encodeURIComponent(options.next)}${role}`);
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page
-    .getByRole("button", {
-      name: options.employer ? "Sign in to employer tools" : "Sign in",
-      exact: true,
-    })
-    .click();
-}
+import { signInTestUser } from "../support/auth";
 
 async function assertRoleRedirect(
   browser: Browser,
   baseURL: string,
-  credentials: { email: string; password: string; employer?: boolean },
+  credentials: { email: string; password: string },
   expectedPath: RegExp,
 ) {
   const context = await browser.newContext({ baseURL });
 
   try {
     const page = await context.newPage();
-    await signIn(page, credentials.email, credentials.password, {
-      employer: credentials.employer,
-      next: "/admin-control-center/sources",
-    });
+    await signInTestUser(page, credentials, "/admin-control-center/sources");
     await expect(page).toHaveURL(expectedPath);
 
     await page.goto("/admin-control-center/sources");
@@ -74,9 +55,11 @@ test("admin can review ingestion status while other roles and missing secrets ar
     error: "Unauthorized",
   });
 
-  await signIn(page, adminEmail, adminPassword, {
-    next: "/admin-control-center/sources",
-  });
+  await signInTestUser(
+    page,
+    { email: adminEmail, password: adminPassword },
+    "/admin-control-center/sources",
+  );
   await expect(page).toHaveURL(/\/admin-control-center\/sources$/);
   await expect(
     page.getByRole("heading", { name: "Imported job source monitor" }),
@@ -103,7 +86,6 @@ test("admin can review ingestion status while other roles and missing secrets ar
     {
       email: recruiterEmail,
       password: recruiterPassword,
-      employer: true,
     },
     /\/employers\/dashboard$/,
   );

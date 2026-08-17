@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { expect, test } from "@playwright/test";
 
+import { signInTestUser } from "../support/auth";
+
 test("recruiter creates and removes an owned draft job", async ({ page }) => {
   const email = process.env.SUPABASE_TEST_RECRUITER_A_EMAIL;
   const password = process.env.SUPABASE_TEST_RECRUITER_A_PASSWORD;
@@ -15,14 +17,11 @@ test("recruiter creates and removes an owned draft job", async ({ page }) => {
   let createdJobId: string | undefined;
 
   try {
-    await page.goto(
-      `/signin?next=${encodeURIComponent("/employers/dashboard/post-job")}&role=employer`,
+    await signInTestUser(
+      page,
+      { email, password },
+      "/employers/dashboard/post-job",
     );
-    await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill(password);
-    await page
-      .getByRole("button", { name: "Sign in to employer tools" })
-      .click();
 
     await expect(page).toHaveURL(/\/employers\/dashboard\/post-job/);
     await page.getByPlaceholder("e.g. Senior Product Designer").fill(title);

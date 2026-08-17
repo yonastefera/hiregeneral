@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { signInTestUser } from "../support/auth";
+
 test("recruiter updates and restores the owned company profile", async ({
   page,
 }) => {
@@ -10,12 +12,11 @@ test("recruiter updates and restores the owned company profile", async ({
     throw new Error("Missing dedicated recruiter E2E credentials.");
   }
 
-  await page.goto(
-    `/signin?next=${encodeURIComponent("/employers/dashboard/company")}&role=employer`,
+  await signInTestUser(
+    page,
+    { email, password },
+    "/employers/dashboard/company",
   );
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in to employer tools" }).click();
 
   await expect(page).toHaveURL(/\/employers\/dashboard\/company/);
   await expect(

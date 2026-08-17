@@ -1,30 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  ArrowRight,
-  Briefcase,
-  CheckCircle2,
-  LockKeyhole,
-  Mail,
-  Sparkles,
-} from "lucide-react";
+import { ArrowRight, CheckCircle2, Mail, Sparkles } from "lucide-react";
+import { REGEXP_ONLY_DIGITS } from "input-otp";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
 import { supabase } from "@/lib/supabase/client";
 import { routeForRole, type AppRole } from "@/lib/auth/roles";
 import { safeInternalPath } from "@/lib/auth/security";
-import { PASSWORD_MIN_LENGTH } from "@/lib/auth/validation";
-import type { UserFlow } from "@/data/jobPlatform";
-
-const roles: { value: UserFlow; label: string; tag: string }[] = [
-  { value: "job_seeker", label: "Job seeker", tag: "Save roles and apply" },
-  { value: "recruiter", label: "Employer", tag: "Post jobs and hire" },
-];
 
 const proofPoints = [
   "Candidates can search jobs before signing in",
@@ -48,78 +40,38 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
   const nextUrl = safeInternalPath(requestedNextUrl)
     ? safeInternalPath(requestedNextUrl)!
     : fallbackNextUrl;
-  const roleIntent = isEmployerIntent ? "&role=employer" : "";
-  const authIntentQuery = `next=${encodeURIComponent(nextUrl)}${roleIntent}`;
-  const signInHref = `/signin?${authIntentQuery}`;
-  const signUpHref = `/signup?${authIntentQuery}`;
-  const forgotPasswordHref = `/forgot-password?${authIntentQuery}`;
-
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [role, setRole] = useState<UserFlow>(
-    isEmployerIntent ? "recruiter" : "job_seeker",
-  );
+  const [token, setToken] = useState("");
+  const [step, setStep] = useState<"email" | "code">("email");
+  const [resendIn, setResendIn] = useState(0);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = window.setInterval(
+      () => setResendIn((seconds) => Math.max(0, seconds - 1)),
+      1_000,
+    );
+    return () => window.clearInterval(timer);
+  }, [resendIn]);
+
   const eyebrow =
-    mode === "signup"
-      ? isEmployerIntent
-        ? "Employer account"
-        : "Create account"
-      : mode === "forgot"
-        ? "Password reset"
-        : isEmployerIntent
-          ? "Employer sign in"
-          : "Sign in";
+    mode === "forgot"
+      ? "Passwordless access"
+      : isEmployerIntent
+        ? "Employer access"
+        : "Secure sign in";
   const heading =
-    mode === "signup"
-      ? isEmployerIntent
-        ? "Create an employer account."
-        : "Create your account."
-      : mode === "forgot"
-        ? "Reset your password."
-        : isEmployerIntent
-          ? "Sign in to post and manage jobs."
-          : "Sign in to keep your search moving.";
+    step === "code"
+      ? "Check your email."
+      : isEmployerIntent
+        ? "Continue to employer tools."
+        : "Welcome to HireGeneral.";
   const subtitle =
-    mode === "signup"
-      ? isEmployerIntent
-        ? "Create a recruiter account to post roles, review applicants, and manage your employer dashboard."
-        : "Create a free candidate account to save jobs, track applications, and come back to roles you care about."
-      : mode === "forgot"
-        ? "Enter the email on your account and we will send a secure reset link."
-        : isEmployerIntent
-          ? "Use your employer account to post openings, manage listings, and continue hiring work."
-          : "Use your account to save jobs, revisit applications, and keep your job search organized.";
-
-  const redirectAfterAuth = async (fallback = nextUrl) => {
-    const response = await fetch("/api/auth/role", { cache: "no-store" });
-
-    if (response.status === 401) {
-      router.push(`/signin?next=${encodeURIComponent(fallback)}`);
-      return;
-    }
-
-    const body = (await response.json()) as {
-      role?: AppRole | null;
-      redirectTo?: string;
-    };
-
-    if (!body.role) {
-      router.push(`/auth/choose-role?next=${encodeURIComponent(fallback)}`);
-      return;
-    }
-
-    const roleRoute = body.redirectTo || routeForRole(body.role);
-    const target =
-      fallback.startsWith("/employers") && !canUseEmployerPath(body.role)
-        ? roleRoute
-        : fallback || roleRoute;
-
-    router.replace(target);
-    router.refresh();
-  };
+    step === "code"
+      ? `Enter the six-digit code sent to ${email.trim()}.`
+      : "Enter your email to sign in or create an account. No password needed.";
 
   const handleGoogle = async () => {
     setGoogleLoading(true);
@@ -144,8 +96,8 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
     event.preventDefault();
     setLoading(true);
 
-    if (mode === "forgot") {
-      const response = await fetch("/api/auth/password-reset", {
+    if (step === "email") {
+      const response = await fetch("/api/auth/otp/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim() }),
@@ -156,54 +108,73 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
         const body = (await response.json().catch(() => null)) as {
           error?: string;
         } | null;
-        toast.error(body?.error ?? "Could not send reset link.");
+        toast.error(body?.error ?? "Could not send a sign-in code.");
         return;
       }
 
-      toast.success(
-        "If an account exists, a password reset link will be sent.",
-      );
+      setStep("code");
+      setResendIn(60);
+      toast.success("If the address is eligible, a code will arrive shortly.");
       return;
     }
 
-    if (mode === "signup") {
-      const response = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: email.trim(),
-          password,
-          role,
-        }),
-      });
-      setLoading(false);
-
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        toast.error(body?.error ?? "Could not create account.");
-        return;
-      }
-
-      toast.success("Check your email to confirm your account.");
-      router.push(signInHref);
-      return;
-    }
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
+    const response = await fetch("/api/auth/otp/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email.trim(), token }),
     });
     setLoading(false);
 
-    if (error) {
-      toast.error("Email or password is incorrect.");
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      toast.error(body?.error ?? "That code is invalid or expired.");
       return;
     }
 
+    const body = (await response.json()) as {
+      role: AppRole | null;
+      redirectTo: string;
+    };
+
     toast.success("Signed in successfully.");
-    await redirectAfterAuth(nextUrl);
+    if (!body.role) {
+      router.replace(`/auth/choose-role?next=${encodeURIComponent(nextUrl)}`);
+      router.refresh();
+      return;
+    }
+
+    const roleRoute = body.redirectTo || routeForRole(body.role);
+    const target =
+      nextUrl.startsWith("/employers") && !canUseEmployerPath(body.role)
+        ? roleRoute
+        : nextUrl || roleRoute;
+    router.replace(target);
+    router.refresh();
+  };
+
+  const resendCode = async () => {
+    if (resendIn > 0 || loading) return;
+    setLoading(true);
+    const response = await fetch("/api/auth/otp/request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email.trim() }),
+    });
+    setLoading(false);
+
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      toast.error(body?.error ?? "Could not resend the code.");
+      return;
+    }
+
+    setToken("");
+    setResendIn(60);
+    toast.success("A new code is on its way.");
   };
 
   return (
@@ -306,7 +277,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
             {subtitle}
           </p>
 
-          {mode !== "forgot" && (
+          {step === "email" && (
             <>
               <Button
                 type="button"
@@ -350,87 +321,63 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
           )}
 
           <form className="space-y-3" onSubmit={handleSubmit}>
-            <Field icon={<Mail className="size-4" />} label="Email">
-              <Input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
-                placeholder="you@email.com"
-                className="h-11 rounded-xl border-border bg-background pl-10 text-sm"
-              />
-            </Field>
-
-            {mode !== "forgot" && (
-              <Field
-                icon={<LockKeyhole className="size-4" />}
-                label="Password"
-                trailing={
-                  mode === "signin" ? (
-                    <Link
-                      href={forgotPasswordHref}
-                      className="text-xs font-medium text-primary hover:underline"
-                    >
-                      Forgot?
-                    </Link>
-                  ) : null
-                }
-              >
+            {step === "email" ? (
+              <Field icon={<Mail className="size-4" />} label="Email">
                 <Input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
                   required
-                  minLength={
-                    mode === "signup" ? PASSWORD_MIN_LENGTH : undefined
-                  }
-                  placeholder="Password"
+                  autoComplete="email"
+                  inputMode="email"
+                  placeholder="you@email.com"
                   className="h-11 rounded-xl border-border bg-background pl-10 text-sm"
                 />
               </Field>
-            )}
-
-            {mode === "signup" && (
-              <p className="text-xs text-muted-foreground">
-                Use at least {PASSWORD_MIN_LENGTH} characters.
-              </p>
-            )}
-
-            {mode === "signup" && (
-              <div>
-                <p className="mb-1.5 text-sm font-medium text-foreground">
-                  I&apos;m here to...
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  {roles.map((item) => {
-                    const active = role === item.value;
-
-                    return (
-                      <button
-                        key={item.value}
-                        type="button"
-                        onClick={() => setRole(item.value)}
-                        className={`group relative overflow-hidden rounded-xl border p-3 text-left transition ${
-                          active
-                            ? "border-primary bg-primary/5 text-foreground shadow-soft"
-                            : "border-border bg-background text-foreground hover:border-foreground/30"
-                        }`}
-                      >
-                        <Briefcase
-                          className={`size-4 ${
-                            active ? "text-primary" : "text-muted-foreground"
-                          }`}
-                        />
-                        <p className="mt-1.5 text-sm font-semibold">
-                          {item.label}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {item.tag}
-                        </p>
-                      </button>
-                    );
-                  })}
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-foreground">
+                    Verification code
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStep("email");
+                      setToken("");
+                    }}
+                    className="text-xs font-medium text-primary hover:underline"
+                  >
+                    Edit email
+                  </button>
                 </div>
+                <InputOTP
+                  maxLength={6}
+                  pattern={REGEXP_ONLY_DIGITS}
+                  value={token}
+                  onChange={setToken}
+                  autoFocus
+                  autoComplete="one-time-code"
+                  containerClassName="w-full justify-between"
+                >
+                  <InputOTPGroup className="w-full justify-between gap-2">
+                    {Array.from({ length: 6 }, (_, index) => (
+                      <InputOTPSlot
+                        key={index}
+                        index={index}
+                        className="h-12 min-w-0 flex-1 rounded-xl border bg-background text-base first:rounded-xl first:border last:rounded-xl"
+                      />
+                    ))}
+                  </InputOTPGroup>
+                </InputOTP>
+                <button
+                  type="button"
+                  onClick={resendCode}
+                  disabled={resendIn > 0 || loading}
+                  className="text-xs font-medium text-primary disabled:text-muted-foreground"
+                >
+                  {resendIn > 0 ? `Resend code in ${resendIn}s` : "Resend code"}
+                </button>
               </div>
             )}
 
@@ -441,51 +388,16 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
             >
               {loading
                 ? "Please wait..."
-                : mode === "signup"
-                  ? "Create account"
-                  : mode === "forgot"
-                    ? "Send reset link"
-                    : isEmployerIntent
-                      ? "Sign in to employer tools"
-                      : "Sign in"}
+                : step === "code"
+                  ? "Verify and continue"
+                  : "Continue with email"}
               <ArrowRight className="ml-1 size-4 transition group-hover:translate-x-0.5" />
             </Button>
           </form>
 
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            {mode === "signin" && (
-              <>
-                New here?{" "}
-                <Link
-                  href={signUpHref}
-                  className="font-semibold text-foreground underline-offset-4 hover:underline"
-                >
-                  Create an account
-                </Link>
-              </>
-            )}
-            {mode === "signup" && (
-              <>
-                Already on HireGeneral?{" "}
-                <Link
-                  href={signInHref}
-                  className="font-semibold text-foreground underline-offset-4 hover:underline"
-                >
-                  Sign in
-                </Link>
-              </>
-            )}
-            {mode === "forgot" && (
-              <>
-                Remembered it?{" "}
-                <Link
-                  href={signInHref}
-                  className="font-semibold text-foreground underline-offset-4 hover:underline"
-                >
-                  Back to sign in
-                </Link>
-              </>
-            )}
+            One email, one secure code. New accounts choose a workspace after
+            verification.
           </p>
 
           <p className="mt-4 text-center text-[11px] leading-relaxed text-muted-foreground/80">

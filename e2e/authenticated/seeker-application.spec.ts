@@ -3,6 +3,8 @@ import { resolve } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { expect, test } from "@playwright/test";
 
+import { signInTestUser } from "../support/auth";
+
 type ApplicationPayload = {
   job_id: string;
   resume_url: string;
@@ -63,12 +65,7 @@ test("seeker applies once and duplicate submission is rejected", async ({
   let uploadedResumePath: string | undefined;
 
   try {
-    await page.goto(
-      `/signin?next=${encodeURIComponent(`/jobs/${job.id}/apply`)}`,
-    );
-    await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill(password);
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await signInTestUser(page, { email, password }, `/jobs/${job.id}/apply`);
 
     await expect(page).toHaveURL(new RegExp(`/jobs/${job.id}/apply`));
     await page.getByLabel("Full name *").fill("Authenticated E2E Seeker");

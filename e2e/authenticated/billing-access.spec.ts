@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { expect, test } from "@playwright/test";
 
+import { signInTestUser } from "../support/auth";
+
 test("billing entry is company-scoped and safely disabled without Stripe", async ({
   browser,
   page,
@@ -44,12 +46,11 @@ test("billing entry is company-scoped and safely disabled without Stripe", async
     .single();
   if (companyError) throw companyError;
 
-  await page.goto(
-    `/signin?next=${encodeURIComponent("/employers/dashboard/subscription")}&role=employer`,
+  await signInTestUser(
+    page,
+    { email: recruiterEmail, password: recruiterPassword },
+    "/employers/dashboard/subscription",
   );
-  await page.getByLabel("Email").fill(recruiterEmail);
-  await page.getByLabel("Password").fill(recruiterPassword);
-  await page.getByRole("button", { name: "Sign in to employer tools" }).click();
 
   await expect(page).toHaveURL(/\/employers\/dashboard\/subscription/);
   await expect(
@@ -85,12 +86,11 @@ test("billing entry is company-scoped and safely disabled without Stripe", async
   });
   try {
     const seekerPage = await seekerContext.newPage();
-    await seekerPage.goto(`/signin?next=${encodeURIComponent("/profile")}`);
-    await seekerPage.getByLabel("Email").fill(seekerEmail);
-    await seekerPage.getByLabel("Password").fill(seekerPassword);
-    await seekerPage
-      .getByRole("button", { name: "Sign in", exact: true })
-      .click();
+    await signInTestUser(
+      seekerPage,
+      { email: seekerEmail, password: seekerPassword },
+      "/profile",
+    );
     await expect(seekerPage).toHaveURL(/\/profile/);
 
     const denied = await seekerPage.request.post(

@@ -31,6 +31,8 @@ const behavioralCoverage: Record<string, string> = {
   "app/api/auth/password-reset/route.ts": "app/api/auth/auth-routes.test.ts",
   "app/api/auth/password-update/route.ts":
     "app/api/auth/password-update/route.test.ts",
+  "app/api/auth/otp/request/route.ts": "app/api/auth/otp/otp-routes.test.ts",
+  "app/api/auth/otp/verify/route.ts": "app/api/auth/otp/otp-routes.test.ts",
   "app/api/auth/role/route.ts": "app/api/auth/role-route.test.ts",
   "app/api/auth/signout/route.ts": "app/api/auth/signout/route.test.ts",
   "app/api/auth/signup/route.ts": "app/api/auth/auth-routes.test.ts",

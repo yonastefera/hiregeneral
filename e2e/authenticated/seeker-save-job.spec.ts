@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { signInTestUser } from "../support/auth";
+
 const publishedJobId = "20000000-0000-4000-8000-000000000001";
 
 test("seeker signs in and toggles a saved job without leaving fixture drift", async ({
@@ -12,12 +14,7 @@ test("seeker signs in and toggles a saved job without leaving fixture drift", as
     throw new Error("Missing dedicated seeker E2E credentials.");
   }
 
-  await page.goto(
-    `/signin?next=${encodeURIComponent(`/jobs/${publishedJobId}`)}`,
-  );
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await signInTestUser(page, { email, password }, `/jobs/${publishedJobId}`);
 
   await expect(page).toHaveURL(new RegExp(`/jobs/${publishedJobId}`));
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();

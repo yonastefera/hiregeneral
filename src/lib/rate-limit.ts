@@ -47,6 +47,20 @@ export const passwordResetRateLimit = new Ratelimit({
   prefix: "ratelimit:auth:password-reset",
 });
 
+export const emailOtpRequestRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(6, "1 h"),
+  analytics: true,
+  prefix: "ratelimit:auth:email-otp-request",
+});
+
+export const emailOtpVerifyRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(20, "15 m"),
+  analytics: true,
+  prefix: "ratelimit:auth:email-otp-verify",
+});
+
 export const roleSelectionRateLimit = new Ratelimit({
   redis,
   limiter: Ratelimit.slidingWindow(10, "1 h"),

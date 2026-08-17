@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { expect, test } from "@playwright/test";
 
+import { signInTestUser } from "../support/auth";
+
 test("seeker completes profile details and preserves ownership", async ({
   page,
 }) => {
@@ -34,10 +36,7 @@ test("seeker completes profile details and preserves ownership", async ({
   const testHeadline = `Authenticated E2E profile ${Date.now()}`;
 
   try {
-    await page.goto(`/signin?next=${encodeURIComponent("/profile")}`);
-    await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill(password);
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await signInTestUser(page, { email, password }, "/profile");
 
     await expect(page).toHaveURL(/\/profile/);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();

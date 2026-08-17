@@ -4,6 +4,8 @@ import { resolve } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { expect, test } from "@playwright/test";
 
+import { signInTestUser } from "../support/auth";
+
 test("only the owning recruiter can access an applicant resume", async ({
   browser,
   page,
@@ -73,14 +75,11 @@ test("only the owning recruiter can access an applicant resume", async ({
     if (uploadError) throw uploadError;
     uploadedFixture = true;
 
-    await page.goto(
-      `/signin?next=${encodeURIComponent("/employers/dashboard/candidates")}&role=employer`,
+    await signInTestUser(
+      page,
+      { email, password },
+      "/employers/dashboard/candidates",
     );
-    await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill(password);
-    await page
-      .getByRole("button", { name: "Sign in to employer tools" })
-      .click();
 
     await expect(page).toHaveURL(/\/employers\/dashboard\/candidates/);
     await expect(
@@ -120,14 +119,11 @@ test("only the owning recruiter can access an applicant resume", async ({
     });
     try {
       const recruiterBPage = await recruiterBContext.newPage();
-      await recruiterBPage.goto(
-        `/signin?next=${encodeURIComponent("/employers/dashboard/candidates")}&role=employer`,
+      await signInTestUser(
+        recruiterBPage,
+        { email: recruiterBEmail, password: recruiterBPassword },
+        "/employers/dashboard/candidates",
       );
-      await recruiterBPage.getByLabel("Email").fill(recruiterBEmail);
-      await recruiterBPage.getByLabel("Password").fill(recruiterBPassword);
-      await recruiterBPage
-        .getByRole("button", { name: "Sign in to employer tools" })
-        .click();
       await expect(recruiterBPage).toHaveURL(
         /\/employers\/dashboard\/candidates/,
       );

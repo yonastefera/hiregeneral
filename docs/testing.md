@@ -38,6 +38,13 @@ SUPABASE_TEST_ADMIN_EMAIL=admin@hiregeneral.test
 SUPABASE_TEST_ADMIN_PASSWORD=
 ```
 
+The password values are credentials for seeded test fixtures only. The public
+HireGeneral interface is passwordless. Authenticated Playwright tests establish
+real Supabase session cookies programmatically so they do not send email OTPs,
+depend on an inbox, or consume transactional-email quota. The public
+authentication spec separately mocks delivery and verifies the email-code UI,
+request payload, safe invalid-code response, and post-verification routing.
+
 The project must contain fixtures owned by Recruiter B, including at least one
 job. Store these variables in the ignored `.env.rls.test` file and run
 `npm run test:rls` after applying all migrations to that project.
