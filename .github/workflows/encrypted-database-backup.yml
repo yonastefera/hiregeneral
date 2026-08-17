@@ -1,0 +1,51 @@
+name: Encrypted database backup
+
+on:
+  schedule:
+    - cron: "17 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: encrypted-production-database-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Back up Supabase public schema
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production-backup
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_PRODUCTION_DB_URL }}
+      BACKUP_AGE_RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+      BACKUP_OUTPUT_DIR: encrypted-backups
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Validate backup configuration
+        run: |
+          test -n "$SUPABASE_DB_URL" || { echo "Missing SUPABASE_PRODUCTION_DB_URL" >&2; exit 1; }
+          test -n "$BACKUP_AGE_RECIPIENT" || { echo "Missing BACKUP_AGE_RECIPIENT" >&2; exit 1; }
+
+      - name: Install age
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes age
+
+      - name: Create encrypted backup
+        run: ./scripts/backup-supabase-public.sh
+
+      - name: Upload encrypted backup
+        uses: actions/upload-artifact@v6
+        with:
+          name: hiregeneral-public-backup-${{ github.run_id }}
+          path: |
+            encrypted-backups/*.dump.age
+            encrypted-backups/*.sha256
+          if-no-files-found: error
+          retention-days: 7

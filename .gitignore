@@ -24,6 +24,8 @@
 
 # production
 /build
+/backups/
+/encrypted-backups/
 
 # misc
 .DS_Store

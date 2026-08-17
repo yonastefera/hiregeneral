@@ -1,9 +1,5 @@
 import type { Metadata } from "next";
 
-import { Analytics } from "@vercel/analytics/next";
-import { GoogleAnalytics } from "@next/third-parties/google";
-
-import MicrosoftClarity from "@/components/MicrosoftClarity";
 import WebVitals from "@/components/WebVitals";
 
 import ConsoleBrand from "@/components/ConsoleBrand";
@@ -11,6 +7,7 @@ import { Footer } from "@/components/Footer";
 
 import { AppProviders } from "@/components/providers/AppProviders";
 import { SiteHeaderController } from "@/components/SiteHeaderController";
+import AnalyticsConsent from "@/components/privacy/AnalyticsConsent";
 
 import "./globals.css";
 
@@ -86,13 +83,11 @@ export default function RootLayout({
 
         <WebVitals />
 
-        {enableAnalytics && <Analytics />}
-
-        {enableAnalytics && clarityProjectId ? (
-          <MicrosoftClarity projectId={clarityProjectId} />
-        ) : null}
-
-        {enableAnalytics && gaId ? <GoogleAnalytics gaId={gaId} /> : null}
+        <AnalyticsConsent
+          enabled={enableAnalytics}
+          gaId={gaId}
+          clarityProjectId={clarityProjectId}
+        />
       </body>
     </html>
   );

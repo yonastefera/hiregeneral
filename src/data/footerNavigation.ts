@@ -59,6 +59,7 @@ export const footerSections: FooterSection[] = [
       { label: "Contact", to: "/contact", audience: "public" },
       { label: "Privacy", to: "/privacy", audience: "public" },
       { label: "Terms", to: "/terms", audience: "public" },
+      { label: "Subprocessors", to: "/subprocessors", audience: "public" },
     ],
   },
 ];
@@ -66,4 +67,5 @@ export const footerSections: FooterSection[] = [
 export const legalLinks: FooterLink[] = [
   { label: "Privacy Policy", to: "/privacy", audience: "public" },
   { label: "Terms of Use", to: "/terms", audience: "public" },
+  { label: "Subprocessors", to: "/subprocessors", audience: "public" },
 ];

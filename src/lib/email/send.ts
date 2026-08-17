@@ -4,9 +4,32 @@ import ConfirmEmail from "@/emails/confirm-email";
 import ResetPassword from "@/emails/reset-password";
 import ApplicationConfirmation from "@/emails/application-confirmation";
 import JobAlertEmail, { type JobAlertEmailJob } from "@/emails/job-alert";
+import { writeRedactedLog } from "@/lib/logging/redact";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = process.env.EMAIL_FROM ?? "HireGeneral <no-reply@hiregeneral.com>";
+
+async function observedEmailSend<T>(operation: string, send: () => Promise<T>) {
+  const startedAt = performance.now();
+  try {
+    const result = await send();
+    writeRedactedLog("info", "external_operation_completed", {
+      operation,
+      externalProvider: "resend",
+      durationMs: Math.round(performance.now() - startedAt),
+    });
+    return result;
+  } catch (error) {
+    writeRedactedLog("error", "external_operation_failed", {
+      operation,
+      externalProvider: "resend",
+      errorCategory: "external_provider",
+      durationMs: Math.round(performance.now() - startedAt),
+      error,
+    });
+    throw error;
+  }
+}
 
 export async function sendConfirmationEmail(params: {
   to: string;
@@ -16,12 +39,14 @@ export async function sendConfirmationEmail(params: {
   const html = await render(
     ConfirmEmail({ confirmUrl: params.confirmUrl, fullName: params.fullName }),
   );
-  return resend.emails.send({
-    from: FROM,
-    to: params.to,
-    subject: "Confirm your HireGeneral account",
-    html,
-  });
+  return observedEmailSend("send_confirmation_email", () =>
+    resend.emails.send({
+      from: FROM,
+      to: params.to,
+      subject: "Confirm your HireGeneral account",
+      html,
+    }),
+  );
 }
 
 export async function sendPasswordResetEmail(params: {
@@ -32,12 +57,14 @@ export async function sendPasswordResetEmail(params: {
   const html = await render(
     ResetPassword({ resetUrl: params.resetUrl, fullName: params.fullName }),
   );
-  return resend.emails.send({
-    from: FROM,
-    to: params.to,
-    subject: "Reset your HireGeneral password",
-    html,
-  });
+  return observedEmailSend("send_password_reset_email", () =>
+    resend.emails.send({
+      from: FROM,
+      to: params.to,
+      subject: "Reset your HireGeneral password",
+      html,
+    }),
+  );
 }
 
 export async function sendApplicationConfirmationEmail(params: {
@@ -54,12 +81,14 @@ export async function sendApplicationConfirmationEmail(params: {
       applicantEmail: params.to,
     }),
   );
-  return resend.emails.send({
-    from: FROM,
-    to: params.to,
-    subject: `Application received — ${params.jobTitle} at ${params.companyName}`,
-    html,
-  });
+  return observedEmailSend("send_application_confirmation_email", () =>
+    resend.emails.send({
+      from: FROM,
+      to: params.to,
+      subject: `Application received — ${params.jobTitle} at ${params.companyName}`,
+      html,
+    }),
+  );
 }
 
 export async function sendJobAlertEmail(params: {
@@ -84,10 +113,12 @@ export async function sendJobAlertEmail(params: {
     }),
   );
 
-  return resend.emails.send({
-    from: FROM,
-    to: params.to,
-    subject: params.alertTitle ?? "New roles matched your HireGeneral alert",
-    html,
-  });
+  return observedEmailSend("send_job_alert_email", () =>
+    resend.emails.send({
+      from: FROM,
+      to: params.to,
+      subject: params.alertTitle ?? "New roles matched your HireGeneral alert",
+      html,
+    }),
+  );
 }

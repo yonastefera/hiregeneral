@@ -11,6 +11,7 @@ import {
   JSON_BODY_LIMITS,
   logServerError,
 } from "@/lib/http/api-security";
+import { startOperation, withRequestId } from "@/lib/logging/observability";
 import {
   verifyStripeWebhookEvent,
   retrieveStripeCharge,
@@ -302,6 +303,11 @@ async function processStripeEvent(event: StripeEvent) {
 }
 
 export async function POST(request: NextRequest) {
+  const operation = startOperation(request, {
+    route: "/api/webhooks/stripe",
+    operation: "process_stripe_webhook",
+    externalProvider: "stripe",
+  });
   const body = await boundedTextBody(request, JSON_BODY_LIMITS.webhook);
   if (!body.ok) return body.response;
 
@@ -314,6 +320,8 @@ export async function POST(request: NextRequest) {
       webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
     });
   } catch (error) {
+    operation.failure("external_provider", error, { stage: "verification" });
+    operation.metric("stripe_webhook_failed");
     logServerError("stripe_webhook_verification_failed", error);
     return NextResponse.json(
       { error: "Could not verify Stripe webhook." },
@@ -326,10 +334,16 @@ export async function POST(request: NextRequest) {
   try {
     const claimed = await claimEvent(event);
     if (!claimed) {
-      return NextResponse.json({ received: true, duplicate: true });
+      operation.success({ duplicate: true });
+      return withRequestId(
+        NextResponse.json({ received: true, duplicate: true }),
+        operation.context.requestId,
+      );
     }
     claimToken = claimed;
   } catch (error) {
+    operation.failure("database", error, { stage: "idempotency_claim" });
+    operation.metric("stripe_webhook_failed");
     logServerError("stripe_webhook_claim_failed", error);
     return NextResponse.json(
       { error: "Could not process Stripe webhook." },
@@ -340,9 +354,18 @@ export async function POST(request: NextRequest) {
   try {
     await processStripeEvent(event);
     await finishEvent(event.id, claimToken, "completed");
-
-    return NextResponse.json({ received: true });
+    operation.success({ eventType: event.type });
+    operation.metric("stripe_webhook_completed");
+    return withRequestId(
+      NextResponse.json({ received: true }),
+      operation.context.requestId,
+    );
   } catch (error) {
+    operation.failure("external_provider", error, {
+      stage: "processing",
+      eventType: event.type,
+    });
+    operation.metric("stripe_webhook_failed");
     logServerError("stripe_webhook_processing_failed", error);
 
     try {

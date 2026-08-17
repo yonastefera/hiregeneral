@@ -48,9 +48,20 @@ export default function LegalDocumentPage({
               {document.description}
             </p>
 
+            {document.approvalStatus === "pending_counsel" && (
+              <div className="mx-auto mt-6 max-w-2xl rounded-2xl border border-amber-300 bg-amber-50 px-5 py-4 text-left text-sm leading-6 text-amber-950">
+                Draft for counsel review. This document is not approved for
+                launch and policy acceptance is not being collected for this
+                draft.
+              </div>
+            )}
+
             <div className="mt-7 inline-flex items-center gap-2 rounded-full border border-black/5 bg-white px-4 py-2 text-sm font-medium text-muted-foreground shadow-sm">
               <CalendarDays className="size-4 text-teal-600" />
-              Effective date: {document.effectiveDate}
+              {document.approvalStatus === "published"
+                ? "Effective date"
+                : "Proposed effective date"}
+              : {document.effectiveDate} · Version {document.version}
             </div>
           </div>
         </div>

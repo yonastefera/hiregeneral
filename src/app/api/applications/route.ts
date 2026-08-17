@@ -13,6 +13,7 @@ import {
   logServerError,
 } from "@/lib/http/api-security";
 import { applicationSubmissionRateLimit } from "@/lib/rate-limit";
+import { startOperation, withRequestId } from "@/lib/logging/observability";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -24,6 +25,10 @@ function retryAfterSeconds(reset: number) {
 }
 
 export async function POST(req: NextRequest) {
+  const operation = startOperation(req, {
+    route: "/api/applications",
+    operation: "submit_application",
+  });
   const supabase = await createClient();
 
   const {
@@ -32,8 +37,13 @@ export async function POST(req: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (authError || !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    operation.failure("authentication", authError);
+    return withRequestId(
+      NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+      operation.context.requestId,
+    );
   }
+  operation.context.userId = user.id;
 
   try {
     const rateLimit = await applicationSubmissionRateLimit.limit(user.id);
@@ -80,6 +90,9 @@ export async function POST(req: NextRequest) {
     .list(user.id, { limit: 10, search: resumeFileName });
 
   if (resumeError) {
+    operation.failure("database", resumeError, {
+      stage: "resume_verification",
+    });
     logServerError("application_resume_verification_failed", resumeError);
     return NextResponse.json({ error: INTERNAL_ERROR }, { status: 500 });
   }
@@ -98,6 +111,7 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   if (jobError) {
+    operation.failure("database", jobError, { stage: "job_verification" });
     logServerError("application_job_verification_failed", jobError);
     return NextResponse.json({ error: INTERNAL_ERROR }, { status: 500 });
   }
@@ -139,6 +153,7 @@ export async function POST(req: NextRequest) {
     }
 
     logServerError("application_insert_failed", error);
+    operation.failure("database", error, { stage: "application_insert" });
 
     return NextResponse.json({ error: INTERNAL_ERROR }, { status: 500 });
   }
@@ -154,9 +169,11 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  return NextResponse.json(
-    { id: data.id, status: data.status },
-    { status: 201 },
+  operation.success({ status: 201 });
+  operation.metric("application_completed");
+  return withRequestId(
+    NextResponse.json({ id: data.id, status: data.status }, { status: 201 }),
+    operation.context.requestId,
   );
 }
 

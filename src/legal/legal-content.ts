@@ -1,3 +1,5 @@
+import type { LegalApprovalStatus } from "./policy-release";
+
 export type LegalSection = {
   title: string;
   body: string[];
@@ -9,6 +11,8 @@ export type LegalDocument = {
   title: string;
   description: string;
   effectiveDate: string;
+  version: string;
+  approvalStatus: LegalApprovalStatus;
   sections: LegalSection[];
 };
 
@@ -18,6 +22,8 @@ export const privacyPolicyContent: LegalDocument = {
   description:
     "This Privacy Policy explains how HireGeneral collects, uses, discloses, retains, and protects information from job seekers, employers, recruiters, and visitors.",
   effectiveDate: "August 16, 2026",
+  version: "privacy-2026-08-16-draft",
+  approvalStatus: "pending_counsel",
   sections: [
     {
       title: "1. Information we collect",
@@ -37,7 +43,7 @@ export const privacyPolicyContent: LegalDocument = {
       title: "3. Information collected automatically",
       body: [
         "When you use HireGeneral, we may automatically collect information about your device, browser, IP address, pages viewed, searches performed, clicks, referring pages, approximate location, session activity, and interactions with job posts, profiles, messages, or employer tools.",
-        "We may use cookies, pixels, analytics tools, log files, and similar technologies to operate the platform, remember preferences, improve performance, protect against fraud, and understand how users interact with our services.",
+        "We use essential cookies and operational logs to provide sessions, protect against fraud, troubleshoot failures, and operate the platform. With your permission, we may also use Vercel Analytics, Google Analytics, and Microsoft Clarity to understand site usage and improve the service.",
       ],
     },
     {
@@ -73,8 +79,8 @@ export const privacyPolicyContent: LegalDocument = {
     {
       title: "6. Personalized content, analytics, and advertising",
       body: [
-        "HireGeneral may use analytics and advertising technologies to understand platform usage, improve recommendations, measure campaign performance, and show relevant content.",
-        "Depending on your settings and applicable law, you may be able to manage cookies, opt out of certain marketing communications, or adjust privacy preferences through your browser, device, email settings, or account controls.",
+        "Optional web analytics are not loaded until a visitor selects Accept analytics. Selecting Essential only keeps those tools disabled. Visitors can reopen Privacy choices and change that selection.",
+        "HireGeneral does not currently use the optional analytics tools for targeted advertising. Essential operational logs and session technologies remain necessary to provide and secure the service.",
       ],
     },
     {
@@ -121,6 +127,7 @@ export const privacyPolicyContent: LegalDocument = {
       body: [
         "HireGeneral may contain links to third-party websites, employer career pages, application systems, payment providers, or integrations. Information collected by those third parties is governed by their own privacy policies, not this Privacy Policy.",
         "For example, if you click an external apply link on a job post, the employer or third-party application system may collect information directly from you.",
+        "A current list of service providers that process information for HireGeneral is available on our Subprocessors page.",
       ],
     },
     {
@@ -168,7 +175,8 @@ export const privacyPolicyContent: LegalDocument = {
     {
       title: "18. Contact us",
       body: [
-        "For privacy questions, requests, or complaints, contact HireGeneral at privacy@hiregeneral.com.",
+        "For privacy questions, requests, or complaints, contact HireGeneral LLC at privacy@hiregeneral.com.",
+        "Mailing address: HireGeneral LLC, 1165 Spring Wood Connector, Atlanta, GA 30328. General support is available at support@hiregeneral.com.",
       ],
     },
   ],
@@ -178,13 +186,15 @@ export const termsContent: LegalDocument = {
   eyebrow: "Terms",
   title: "Terms & Conditions",
   description:
-    "These sample Terms explain the basic rules for using HireGeneral as a job seeker, employer, recruiter, company representative, or visitor.",
-  effectiveDate: "May 17, 2026",
+    "These Terms explain the basic rules for using HireGeneral as a job seeker, employer, recruiter, company representative, or visitor.",
+  effectiveDate: "August 16, 2026",
+  version: "terms-2026-08-16-draft",
+  approvalStatus: "pending_counsel",
   sections: [
     {
       title: "1. Acceptance of terms",
       body: [
-        "These Terms & Conditions govern your access to and use of HireGeneral, including our job marketplace, employer tools, candidate profiles, job posts, company pages, applications, dashboards, communications, and related services.",
+        "These Terms & Conditions are between you and HireGeneral LLC and govern your access to and use of HireGeneral, including our job marketplace, employer tools, candidate profiles, job posts, company pages, applications, dashboards, communications, and related services.",
         "By accessing or using HireGeneral, you agree to these Terms and our Privacy Policy. If you do not agree, you should not use the platform.",
       ],
     },
@@ -255,6 +265,7 @@ export const termsContent: LegalDocument = {
       body: [
         "Employers are responsible for all job posts, company information, hiring communications, application requirements, compensation details, and employment decisions made through or in connection with HireGeneral.",
         "Employers must comply with applicable employment, labor, anti-discrimination, wage transparency, privacy, and recruiting laws.",
+        "Employers may use applicant and candidate information only for legitimate recruiting, hiring, and related compliance purposes. Employers must protect that information, limit access to authorized personnel, honor applicable retention and deletion obligations, and must not use protected or demographic information to make unlawful employment decisions.",
         "HireGeneral does not control employer hiring decisions, interview processes, compensation offers, job requirements, working conditions, or employment outcomes.",
       ],
     },
@@ -281,7 +292,15 @@ export const termsContent: LegalDocument = {
       ],
     },
     {
-      title: "13. Disclaimers",
+      title: "13. Paid services, billing, and cancellation",
+      body: [
+        "When you purchase a paid employer plan or feature, you authorize HireGeneral and its payment processor, Stripe, to charge the payment method you provide for the price, billing interval, taxes, and other amounts shown at checkout.",
+        "Recurring subscriptions renew for the displayed billing interval until cancelled. You may manage or cancel an eligible subscription through the billing portal. Unless the checkout terms state otherwise, cancellation takes effect at the end of the current paid period and does not retroactively refund charges already incurred.",
+        "Fees are non-refundable except where required by law or expressly stated at checkout. HireGeneral may change future pricing or plan features with advance notice where required, but a change will not alter charges already paid for the current billing period.",
+      ],
+    },
+    {
+      title: "14. Disclaimers",
       body: [
         "HireGeneral is provided on an “as is” and “as available” basis. We do not guarantee that the platform will be uninterrupted, error-free, secure, current, complete, or free of harmful components.",
         "We do not guarantee any specific hiring result, job placement, applicant volume, candidate quality, offer, interview, salary, employer response, or business outcome.",
@@ -289,108 +308,64 @@ export const termsContent: LegalDocument = {
       ],
     },
     {
-      title: "14. Limitation of liability",
+      title: "15. Limitation of liability",
       body: [
         "To the fullest extent permitted by law, HireGeneral and its owners, employees, contractors, service providers, partners, and affiliates will not be liable for indirect, incidental, consequential, special, punitive, exemplary, or similar damages, including lost profits, lost data, business interruption, reputational harm, or loss of goodwill.",
         "To the fullest extent permitted by law, HireGeneral’s total liability for claims arising from or related to the platform or these Terms will not exceed the greater of the amount you paid to HireGeneral for the service giving rise to the claim during the prior twelve months or one hundred dollars.",
       ],
     },
     {
-      title: "15. Indemnification",
+      title: "16. Indemnification",
       body: [
         "You agree to defend, indemnify, and hold harmless HireGeneral and its owners, employees, contractors, service providers, partners, and affiliates from claims, damages, liabilities, losses, costs, and expenses arising from your content, your use of the platform, your violation of these Terms, your violation of law, or your violation of another person’s or organization’s rights.",
       ],
     },
     {
-      title: "16. Dispute resolution",
+      title: "17. Dispute resolution",
       body: [
-        "If a dispute arises, we encourage you to contact HireGeneral first so we can try to resolve the issue informally.",
-        "Before filing a formal claim, you agree to send a written notice describing the dispute, the facts supporting your claim, your requested resolution, and your contact information. HireGeneral may also send you a similar notice if we have a dispute with you.",
-        "The parties agree to attempt in good faith to resolve the dispute informally before pursuing arbitration, small claims court, or other legal proceedings where permitted by law.",
+        "Before filing a formal claim, the complaining party must send a written notice describing the dispute, the facts supporting the claim, the requested resolution, and current contact information to legal@hiregeneral.com or the mailing address in the Contact section.",
+        "The parties will attempt in good faith to resolve the dispute for 30 days after the notice is received. If it is not resolved, either party may pursue available remedies in court. Nothing in this section prevents either party from seeking urgent injunctive relief or using an eligible small-claims procedure.",
       ],
     },
     {
-      title: "17. Arbitration procedures",
+      title: "18. Governing law and venue",
       body: [
-        "Where permitted by law, disputes that are not resolved through the informal dispute process may be resolved through binding individual arbitration or, where available, small claims court.",
-        "Any arbitration would be conducted by a neutral arbitrator under rules selected in the final legal version of these Terms. The arbitrator may decide issues related to the dispute, the scope of the arbitration agreement, and the relief available, except where applicable law requires a court to decide a particular issue.",
-        "Arbitration is generally more streamlined than court litigation. The parties may have more limited discovery and more limited appellate review than they would in court.",
+        "These Terms and disputes arising from them are governed by the laws of the State of Georgia, without regard to conflict-of-law rules, except where applicable law requires otherwise.",
+        "Subject to any non-waivable rights under applicable law, state and federal courts serving Fulton County, Georgia will have exclusive jurisdiction and venue over disputes arising from these Terms or the platform.",
       ],
     },
     {
-      title: "18. Class action and jury trial waiver",
-      body: [
-        "To the fullest extent permitted by law, you and HireGeneral agree that disputes will be resolved only on an individual basis and not as part of a class, collective, consolidated, representative, or private attorney general action.",
-        "To the fullest extent permitted by law, you and HireGeneral waive the right to a jury trial for disputes arising out of or related to these Terms or the platform.",
-        "If any part of this section is found unenforceable for a particular claim or remedy, that claim or remedy may proceed only as required by applicable law, and the remaining enforceable portions will continue to apply.",
-      ],
-    },
-    {
-      title: "19. Mass arbitration procedures",
-      body: [
-        "If multiple similar arbitration demands are filed by the same or coordinated counsel, the final legal version of these Terms may require staged or bellwether procedures designed to manage those disputes efficiently and fairly.",
-        "These procedures may include batching similar claims, delaying the filing or processing of later claims, tolling applicable limitations periods, and using a process administrator or arbitrator to manage procedural issues.",
-        "This placeholder section should be reviewed carefully by legal counsel before launch.",
-      ],
-    },
-    {
-      title: "20. Arbitration opt-out",
-      body: [
-        "The final legal version of these Terms may allow users to opt out of arbitration within a specified period after accepting the Terms by sending written notice to a designated legal contact.",
-        "If HireGeneral offers an arbitration opt-out, the final Terms should state the exact deadline, required contact information, email or mailing address, and information the user must include in the opt-out notice.",
-      ],
-    },
-    {
-      title: "21. Governing law and jurisdiction",
-      body: [
-        "The final legal version of these Terms should identify the governing law and the courts or forum where disputes may be brought when arbitration does not apply.",
-        "For this placeholder version, any governing law, venue, and jurisdiction language should be confirmed by legal counsel based on HireGeneral’s business entity, operating location, and user base.",
-      ],
-    },
-    {
-      title: "22. Waiver of jury trial",
-      body: [
-        "To the extent a dispute is not subject to arbitration and to the extent permitted by applicable law, you and HireGeneral waive the right to a jury trial in any action, suit, or proceeding arising from or related to these Terms or the platform.",
-      ],
-    },
-    {
-      title: "23. Class action waiver",
-      body: [
-        "To the extent a dispute is not subject to arbitration and to the extent permitted by applicable law, you agree not to bring or participate in a class, collective, consolidated, representative, or private attorney general action against HireGeneral related to your use of the platform.",
-      ],
-    },
-    {
-      title: "24. Suspension and termination",
+      title: "19. Suspension and termination",
       body: [
         "HireGeneral may suspend, restrict, or terminate access to the platform if we believe a user has violated these Terms, created risk for the platform or other users, engaged in unlawful activity, or used the services in a way that harms the marketplace.",
         "You may stop using HireGeneral at any time. Certain provisions of these Terms will continue to apply after termination where reasonably intended to survive, including provisions related to user content licenses, disclaimers, limitation of liability, indemnification, dispute resolution, and intellectual property.",
       ],
     },
     {
-      title: "25. Assignment",
+      title: "20. Assignment",
       body: [
         "HireGeneral may assign or transfer its rights and obligations under these Terms in connection with a merger, acquisition, financing, restructuring, sale of assets, or other business transaction.",
         "You may not assign or transfer your rights or obligations under these Terms without HireGeneral’s prior written consent.",
       ],
     },
     {
-      title: "26. Severability and waiver",
+      title: "21. Severability and waiver",
       body: [
         "If any provision of these Terms is found invalid or unenforceable, that provision will be modified or limited to the extent necessary so the remaining Terms remain in effect.",
         "HireGeneral’s failure to enforce any provision of these Terms is not a waiver of our right to enforce that provision later.",
       ],
     },
     {
-      title: "27. Entire agreement",
+      title: "22. Entire agreement",
       body: [
         "These Terms, together with the Privacy Policy and any additional policies or agreements that apply to specific services, make up the agreement between you and HireGeneral regarding your use of the platform.",
       ],
     },
     {
-      title: "28. Contact",
+      title: "23. Contact",
       body: [
-        "For questions about these Terms, contact HireGeneral at legal@hiregeneral.com.",
-        "This is placeholder contact information. Replace it with HireGeneral’s final legal contact, company address, and support email before launch.",
+        "For questions or formal notices about these Terms, contact HireGeneral LLC at legal@hiregeneral.com.",
+        "Mailing address: HireGeneral LLC, 1165 Spring Wood Connector, Atlanta, GA 30328. General support is available at support@hiregeneral.com.",
       ],
     },
   ],

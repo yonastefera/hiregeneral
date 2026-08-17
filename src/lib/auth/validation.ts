@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { legalPolicyRelease } from "@/legal/policy-release";
+
 export const PASSWORD_MIN_LENGTH = 12;
 export const PASSWORD_MAX_LENGTH = 128;
 
@@ -44,6 +46,13 @@ export const roleSelectionSchema = z
   .object({
     role: publicRoleSchema,
     fullName: z.string().trim().max(120).optional(),
+    legalAcceptance: z
+      .object({
+        termsVersion: z.literal(legalPolicyRelease.termsVersion),
+        privacyVersion: z.literal(legalPolicyRelease.privacyVersion),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

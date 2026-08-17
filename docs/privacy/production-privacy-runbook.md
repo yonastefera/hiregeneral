@@ -20,22 +20,51 @@ continue.
 
 ## Provider retention inventory
 
-Record values from the active production plan and contract. Marketing pages or
-generic documentation are not sufficient evidence when the contracted value is
-available.
+This inventory was reconciled with the application on 2026-08-16. It records
+documented provider behavior, but the active production plan and dashboard
+settings still require private evidence. Do not commit screenshots containing
+keys, customer records, or other personal data.
 
-| Provider / system                        | Data involved                                                | Backup or deletion window                                | Verified on | Evidence location                | Status  |
-| ---------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------- | ----------- | -------------------------------- | ------- |
-| Supabase Database                        | Profiles, applications, messages, audit and billing metadata | Pending plan verification                                | Pending     | Private operations system        | Blocked |
-| Supabase Auth                            | Identity and session data                                    | Pending plan verification                                | Pending     | Private operations system        | Blocked |
-| Supabase Storage                         | Resumes and avatars                                          | Pending plan verification                                | Pending     | Private operations system        | Blocked |
-| Vercel                                   | Runtime logs, deployment and cache data                      | Pending plan verification                                | Pending     | Private operations system        | Blocked |
-| Resend                                   | Transactional email delivery metadata                        | Pending contract verification                            | Pending     | Private vendor-management system | Blocked |
-| Stripe                                   | Customer, subscription, payment and dispute records          | Pending legal and contract verification                  | Pending     | Private compliance system        | Blocked |
-| Analytics and error monitoring providers | Redacted product and diagnostic events                       | Confirm enabled providers and their configured retention | Pending     | Private vendor-management system | Blocked |
+| Provider / system    | Data involved                                                | Documented retention or deletion behavior                                                                                                                                                                                                                                                                                          | Production verification required                                                                                                                            | Status                              |
+| -------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Supabase Database    | Profiles, applications, messages, audit and billing metadata | [Supabase backups](https://supabase.com/docs/guides/platform/backups) retain daily backups for 7 days on Pro, 14 days on Team, and up to 30 days on Enterprise. Free projects do not include managed downloadable backups.                                                                                                         | Production Free plan and absence of backups confirmed 2026-08-16. Encrypted daily workflow added; first successful backup and test restore remain required. | Implementation pending verification |
+| Supabase Auth        | Identity, session, and Auth audit data                       | Auth identities live in the project database and are removed by the account-deletion worker. The [Supabase plan comparison](https://supabase.com/pricing) currently lists only 1 hour of Auth audit-log retention on Free and 7 or 28 days on paid plans.                                                                          | Capture the production plan and Auth log-retention screen; test one staged Auth deletion.                                                                   | Dashboard evidence required         |
+| Supabase Storage     | Resumes and avatars                                          | [Database backups do not contain Storage objects](https://supabase.com/docs/guides/platform/backups#database-backups-do-not-include-storage-objects). Restoring a database can restore object metadata but cannot restore a deleted file.                                                                                          | Test resume/avatar deletion and document any separate Storage backup product or policy.                                                                     | Destructive test required           |
+| Vercel runtime logs  | Redacted request, error, and deployment diagnostics          | [Runtime log availability](https://vercel.com/docs/logs/runtime) is plan-dependent: 1 hour on Hobby, 1 day on Pro, 30 days with Observability Plus, and 3 days on Enterprise without the add-on.                                                                                                                                   | Production Hobby plan verified 2026-08-16. Observability metrics expose 12 hours; no Log Drain is configured.                                               | Verified                            |
+| Vercel Web Analytics | Anonymous page and referrer analytics                        | [Web Analytics reporting](https://vercel.com/docs/analytics/limits-and-pricing) is plan-dependent: 1 month on Hobby, 12 months on Pro, and up to 24 months with paid analytics/Enterprise. Vercel says its anonymous visitor session hash is [discarded after 24 hours](https://vercel.com/docs/analytics/privacy-policy).         | Vercel Web Analytics is disabled. `NEXT_PUBLIC_ENABLE_ANALYTICS=false` was deployed to Production and Preview on 2026-08-16.                                | Disabled and verified               |
+| Resend               | Transactional email content and delivery metadata            | Resend documents [30-day email-data retention on all standard plans](https://resend.com/docs/dashboard/webhooks/how-to-store-webhooks-data).                                                                                                                                                                                       | Free standard Transactional and Marketing subscriptions verified 2026-08-16; no Enterprise retention override.                                              | Verified: 30 days                   |
+| Stripe               | Customer, subscription, payment, refund, and dispute records | Payment records may be retained for fraud, tax, accounting, dispute, and other legal obligations. No fixed end-to-end deletion SLA has been established for HireGeneral from public documentation. Deleting a local account must not erase records that legal/privacy requires HireGeneral or Stripe to retain.                    | Legal/privacy must approve the retention basis and record the Stripe data-request/escalation path and contracted SLA.                                       | Legal/contract review required      |
+| Google Analytics 4   | Page, device, referral, and configured event data            | [GA4 user/event-level retention](https://support.google.com/analytics/answer/7667196) can be configured to 2 or 14 months; the setting does not remove standard aggregated reports on the same schedule.                                                                                                                           | Provider ID is configured, but the production master analytics flag was set to `false` on 2026-08-16.                                                       | Disabled pending consent            |
+| Microsoft Clarity    | Session reconstruction, clicks, scrolls, and heatmaps        | [Clarity retention](https://learn.microsoft.com/en-us/clarity/setup-and-installation/data-retention) keeps playback data for 30 days and click/heatmap/labeled data for up to 9 months; provider backups are deleted after the applicable period. A single user's data cannot be selectively removed without deleting the project. | Provider ID is configured, but the production master analytics flag was set to `false` on 2026-08-16.                                                       | Disabled pending consent            |
+| Error monitoring     | Application errors and redacted diagnostics                  | No third-party error-monitoring SDK was found in the application inventory on 2026-08-16.                                                                                                                                                                                                                                          | Re-run the dependency and environment inventory before launch and whenever a provider is added.                                                             | Not currently configured            |
+
+The application loads Vercel Web Analytics, Google Analytics, and Microsoft
+Clarity only in production when `NEXT_PUBLIC_ENABLE_ANALYTICS=true`; Google and
+Clarity also require their provider IDs. A provider with no production ID is
+inactive, but the disabled state must still be captured in the private
+subprocessor register.
 
 Add every production subprocessor before launch. Removing a provider from the
 application does not remove its historical deletion obligation.
+
+### Evidence closeout checklist
+
+Store the following in the private operations or vendor-management system:
+
+1. Supabase production plan, backup configuration, Auth log retention, and a
+   dated database/Auth/Storage deletion test.
+2. Vercel plan, Runtime Logs/Log Drains retention, Web Analytics plan, and the
+   production values (enabled/disabled only, never secrets) for analytics.
+3. Resend plan and any contract that changes the documented 30-day default.
+4. Stripe legal retention decision, data-request contact/path, and deletion
+   response target.
+5. GA4 retention and consent settings, or evidence that GA4 is disabled.
+6. Clarity project, masking, consent, and retention settings, or evidence that
+   Clarity is disabled.
+
+After these artifacts are approved, replace each “required” status above with
+the evidence record identifier and review date. Provider documentation alone
+does not satisfy the account-deletion execution gate.
 
 ## Daily report-only review
 

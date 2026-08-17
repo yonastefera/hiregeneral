@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { routeForRole, type AppRole } from "@/lib/auth/roles";
 import { safeInternalPath, safeNextForRole } from "@/lib/auth/security";
 import { cn } from "@/lib/utils";
+import { legalPolicyRelease } from "@/legal/policy-release";
 
 const roleOptions: Array<{
   role: Extract<AppRole, "job_seeker" | "recruiter">;
@@ -60,6 +61,7 @@ export default function ChooseRolePage() {
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [acceptedPolicies, setAcceptedPolicies] = useState(false);
 
   const nextUrl = useMemo(() => {
     return safeInternalPath(requestedNext);
@@ -106,7 +108,18 @@ export default function ChooseRolePage() {
       const response = await fetch("/api/auth/role", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: selectedRole, fullName }),
+        body: JSON.stringify({
+          role: selectedRole,
+          fullName,
+          ...(legalPolicyRelease.acceptanceRequired
+            ? {
+                legalAcceptance: {
+                  termsVersion: legalPolicyRelease.termsVersion,
+                  privacyVersion: legalPolicyRelease.privacyVersion,
+                },
+              }
+            : {}),
+        }),
       });
       const body = (await response.json()) as RolePayload;
 
@@ -206,12 +219,45 @@ export default function ChooseRolePage() {
             ))}
           </div>
 
+          {legalPolicyRelease.acceptanceRequired && (
+            <label className="mt-6 flex items-start gap-3 rounded-2xl border border-border bg-background p-4 text-sm leading-6">
+              <input
+                checked={acceptedPolicies}
+                className="mt-1 size-4 accent-primary"
+                onChange={(event) => setAcceptedPolicies(event.target.checked)}
+                type="checkbox"
+              />
+              <span>
+                I agree to the{" "}
+                <a
+                  className="font-medium text-primary underline"
+                  href="/terms"
+                  target="_blank"
+                >
+                  Terms
+                </a>{" "}
+                and acknowledge the{" "}
+                <a
+                  className="font-medium text-primary underline"
+                  href="/privacy"
+                  target="_blank"
+                >
+                  Privacy Policy
+                </a>
+                .
+              </span>
+            </label>
+          )}
+
           <Button
             type="button"
             size="xl"
             className="mt-6 w-full"
             onClick={saveRole}
-            disabled={saving}
+            disabled={
+              saving ||
+              (legalPolicyRelease.acceptanceRequired && !acceptedPolicies)
+            }
           >
             {saving ? (
               <>

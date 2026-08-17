@@ -26,6 +26,8 @@
     "format:check": "prettier --check .",
     "security:audit": "npm audit --omit=dev --audit-level=critical",
     "db:types": "node scripts/generate-supabase-types.mjs",
+    "db:backup:encrypted": "bash scripts/backup-supabase-public.sh",
+    "db:restore:test": "bash scripts/restore-supabase-public.sh",
     "ci": "npm run format:check && npm run lint && npm run typecheck && npm run test:unit && npm run test:migrations && npm run test:schema-bundle && npm run build",
     "prepare": "husky",
     "seed:locations": "tsx scripts/seed-locations-geonames.ts",

@@ -59,6 +59,12 @@ export function writeRedactedLog(
 ) {
   const entry = JSON.stringify({
     event,
+    level,
+    environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "unknown",
+    release:
+      process.env.VERCEL_GIT_COMMIT_SHA ??
+      process.env.NEXT_PUBLIC_RELEASE_VERSION ??
+      "local",
     ...(redactLogValue(context) as Record<string, unknown>),
     timestamp: new Date().toISOString(),
   });

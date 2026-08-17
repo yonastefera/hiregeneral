@@ -9,6 +9,11 @@ import { readJsonBody } from "@/lib/http/json-body";
 import { roleSelectionRateLimit } from "@/lib/rate-limit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { recordCurrentPolicyAcceptance } from "@/legal/policy-acceptance";
+import {
+  isCurrentPublishedAcceptance,
+  legalPolicyRelease,
+} from "@/legal/policy-release";
 
 export const runtime = "nodejs";
 
@@ -113,11 +118,31 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { role: selectedRole, fullName } = parsed.data;
+  const { role: selectedRole, fullName, legalAcceptance } = parsed.data;
+
+  if (
+    legalPolicyRelease.acceptanceRequired &&
+    !isCurrentPublishedAcceptance(legalAcceptance)
+  ) {
+    return NextResponse.json(
+      { error: "Accept the current Terms and Privacy Policy to continue." },
+      { status: 400 },
+    );
+  }
 
   try {
+    const admin = createSupabaseAdminClient();
+
+    if (legalPolicyRelease.acceptanceRequired) {
+      await recordCurrentPolicyAcceptance({
+        admin,
+        userId: user.id,
+        source: "role_selection",
+      });
+    }
+
     const role = await assignInitialRole({
-      admin: createSupabaseAdminClient(),
+      admin,
       user,
       role: selectedRole,
       fullName,

@@ -7,10 +7,16 @@ import { boundedJsonBody, enforceRateLimit } from "@/lib/http/api-security";
 import { emailOtpRequestRateLimit } from "@/lib/rate-limit";
 import { enforceDuplicateCooldown } from "@/lib/security/abuse";
 import { createSupabasePublicClient } from "@/lib/supabase/public";
+import { startOperation, withRequestId } from "@/lib/logging/observability";
 
 const OTP_MESSAGE = "If the address is eligible, a code will arrive shortly.";
 
 export async function POST(request: NextRequest) {
+  const operation = startOperation(request, {
+    route: "/api/auth/otp/request",
+    operation: "request_email_otp",
+    externalProvider: "supabase_auth",
+  });
   const body = await boundedJsonBody(request);
   if (!body.ok) return body.response;
 
@@ -51,7 +57,15 @@ export async function POST(request: NextRequest) {
       code: error.code,
       status: error.status,
     });
+    operation.failure("external_provider", error);
+    operation.metric("signup_confirmation_request_failed");
+  } else {
+    operation.success();
+    operation.metric("signup_confirmation_requested");
   }
 
-  return NextResponse.json({ ok: true, message: OTP_MESSAGE });
+  return withRequestId(
+    NextResponse.json({ ok: true, message: OTP_MESSAGE }),
+    operation.context.requestId,
+  );
 }
