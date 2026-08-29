@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   audit: vi.fn(),
+  getPreviousSuccessfulJobCount: vi.fn(),
+  getPublishedImportedJobCount: vi.fn(),
   getSources: vi.fn(),
   limit: vi.fn(),
 }));
@@ -22,10 +24,12 @@ vi.mock("@/lib/ingest/job-detail-extractor", () => ({
 vi.mock("@/lib/ingest/ingestion-runs", () => ({
   startIngestionRun: vi.fn(),
   finishIngestionRun: vi.fn(),
+  getPreviousSuccessfulJobCount: mocks.getPreviousSuccessfulJobCount,
 }));
 vi.mock("@/lib/ingest/source", () => ({ validateImportedJobs: vi.fn() }));
 vi.mock("@/lib/ingest/upsert-jobs", () => ({
   expireStaleImportedJobs: vi.fn(),
+  getPublishedImportedJobCount: mocks.getPublishedImportedJobCount,
   upsertImportedJobs: vi.fn(),
 }));
 
@@ -46,6 +50,8 @@ beforeEach(() => {
   process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-test";
   mocks.limit.mockResolvedValue({ success: true, reset: Date.now() + 60_000 });
   mocks.getSources.mockResolvedValue([]);
+  mocks.getPreviousSuccessfulJobCount.mockResolvedValue(null);
+  mocks.getPublishedImportedJobCount.mockResolvedValue(0);
   mocks.audit.mockResolvedValue(undefined);
 });
 

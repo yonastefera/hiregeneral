@@ -50,7 +50,7 @@ if [[ -n "${PRODUCTION_DATABASE_HOST:-}" && "$restore_host" == "$PRODUCTION_DATA
   exit 1
 fi
 
-echo "Restoring public schema into test host: $restore_host"
+echo "Restoring public, Auth, and Storage metadata into test host: $restore_host"
 
 age --decrypt --identity "$RESTORE_AGE_IDENTITY" "$backup_path" \
   | docker run --rm --interactive \
@@ -58,5 +58,4 @@ age --decrypt --identity "$RESTORE_AGE_IDENTITY" "$backup_path" \
     postgres:17-alpine \
     sh -c 'exec pg_restore --dbname="$DATABASE_URL" --clean --if-exists --no-owner --no-privileges --exit-on-error'
 
-echo "Restore completed. Run application, migration, and RLS verification before treating it as successful."
-
+echo "Database restore completed. Restore the matching Storage object artifact before verification."

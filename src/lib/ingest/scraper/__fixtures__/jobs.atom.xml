@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <id>job-42</id>
+    <title>Software Engineer (Atlanta, GA)</title>
+    <link rel="alternate" href="https://jobs.example.com/job-42" />
+    <published>2026-08-21T12:00:00Z</published>
+    <content>Build reliable services for customers in the United States.</content>
+  </entry>
+</feed>

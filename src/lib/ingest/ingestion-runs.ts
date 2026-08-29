@@ -8,6 +8,24 @@ const supabaseAdmin = createClient(
 
 export type IngestionRunStatus = "running" | "success" | "failed";
 
+export async function getPreviousSuccessfulJobCount(source: JobSource) {
+  const { data, error } = await supabaseAdmin
+    .from("job_ingestion_runs")
+    .select("valid_jobs")
+    .eq("source_name", source.sourceType)
+    .eq("source_slug", source.sourceSlug)
+    .eq("status", "success")
+    .order("finished_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Could not load previous ingestion run: ${error.message}`);
+  }
+
+  return data?.valid_jobs ?? null;
+}
+
 export async function startIngestionRun(source: JobSource) {
   const { data, error } = await supabaseAdmin
     .from("job_ingestion_runs")

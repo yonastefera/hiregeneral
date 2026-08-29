@@ -14,12 +14,14 @@ concurrency:
 
 jobs:
   backup:
-    name: Back up Supabase public schema
+    name: Back up Supabase database and Storage
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production-backup
     env:
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_PRODUCTION_DB_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_PRODUCTION_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_PRODUCTION_SERVICE_ROLE_KEY }}
       BACKUP_AGE_RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
       BACKUP_OUTPUT_DIR: encrypted-backups
 
@@ -30,7 +32,14 @@ jobs:
       - name: Validate backup configuration
         run: |
           test -n "$SUPABASE_DB_URL" || { echo "Missing SUPABASE_PRODUCTION_DB_URL" >&2; exit 1; }
+          test -n "$SUPABASE_URL" || { echo "Missing SUPABASE_PRODUCTION_URL" >&2; exit 1; }
+          test -n "$SUPABASE_SERVICE_ROLE_KEY" || { echo "Missing SUPABASE_PRODUCTION_SERVICE_ROLE_KEY" >&2; exit 1; }
           test -n "$BACKUP_AGE_RECIPIENT" || { echo "Missing BACKUP_AGE_RECIPIENT" >&2; exit 1; }
+
+      - name: Use Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
 
       - name: Install age
         run: |
@@ -43,9 +52,10 @@ jobs:
       - name: Upload encrypted backup
         uses: actions/upload-artifact@v6
         with:
-          name: hiregeneral-public-backup-${{ github.run_id }}
+          name: hiregeneral-supabase-backup-${{ github.run_id }}
           path: |
             encrypted-backups/*.dump.age
+            encrypted-backups/*.tar.age
             encrypted-backups/*.sha256
           if-no-files-found: error
           retention-days: 7

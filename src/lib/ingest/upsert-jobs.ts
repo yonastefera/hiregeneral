@@ -12,6 +12,24 @@ function sourceIdPrefix(sourceSlug: string) {
   return `${sourceSlug}:%`;
 }
 
+export async function getPublishedImportedJobCount(params: {
+  sourceName: string;
+  sourceSlug: string;
+}) {
+  const { count, error } = await supabaseAdmin
+    .from("jobs")
+    .select("id", { count: "exact", head: true })
+    .eq("source_name", params.sourceName)
+    .like("source_id", sourceIdPrefix(params.sourceSlug))
+    .eq("status", "published");
+
+  if (error) {
+    throw new Error(`Supabase imported job count failed: ${error.message}`);
+  }
+
+  return count ?? 0;
+}
+
 export async function upsertImportedJobs(jobs: ImportedJob[]) {
   if (jobs.length === 0) {
     return {

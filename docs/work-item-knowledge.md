@@ -258,12 +258,13 @@ These are active constraints, not assumptions to silently work around:
 - Account deletion execution must remain disabled until the privacy runbook's
   owners, approvals, backup/restore evidence, provider deletion paths, and
   alerting gates are complete.
-- The encrypted database backup covers only the PostgreSQL `public` schema; it
-  does not cover Supabase Auth identities or Storage objects.
+- The encrypted backup tooling covers PostgreSQL `public`, Auth data, Storage
+  metadata, and Storage object bytes. Production readiness still requires a
+  successful paired-artifact restore drill against the dedicated test project.
 - Production application migration history is not represented by a discovered
   migration ledger. Treat live-schema reconciliation as a controlled operation.
-- Dependency auditing currently reports existing advisories non-blockingly;
-  dependency changes still require deliberate security review.
+- Dependency auditing blocks CI on critical production advisories; high and
+  lower advisories still require deliberate review and remediation.
 - Location autocomplete improved after matching indexes but remains dominated
   by ZIP-row processing and city/state deduplication. A maintained city-level
   structure is the documented future direction, not another incidental index.

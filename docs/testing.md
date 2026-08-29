@@ -84,7 +84,7 @@ and screenshots for seven days.
 
 ## Dependency scanning
 
-`npm run security:audit` scans production dependencies. It is initially
-non-blocking in CI so existing advisories remain visible while framework and
-transitive upgrades are handled deliberately. Remove `continue-on-error` once
-the current critical advisory is remediated.
+`npm run security:audit` scans production dependencies and blocks CI when npm
+reports a critical production advisory. High and lower advisories remain
+visible for deliberate remediation without allowing an unreviewed forced
+upgrade to change framework or transitive behavior.

@@ -10,14 +10,17 @@ import { getJobSourceAdapter } from "@/lib/ingest/adapters";
 import { enhanceImportedJobFromDetailPage } from "@/lib/ingest/job-detail-extractor";
 import {
   finishIngestionRun,
+  getPreviousSuccessfulJobCount,
   startIngestionRun,
 } from "@/lib/ingest/ingestion-runs";
 import { getEnabledJobSources } from "@/lib/ingest/job-sources";
 import { validateImportedJobs } from "@/lib/ingest/source";
 import {
   expireStaleImportedJobs,
+  getPublishedImportedJobCount,
   upsertImportedJobs,
 } from "@/lib/ingest/upsert-jobs";
+import { evaluateIngestionVolume } from "@/lib/ingest/volume-guard";
 import type { ImportedJob } from "@/lib/ingest/normalize";
 import { ingestionRateLimit } from "@/lib/rate-limit";
 import { recordPrivilegedAction } from "@/lib/security/audit";
@@ -43,6 +46,8 @@ type SourceResult = {
   rejectedJobs: number;
   upsertedJobs: number;
   expiredJobs: number;
+  staleExpirationSkipped: boolean;
+  staleExpirationReason: string | null;
   runId: string | null;
   error: string | null;
   rejected: Array<{
@@ -226,6 +231,8 @@ async function runJobsIngestion(request: Request) {
           rejectedJobs: 0,
           upsertedJobs: 0,
           expiredJobs: 0,
+          staleExpirationSkipped: false,
+          staleExpirationReason: null,
           runId: null,
           error: "Source type not implemented yet",
           rejected: [],
@@ -243,12 +250,21 @@ async function runJobsIngestion(request: Request) {
         rejectedJobs: 0,
         upsertedJobs: 0,
         expiredJobs: 0,
+        staleExpirationSkipped: false,
+        staleExpirationReason: null,
         runId: null,
         error: null,
         rejected: [],
       };
 
       try {
+        const [previousValidJobs, publishedJobs] = await Promise.all([
+          getPreviousSuccessfulJobCount(source),
+          getPublishedImportedJobCount({
+            sourceName: source.sourceType,
+            sourceSlug: source.sourceSlug,
+          }),
+        ]);
         const runId = await startIngestionRun(source);
         sourceResult.runId = runId;
 
@@ -283,8 +299,16 @@ async function runJobsIngestion(request: Request) {
         const upsertResult = await upsertImportedJobs(validation.jobs);
         sourceResult.upsertedJobs = upsertResult.upserted;
 
-        const shouldExpireStale =
-          validation.jobs.length > 0 || rawJobs.length === 0;
+        const volumeDecision = evaluateIngestionVolume({
+          source,
+          currentValidJobs: validation.jobs.length,
+          previousValidJobs,
+          publishedJobs,
+        });
+        const shouldExpireStale = volumeDecision.allowStaleExpiration;
+
+        sourceResult.staleExpirationSkipped = !shouldExpireStale;
+        sourceResult.staleExpirationReason = volumeDecision.reason;
 
         if (shouldExpireStale) {
           const staleResult = await expireStaleImportedJobs({
