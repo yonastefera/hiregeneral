@@ -72,14 +72,16 @@ the dedicated `hiregeneral-test` project. Production and test now match for all
 of the remediated role-assignment and job-enrichment controls.
 
 The evidence query now includes every named and forward migration through
-`20260816210000_legal_policy_acceptance.sql`. Run it again against production
-after taking the paired encrypted database and Storage backup, then record the
-UTC capture time and result below. Do not mark this refresh complete from local
-repository evidence alone.
+`20260829043000_scalable_job_ingestion.sql`.
+
+The production evidence refresh completed on 2026-08-29 after the scalable
+ingestion migration was applied. All 35 distinctive migration markers returned
+`true`, including the staging table, dead-letter table, and atomic publication
+function introduced for Phase 2 ingestion.
 
 | Captured at (UTC) | Production project     | Evidence refresh                      |
 | ----------------- | ---------------------- | ------------------------------------- |
-| Pending           | `svzsorgmgvvmikrwboaq` | Requires authorized read-only SQL run |
+| 2026-08-29        | `svzsorgmgvvmikrwboaq` | All 35 distinctive markers present    |
 
 ## Reconciliation checklist
 

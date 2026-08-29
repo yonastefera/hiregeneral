@@ -45,6 +45,11 @@ type MonitorRun = {
   rejected_jobs: number;
   upserted_jobs: number;
   expired_jobs: number;
+  attempt_count: number;
+  retry_count: number;
+  dead_lettered: boolean;
+  quality_metrics: Record<string, unknown>;
+  published_at: string | null;
   error_message: string | null;
   started_at: string;
   finished_at: string | null;
@@ -61,6 +66,9 @@ type MonitorSource = {
   failedCount: number;
   runningCount: number;
   staleRunningCount?: number;
+  openDeadLetterCount: number;
+  retryCount: number;
+  latestQualityMetrics: Record<string, unknown>;
   latestRun: MonitorRun | null;
   lastError: string | null;
 };
@@ -94,6 +102,9 @@ type MonitorResponse = {
     rejectedJobs: number;
     upsertedJobs: number;
     expiredJobs: number;
+    retries: number;
+    deadLetteredRuns: number;
+    openDeadLetters: number;
     successfulRuns: number;
     failedRuns: number;
     runningRuns: number;
@@ -154,10 +165,22 @@ function statusVariant(status: MonitorStatus) {
 function qualityNotes(source: MonitorSource, company?: MonitorCompany) {
   const notes: string[] = [];
   const latestRun = source.latestRun;
+  const applyLinkIssues = source.latestQualityMetrics.applyLinkIssues;
+  const rejectionRate = source.latestQualityMetrics.rejectionRate;
 
   if (source.status === "missing") notes.push("No run in window");
   if (source.status === "stale_running") notes.push("Stale running job");
   if (source.failedCount > 0) notes.push(`${source.failedCount} failed`);
+  if (source.openDeadLetterCount > 0) {
+    notes.push(`${source.openDeadLetterCount} dead letter`);
+  }
+  if (source.retryCount > 0) notes.push(`${source.retryCount} retries`);
+  if (typeof applyLinkIssues === "number" && applyLinkIssues > 0) {
+    notes.push(`${applyLinkIssues} link issues`);
+  }
+  if (typeof rejectionRate === "number" && rejectionRate >= 0.1) {
+    notes.push(`${Math.round(rejectionRate * 100)}% rejected`);
+  }
   if (latestRun && latestRun.valid_jobs === 0) notes.push("No valid jobs");
   if (latestRun && latestRun.expired_jobs > latestRun.upserted_jobs) {
     notes.push("High expiry");
@@ -408,6 +431,11 @@ export default function SourceMonitorPage() {
                     value={totals?.upsertedJobs}
                   />
                   <SummaryMetric label="Expired" value={totals?.expiredJobs} />
+                  <SummaryMetric label="Retries" value={totals?.retries} />
+                  <SummaryMetric
+                    label="Dead letters"
+                    value={totals?.openDeadLetters}
+                  />
                   <SummaryMetric
                     label="Companies"
                     value={totals?.companiesWithPublishedJobs}

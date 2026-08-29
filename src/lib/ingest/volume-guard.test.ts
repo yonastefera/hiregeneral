@@ -51,6 +51,17 @@ describe("ingestion volume guard", () => {
     ).toBe(false);
   });
 
+  it("does not close every job for a small source that unexpectedly returns zero", () => {
+    expect(
+      evaluateIngestionVolume({
+        source,
+        currentValidJobs: 0,
+        previousValidJobs: 4,
+        publishedJobs: 4,
+      }).allowStaleExpiration,
+    ).toBe(false);
+  });
+
   it("allows explicit per-source thresholds", () => {
     expect(
       evaluateIngestionVolume({

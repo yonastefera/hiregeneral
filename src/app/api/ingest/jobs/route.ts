@@ -6,57 +6,20 @@ import {
   requestIp,
   safeServerError,
 } from "@/lib/http/api-security";
-import { getJobSourceAdapter } from "@/lib/ingest/adapters";
-import { enhanceImportedJobFromDetailPage } from "@/lib/ingest/job-detail-extractor";
-import {
-  finishIngestionRun,
-  getPreviousSuccessfulJobCount,
-  startIngestionRun,
-} from "@/lib/ingest/ingestion-runs";
 import { getEnabledJobSources } from "@/lib/ingest/job-sources";
-import { validateImportedJobs } from "@/lib/ingest/source";
-import {
-  expireStaleImportedJobs,
-  getPublishedImportedJobCount,
-  upsertImportedJobs,
-} from "@/lib/ingest/upsert-jobs";
-import { evaluateIngestionVolume } from "@/lib/ingest/volume-guard";
-import type { ImportedJob } from "@/lib/ingest/normalize";
+import { runSourceWorkers } from "@/lib/ingest/source-worker";
 import { ingestionRateLimit } from "@/lib/rate-limit";
 import { recordPrivilegedAction } from "@/lib/security/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const DEFAULT_SOURCE_TIMEOUT_MS = 90_000;
-const DEFAULT_DETAIL_ENHANCEMENT_CONCURRENCY = 3;
+const DEFAULT_SOURCE_CONCURRENCY = 3;
 
 const ingestionQuerySchema = z.object({
   sourceSlug: z.string().trim().min(1).max(120).nullable(),
   sourceType: z.string().trim().min(1).max(80).nullable(),
 });
-
-type SourceResult = {
-  companyName: string;
-  sourceType: string;
-  sourceSlug: string;
-  status: "success" | "failed" | "skipped";
-  fetchedJobs: number;
-  validJobs: number;
-  rejectedJobs: number;
-  upsertedJobs: number;
-  expiredJobs: number;
-  staleExpirationSkipped: boolean;
-  staleExpirationReason: string | null;
-  runId: string | null;
-  error: string | null;
-  rejected: Array<{
-    index: number;
-    sourceId?: string;
-    title?: string;
-    issues: string[];
-  }>;
-};
 
 function missingEnvVars() {
   return [
@@ -78,77 +41,11 @@ function isVercelCronRequest(request: Request) {
   );
 }
 
-function metadataNumber(
-  metadata: Record<string, unknown> | undefined,
-  key: string,
-) {
-  const value = metadata?.[key];
-
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function sourceTimeoutMs(source?: { metadata?: Record<string, unknown> }) {
-  const sourceValue = metadataNumber(source?.metadata, "sourceTimeoutMs");
-
-  if (sourceValue && sourceValue > 0) {
-    return sourceValue;
-  }
-
-  const value = Number(process.env.INGEST_SOURCE_TIMEOUT_MS);
-
-  return Number.isFinite(value) && value > 0
-    ? value
-    : DEFAULT_SOURCE_TIMEOUT_MS;
-}
-
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  concurrency: number,
-  mapper: (item: T) => Promise<R>,
-) {
-  const results: R[] = [];
-  let nextIndex = 0;
-
-  async function worker() {
-    while (nextIndex < items.length) {
-      const currentIndex = nextIndex;
-      nextIndex += 1;
-      results[currentIndex] = await mapper(items[currentIndex]);
-    }
-  }
-
-  await Promise.all(
-    Array.from({ length: Math.min(concurrency, items.length) }, () => worker()),
-  );
-
-  return results;
-}
-
-async function enhanceJobsFromSourceDetails(
-  jobs: ImportedJob[],
-  source: { metadata?: Record<string, unknown> },
-  signal?: AbortSignal,
-) {
-  const enabled = source.metadata?.enhanceDetails !== false;
-
-  if (!enabled || jobs.length === 0) return jobs;
-
-  const concurrency = Math.min(
-    Math.max(
-      metadataNumber(source.metadata, "detailEnhancementConcurrency") ??
-        DEFAULT_DETAIL_ENHANCEMENT_CONCURRENCY,
-      1,
-    ),
-    8,
-  );
-
-  return mapWithConcurrency(jobs, concurrency, (job) =>
-    enhanceImportedJobFromDetailPage({
-      job,
-      detailUrl: job.applyUrl,
-      signal,
-    }),
-  );
+function sourceConcurrency() {
+  const configured = Number(process.env.INGEST_SOURCE_CONCURRENCY);
+  return Number.isInteger(configured) && configured > 0
+    ? Math.min(configured, 10)
+    : DEFAULT_SOURCE_CONCURRENCY;
 }
 
 async function runJobsIngestion(request: Request) {
@@ -163,15 +60,9 @@ async function runJobsIngestion(request: Request) {
     }
 
     const authHeader = request.headers.get("authorization");
-    const isAuthorizedBySecret = authHeaders.includes(authHeader ?? "");
-    const isAuthorizedByCron = isCronRequest;
-
-    if (!isAuthorizedBySecret && !isAuthorizedByCron) {
+    if (!authHeaders.includes(authHeader ?? "") && !isCronRequest) {
       return NextResponse.json(
-        {
-          ok: false,
-          error: "Unauthorized",
-        },
+        { ok: false, error: "Unauthorized" },
         { status: 401 },
       );
     }
@@ -201,167 +92,25 @@ async function runJobsIngestion(request: Request) {
       );
     }
 
-    const { sourceSlug: requestedSourceSlug, sourceType: requestedSourceType } =
-      parsedQuery.data;
+    const { sourceSlug, sourceType } = parsedQuery.data;
     const allSources = await getEnabledJobSources();
-    const sources = allSources.filter((source) => {
-      if (requestedSourceSlug && source.sourceSlug !== requestedSourceSlug) {
-        return false;
-      }
-
-      if (requestedSourceType && source.sourceType !== requestedSourceType) {
-        return false;
-      }
-
-      return true;
-    });
-    const sourcesResult: SourceResult[] = [];
-
-    for (const source of sources) {
-      const adapter = getJobSourceAdapter(source.sourceType);
-
-      if (!adapter) {
-        sourcesResult.push({
-          companyName: source.companyName,
-          sourceType: source.sourceType,
-          sourceSlug: source.sourceSlug,
-          status: "skipped",
-          fetchedJobs: 0,
-          validJobs: 0,
-          rejectedJobs: 0,
-          upsertedJobs: 0,
-          expiredJobs: 0,
-          staleExpirationSkipped: false,
-          staleExpirationReason: null,
-          runId: null,
-          error: "Source type not implemented yet",
-          rejected: [],
-        });
-        continue;
-      }
-
-      const sourceResult: SourceResult = {
-        companyName: source.companyName,
-        sourceType: source.sourceType,
-        sourceSlug: source.sourceSlug,
-        status: "failed",
-        fetchedJobs: 0,
-        validJobs: 0,
-        rejectedJobs: 0,
-        upsertedJobs: 0,
-        expiredJobs: 0,
-        staleExpirationSkipped: false,
-        staleExpirationReason: null,
-        runId: null,
-        error: null,
-        rejected: [],
-      };
-
-      try {
-        const [previousValidJobs, publishedJobs] = await Promise.all([
-          getPreviousSuccessfulJobCount(source),
-          getPublishedImportedJobCount({
-            sourceName: source.sourceType,
-            sourceSlug: source.sourceSlug,
-          }),
-        ]);
-        const runId = await startIngestionRun(source);
-        sourceResult.runId = runId;
-
-        const abortController = new AbortController();
-        const timeout = setTimeout(
-          () => abortController.abort(),
-          sourceTimeoutMs(source),
-        );
-
-        let rawJobs;
-
-        try {
-          const adapterJobs = await adapter.fetchJobs(source, {
-            signal: abortController.signal,
-          });
-          rawJobs = await enhanceJobsFromSourceDetails(
-            adapterJobs,
-            source,
-            abortController.signal,
-          );
-        } finally {
-          clearTimeout(timeout);
-        }
-
-        const validation = validateImportedJobs(rawJobs);
-
-        sourceResult.fetchedJobs = rawJobs.length;
-        sourceResult.validJobs = validation.jobs.length;
-        sourceResult.rejectedJobs = validation.rejected.length;
-        sourceResult.rejected = validation.rejected.slice(0, 10);
-
-        const upsertResult = await upsertImportedJobs(validation.jobs);
-        sourceResult.upsertedJobs = upsertResult.upserted;
-
-        const volumeDecision = evaluateIngestionVolume({
-          source,
-          currentValidJobs: validation.jobs.length,
-          previousValidJobs,
-          publishedJobs,
-        });
-        const shouldExpireStale = volumeDecision.allowStaleExpiration;
-
-        sourceResult.staleExpirationSkipped = !shouldExpireStale;
-        sourceResult.staleExpirationReason = volumeDecision.reason;
-
-        if (shouldExpireStale) {
-          const staleResult = await expireStaleImportedJobs({
-            sourceName: source.sourceType,
-            sourceSlug: source.sourceSlug,
-            activeSourceIds: validation.jobs.map((job) => job.sourceId),
-          });
-
-          sourceResult.expiredJobs = staleResult.expired;
-        }
-
-        sourceResult.status = "success";
-
-        await finishIngestionRun({
-          runId,
-          status: "success",
-          fetchedJobs: sourceResult.fetchedJobs,
-          validJobs: sourceResult.validJobs,
-          rejectedJobs: sourceResult.rejectedJobs,
-          upsertedJobs: sourceResult.upsertedJobs,
-          expiredJobs: sourceResult.expiredJobs,
-        });
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Unknown source error";
-
-        sourceResult.status = "failed";
-        sourceResult.error = message;
-
-        if (sourceResult.runId) {
-          await finishIngestionRun({
-            runId: sourceResult.runId,
-            status: "failed",
-            fetchedJobs: sourceResult.fetchedJobs,
-            validJobs: sourceResult.validJobs,
-            rejectedJobs: sourceResult.rejectedJobs,
-            upsertedJobs: sourceResult.upsertedJobs,
-            expiredJobs: sourceResult.expiredJobs,
-            errorMessage: message,
-          });
-        }
-      }
-
-      sourcesResult.push(sourceResult);
-    }
-
+    const sources = allSources.filter(
+      (source) =>
+        (!sourceSlug || source.sourceSlug === sourceSlug) &&
+        (!sourceType || source.sourceType === sourceType),
+    );
+    const concurrency = sourceConcurrency();
+    const sourcesResult = await runSourceWorkers(sources, concurrency);
     const totals = sourcesResult.reduce(
       (acc, source) => ({
         fetchedJobs: acc.fetchedJobs + source.fetchedJobs,
         validJobs: acc.validJobs + source.validJobs,
         rejectedJobs: acc.rejectedJobs + source.rejectedJobs,
+        applyLinksChecked: acc.applyLinksChecked + source.applyLinksChecked,
+        applyLinkIssues: acc.applyLinkIssues + source.applyLinkIssues,
         upsertedJobs: acc.upsertedJobs + source.upsertedJobs,
         expiredJobs: acc.expiredJobs + source.expiredJobs,
+        retries: acc.retries + Math.max(0, source.attempts - 1),
         failedSources: acc.failedSources + (source.status === "failed" ? 1 : 0),
         skippedSources:
           acc.skippedSources + (source.status === "skipped" ? 1 : 0),
@@ -370,8 +119,11 @@ async function runJobsIngestion(request: Request) {
         fetchedJobs: 0,
         validJobs: 0,
         rejectedJobs: 0,
+        applyLinksChecked: 0,
+        applyLinkIssues: 0,
         upsertedJobs: 0,
         expiredJobs: 0,
+        retries: 0,
         failedSources: 0,
         skippedSources: 0,
       },
@@ -380,16 +132,14 @@ async function runJobsIngestion(request: Request) {
     await recordPrivilegedAction({
       action: "admin.job_ingestion_completed",
       targetType: "job_ingestion",
-      targetId: requestedSourceSlug ?? requestedSourceType ?? "all",
-      metadata: {
-        totalSources: sources.length,
-        ...totals,
-      },
+      targetId: sourceSlug ?? sourceType ?? "all",
+      metadata: { totalSources: sources.length, concurrency, ...totals },
     });
 
     return NextResponse.json({
       ok: totals.failedSources === 0,
       totalSources: sources.length,
+      concurrency,
       totals,
       sources: sourcesResult,
     });

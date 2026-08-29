@@ -35,6 +35,13 @@ export function evaluateIngestionVolume(params: {
     1,
   );
 
+  if (baseline > 0 && currentValidJobs === 0) {
+    return {
+      allowStaleExpiration: false,
+      reason: `Stale expiration skipped: the source returned no valid jobs against a ${baseline}-job baseline.`,
+    };
+  }
+
   if (baseline < minimumBaseline) {
     return { allowStaleExpiration: true, reason: null };
   }

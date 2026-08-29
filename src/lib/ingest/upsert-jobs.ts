@@ -6,7 +6,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
-const STALE_UPDATE_CHUNK_SIZE = 100;
+const STAGING_CHUNK_SIZE = 500;
 
 function sourceIdPrefix(sourceSlug: string) {
   return `${sourceSlug}:%`;
@@ -30,114 +30,70 @@ export async function getPublishedImportedJobCount(params: {
   return count ?? 0;
 }
 
-export async function upsertImportedJobs(jobs: ImportedJob[]) {
-  if (jobs.length === 0) {
-    return {
-      upserted: 0,
-    };
-  }
-
-  const rows = jobs.map((job) => ({
-    recruiter_id: job.recruiterId,
-
-    company_id: job.companyId,
-    company_name: job.companyName,
-    company_logo_url: job.companyLogoUrl,
-
-    title: job.title,
-    slug: importedJobSlug(job),
-    description: job.description,
-    location: job.location,
-
-    latitude: job.latitude,
-    longitude: job.longitude,
-
-    employment_type: job.employmentType,
-    work_mode: job.workMode,
-
-    salary_min: job.salaryMin,
-    salary_max: job.salaryMax,
-    salary_currency: job.salaryCurrency,
-
-    skills: job.skills,
-    responsibilities: job.responsibilities,
-    requirements: job.requirements,
-    benefits: job.benefits,
-
-    status: job.status,
-
-    posted_at: job.postedAt,
-    expires_at: job.expiresAt,
-
-    source_name: job.sourceName,
-    source_id: job.sourceId,
-    apply_url: job.applyUrl,
-
-    experience_level: job.experienceLevel,
-    category: job.category,
-
-    company_tagline: job.companyTagline,
-    company_size: job.companySize,
-    company_website: job.companyWebsite,
-  }));
-
-  const { error } = await supabaseAdmin.from("jobs").upsert(rows, {
-    onConflict: "source_name,source_id",
-    ignoreDuplicates: false,
-  });
-
-  if (error) {
-    throw new Error(`Supabase upsert failed: ${error.message}`);
-  }
-
+function stagedPayload(job: ImportedJob) {
   return {
-    upserted: rows.length,
+    ...job,
+    slug: importedJobSlug(job),
   };
 }
 
-export async function expireStaleImportedJobs(params: {
+export async function stageImportedJobs(params: {
+  runId: string;
   sourceName: string;
   sourceSlug: string;
-  activeSourceIds: string[];
+  jobs: ImportedJob[];
 }) {
-  const { sourceName, sourceSlug, activeSourceIds } = params;
-  const now = new Date().toISOString();
+  const { error: clearError } = await supabaseAdmin
+    .from("job_ingestion_staging")
+    .delete()
+    .eq("run_id", params.runId);
 
-  const { data, error } = await supabaseAdmin
-    .from("jobs")
-    .select("id, source_id")
-    .eq("source_name", sourceName)
-    .like("source_id", sourceIdPrefix(sourceSlug))
-    .eq("status", "published");
-
-  if (error) {
-    throw new Error(`Supabase stale job lookup failed: ${error.message}`);
+  if (clearError) {
+    throw new Error(`Supabase staging cleanup failed: ${clearError.message}`);
   }
 
-  const active = new Set(activeSourceIds);
-  const staleIds = (data ?? [])
-    .filter((job) => job.source_id && !active.has(job.source_id))
-    .map((job) => job.id as string);
+  if (params.jobs.length === 0) return { staged: 0 };
 
-  for (let i = 0; i < staleIds.length; i += STALE_UPDATE_CHUNK_SIZE) {
-    const ids = staleIds.slice(i, i + STALE_UPDATE_CHUNK_SIZE);
+  const rows = params.jobs.map((job) => ({
+    run_id: params.runId,
+    source_name: params.sourceName,
+    source_slug: params.sourceSlug,
+    source_id: job.sourceId,
+    payload: stagedPayload(job),
+  }));
+  for (let index = 0; index < rows.length; index += STAGING_CHUNK_SIZE) {
+    const { error } = await supabaseAdmin
+      .from("job_ingestion_staging")
+      .insert(rows.slice(index, index + STAGING_CHUNK_SIZE));
 
-    const { error: updateError } = await supabaseAdmin
-      .from("jobs")
-      .update({
-        status: "closed",
-        expires_at: now,
-      })
-      .in("id", ids);
-
-    if (updateError) {
-      throw new Error(
-        `Supabase stale job update failed: ${updateError.message}`,
-      );
+    if (error) {
+      throw new Error(`Supabase staging failed: ${error.message}`);
     }
   }
 
+  return { staged: rows.length };
+}
+
+export async function publishStagedImportedJobs(params: {
+  runId: string;
+  expireStale: boolean;
+}) {
+  const { data, error } = await supabaseAdmin.rpc(
+    "publish_job_ingestion_stage",
+    {
+      p_run_id: params.runId,
+      p_expire_stale: params.expireStale,
+    },
+  );
+
+  if (error) {
+    throw new Error(`Supabase atomic publish failed: ${error.message}`);
+  }
+
+  const result = Array.isArray(data) ? data[0] : data;
+
   return {
-    expired: staleIds.length,
+    upserted: Number(result?.upserted_jobs ?? 0),
+    expired: Number(result?.expired_jobs ?? 0),
   };
 }

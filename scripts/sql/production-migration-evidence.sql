@@ -37,6 +37,7 @@ from (
     ('20260816070000_restrict_recruiter_profile_access.sql', exists (select 1 from pg_catalog.pg_policies where schemaname = 'public' and tablename = 'profiles' and policyname = 'Owners and admins can view profiles')),
     ('20260816073000_employer_access_consent.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'employer_access_consent_at') and to_regclass('public.profiles_employer_discovery_idx') is not null),
     ('20260816080000_hiring_companies_rpc.sql', exists (select 1 from pg_catalog.pg_proc p join pg_catalog.pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'get_hiring_companies_this_week')),
-    ('20260816210000_legal_policy_acceptance.sql', to_regclass('public.legal_policy_acceptances') is not null)
+    ('20260816210000_legal_policy_acceptance.sql', to_regclass('public.legal_policy_acceptances') is not null),
+    ('20260829043000_scalable_job_ingestion.sql', to_regclass('public.job_ingestion_staging') is not null and to_regclass('public.job_ingestion_dead_letters') is not null and exists (select 1 from pg_catalog.pg_proc p join pg_catalog.pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'publish_job_ingestion_stage'))
 ) as evidence(migration_name, distinctive_object_present)
 order by migration_name;

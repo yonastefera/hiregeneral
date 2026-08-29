@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getPublishedImportedJobCount: vi.fn(),
   getSources: vi.fn(),
   limit: vi.fn(),
+  runSourceWorkers: vi.fn(),
 }));
 
 vi.mock("@/lib/rate-limit", () => ({
@@ -16,6 +17,9 @@ vi.mock("@/lib/security/audit", () => ({
 }));
 vi.mock("@/lib/ingest/job-sources", () => ({
   getEnabledJobSources: mocks.getSources,
+}));
+vi.mock("@/lib/ingest/source-worker", () => ({
+  runSourceWorkers: mocks.runSourceWorkers,
 }));
 vi.mock("@/lib/ingest/adapters", () => ({ getJobSourceAdapter: vi.fn() }));
 vi.mock("@/lib/ingest/job-detail-extractor", () => ({
@@ -28,9 +32,7 @@ vi.mock("@/lib/ingest/ingestion-runs", () => ({
 }));
 vi.mock("@/lib/ingest/source", () => ({ validateImportedJobs: vi.fn() }));
 vi.mock("@/lib/ingest/upsert-jobs", () => ({
-  expireStaleImportedJobs: vi.fn(),
   getPublishedImportedJobCount: mocks.getPublishedImportedJobCount,
-  upsertImportedJobs: vi.fn(),
 }));
 
 import { POST } from "@/app/api/ingest/jobs/route";
@@ -50,6 +52,7 @@ beforeEach(() => {
   process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-test";
   mocks.limit.mockResolvedValue({ success: true, reset: Date.now() + 60_000 });
   mocks.getSources.mockResolvedValue([]);
+  mocks.runSourceWorkers.mockResolvedValue([]);
   mocks.getPreviousSuccessfulJobCount.mockResolvedValue(null);
   mocks.getPublishedImportedJobCount.mockResolvedValue(0);
   mocks.audit.mockResolvedValue(undefined);
@@ -93,6 +96,23 @@ describe("POST /api/ingest/jobs", () => {
     expect(mocks.audit).toHaveBeenCalledWith(
       expect.objectContaining({ action: "admin.job_ingestion_completed" }),
     );
+  });
+
+  it("runs filtered sources with bounded source concurrency", async () => {
+    process.env.INGEST_SOURCE_CONCURRENCY = "4";
+    const source = {
+      sourceSlug: "acme",
+      sourceType: "greenhouse",
+    };
+    mocks.getSources.mockResolvedValue([
+      source,
+      { sourceSlug: "other", sourceType: "lever" },
+    ]);
+
+    const response = await POST(request("ingest-secret", "?sourceSlug=acme"));
+    expect(response.status).toBe(200);
+    expect(mocks.runSourceWorkers).toHaveBeenCalledWith([source], 4);
+    delete process.env.INGEST_SOURCE_CONCURRENCY;
   });
 
   it("returns a safe error when ingestion fails", async () => {

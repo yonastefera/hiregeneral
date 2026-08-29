@@ -18,9 +18,25 @@ type IngestionRunRow = {
   rejected_jobs: number;
   upserted_jobs: number;
   expired_jobs: number;
+  attempt_count: number;
+  retry_count: number;
+  dead_lettered: boolean;
+  quality_metrics: Record<string, unknown>;
+  published_at: string | null;
   error_message: string | null;
   started_at: string;
   finished_at: string | null;
+};
+
+type DeadLetterRow = {
+  id: string;
+  run_id: string;
+  source_name: string;
+  source_slug: string;
+  attempt_count: number;
+  error_code: string;
+  error_message: string;
+  created_at: string;
 };
 
 type JobSourceRow = {
@@ -223,6 +239,7 @@ export async function GET(request: Request) {
     const [
       { data: sources, error: sourcesError },
       { data: runs, error: runsError },
+      { data: deadLetters, error: deadLettersError },
     ] = await Promise.all([
       supabase
         .from("job_sources")
@@ -242,6 +259,11 @@ export async function GET(request: Request) {
             "rejected_jobs",
             "upserted_jobs",
             "expired_jobs",
+            "attempt_count",
+            "retry_count",
+            "dead_lettered",
+            "quality_metrics",
+            "published_at",
             "error_message",
             "started_at",
             "finished_at",
@@ -250,6 +272,14 @@ export async function GET(request: Request) {
         .gte("started_at", startIso)
         .lt("started_at", endIso)
         .order("started_at", { ascending: false }),
+      supabase
+        .from("job_ingestion_dead_letters")
+        .select(
+          "id, run_id, source_name, source_slug, attempt_count, error_code, error_message, created_at",
+        )
+        .eq("status", "open")
+        .order("created_at", { ascending: false })
+        .limit(100),
     ]);
 
     if (sourcesError) {
@@ -260,11 +290,19 @@ export async function GET(request: Request) {
       throw new Error(`Could not load ingestion runs: ${runsError.message}`);
     }
 
+    if (deadLettersError) {
+      throw new Error(
+        `Could not load ingestion dead letters: ${deadLettersError.message}`,
+      );
+    }
+
     const sourceRows = (sources ?? []) as JobSourceRow[];
     const runRows = (runs ?? []) as unknown as IngestionRunRow[];
+    const deadLetterRows = (deadLetters ?? []) as unknown as DeadLetterRow[];
     const enabledSources = sourceRows.filter((source) => source.enabled);
 
     const runsBySource = new Map<string, IngestionRunRow[]>();
+    const deadLettersBySource = new Map<string, DeadLetterRow[]>();
 
     for (const run of runRows) {
       const key = sourceKey(run.source_name, run.source_slug);
@@ -273,9 +311,17 @@ export async function GET(request: Request) {
       runsBySource.set(key, existing);
     }
 
+    for (const deadLetter of deadLetterRows) {
+      const key = sourceKey(deadLetter.source_name, deadLetter.source_slug);
+      const existing = deadLettersBySource.get(key) ?? [];
+      existing.push(deadLetter);
+      deadLettersBySource.set(key, existing);
+    }
+
     const sourceHealth = enabledSources.map((source) => {
       const key = sourceKey(source.source_type, source.source_slug);
       const sourceRuns = runsBySource.get(key) ?? [];
+      const sourceDeadLetters = deadLettersBySource.get(key) ?? [];
       const latestRun = sourceRuns[0] ?? null;
       const failedRuns = sourceRuns.filter((run) => run.status === "failed");
       const staleRunningRuns = sourceRuns.filter((run) =>
@@ -292,7 +338,7 @@ export async function GET(request: Request) {
           ? "stale_running"
           : latestRun.status
         : "missing";
-      const healthy = status === "success";
+      const healthy = status === "success" && sourceDeadLetters.length === 0;
 
       return {
         companyName: source.company_name,
@@ -305,6 +351,9 @@ export async function GET(request: Request) {
         failedCount: failedRuns.length,
         runningCount: runningRuns.length,
         staleRunningCount: staleRunningRuns.length,
+        openDeadLetterCount: sourceDeadLetters.length,
+        retryCount: sourceRuns.reduce((sum, run) => sum + run.retry_count, 0),
+        latestQualityMetrics: latestRun?.quality_metrics ?? {},
         latestRun,
         lastError: failedRuns[0]?.error_message ?? null,
       };
@@ -317,6 +366,8 @@ export async function GET(request: Request) {
         rejectedJobs: acc.rejectedJobs + run.rejected_jobs,
         upsertedJobs: acc.upsertedJobs + run.upserted_jobs,
         expiredJobs: acc.expiredJobs + run.expired_jobs,
+        retries: acc.retries + run.retry_count,
+        deadLetteredRuns: acc.deadLetteredRuns + (run.dead_lettered ? 1 : 0),
         successfulRuns: acc.successfulRuns + (run.status === "success" ? 1 : 0),
         failedRuns: acc.failedRuns + (run.status === "failed" ? 1 : 0),
         runningRuns:
@@ -333,6 +384,8 @@ export async function GET(request: Request) {
         rejectedJobs: 0,
         upsertedJobs: 0,
         expiredJobs: 0,
+        retries: 0,
+        deadLetteredRuns: 0,
         successfulRuns: 0,
         failedRuns: 0,
         runningRuns: 0,
@@ -440,6 +493,7 @@ export async function GET(request: Request) {
         companiesWithPublishedJobs: companies.filter(
           (company) => company.publishedJobs > 0,
         ).length,
+        openDeadLetters: deadLetterRows.length,
       },
       sources: sourceHealth,
       companies,
@@ -457,7 +511,9 @@ export async function GET(request: Request) {
         sourceSlug: source.sourceSlug,
         status: source.status,
         error: source.lastError,
+        openDeadLetterCount: source.openDeadLetterCount,
       })),
+      deadLetters: deadLetterRows,
       staleRunningRuns: sourceHealth
         .filter((source) => source.staleRunningCount > 0)
         .map((source) => ({

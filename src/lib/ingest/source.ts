@@ -48,3 +48,15 @@ export function validateImportedJobs(jobs: ImportedJob[]): ValidatedJobsResult {
 
   return result;
 }
+
+export function deduplicateImportedJobs(jobs: ImportedJob[]) {
+  const jobsBySourceId = new Map<string, ImportedJob>();
+  let duplicateCount = 0;
+
+  for (const job of jobs) {
+    if (jobsBySourceId.has(job.sourceId)) duplicateCount += 1;
+    jobsBySourceId.set(job.sourceId, job);
+  }
+
+  return { jobs: [...jobsBySourceId.values()], duplicateCount };
+}
