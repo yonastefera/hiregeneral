@@ -1,10 +1,11 @@
-import { readFile, readdir, writeFile } from "node:fs/promises";
-import { join, relative, resolve, sep } from "node:path";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join, relative, resolve, sep } from "node:path";
 
 const migrationDirectory = resolve("src/lib/migrations");
 const outputPath =
   process.env.HIREGENERAL_TEST_SCHEMA_OUTPUT ??
-  "/private/tmp/hiregeneral-test-schema.sql";
+  join(tmpdir(), "hiregeneral-test-schema.sql");
 
 const entries = await readdir(migrationDirectory, { withFileTypes: true });
 const legacy = entries
@@ -96,5 +97,6 @@ const bundle = [
   verification,
 ].join("\n");
 
+await mkdir(dirname(outputPath), { recursive: true });
 await writeFile(outputPath, bundle, { mode: 0o600 });
 console.log(`Wrote ${files.length} ordered migrations to ${outputPath}`);
