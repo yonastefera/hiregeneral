@@ -79,9 +79,9 @@ ingestion migration was applied. All 35 distinctive migration markers returned
 `true`, including the staging table, dead-letter table, and atomic publication
 function introduced for Phase 2 ingestion.
 
-| Captured at (UTC) | Production project     | Evidence refresh                      |
-| ----------------- | ---------------------- | ------------------------------------- |
-| 2026-08-29        | `svzsorgmgvvmikrwboaq` | All 35 distinctive markers present    |
+| Captured at (UTC) | Production project     | Evidence refresh                   |
+| ----------------- | ---------------------- | ---------------------------------- |
+| 2026-08-29        | `svzsorgmgvvmikrwboaq` | All 35 distinctive markers present |
 
 ## Reconciliation checklist
 
