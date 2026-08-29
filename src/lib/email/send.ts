@@ -6,8 +6,21 @@ import ApplicationConfirmation from "@/emails/application-confirmation";
 import JobAlertEmail, { type JobAlertEmailJob } from "@/emails/job-alert";
 import { writeRedactedLog } from "@/lib/logging/redact";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = process.env.EMAIL_FROM ?? "HireGeneral <no-reply@hiregeneral.com>";
+
+let resend: Resend | undefined;
+
+function getResendClient() {
+  if (resend) return resend;
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error("Missing RESEND_API_KEY");
+  }
+
+  resend = new Resend(apiKey);
+  return resend;
+}
 
 async function observedEmailSend<T>(operation: string, send: () => Promise<T>) {
   const startedAt = performance.now();
@@ -40,7 +53,7 @@ export async function sendConfirmationEmail(params: {
     ConfirmEmail({ confirmUrl: params.confirmUrl, fullName: params.fullName }),
   );
   return observedEmailSend("send_confirmation_email", () =>
-    resend.emails.send({
+    getResendClient().emails.send({
       from: FROM,
       to: params.to,
       subject: "Confirm your HireGeneral account",
@@ -58,7 +71,7 @@ export async function sendPasswordResetEmail(params: {
     ResetPassword({ resetUrl: params.resetUrl, fullName: params.fullName }),
   );
   return observedEmailSend("send_password_reset_email", () =>
-    resend.emails.send({
+    getResendClient().emails.send({
       from: FROM,
       to: params.to,
       subject: "Reset your HireGeneral password",
@@ -82,7 +95,7 @@ export async function sendApplicationConfirmationEmail(params: {
     }),
   );
   return observedEmailSend("send_application_confirmation_email", () =>
-    resend.emails.send({
+    getResendClient().emails.send({
       from: FROM,
       to: params.to,
       subject: `Application received — ${params.jobTitle} at ${params.companyName}`,
@@ -114,7 +127,7 @@ export async function sendJobAlertEmail(params: {
   );
 
   return observedEmailSend("send_job_alert_email", () =>
-    resend.emails.send({
+    getResendClient().emails.send({
       from: FROM,
       to: params.to,
       subject: params.alertTitle ?? "New roles matched your HireGeneral alert",

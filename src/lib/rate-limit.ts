@@ -1,22 +1,55 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
-const redis = Redis.fromEnv();
+let redisClient: Redis | undefined;
 
-export const locationSearchRateLimit = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(90, "1 m"),
-  analytics: true,
-  prefix: "ratelimit:locations",
+function getRedisClient() {
+  redisClient ??= Redis.fromEnv();
+  return redisClient;
+}
+
+export const redis = new Proxy({} as Redis, {
+  get(_target, property) {
+    const client = getRedisClient();
+    const value = Reflect.get(client, property, client) as unknown;
+
+    return typeof value === "function" ? value.bind(client) : value;
+  },
 });
 
-function publicReadLimiter(requests: number, prefix: string) {
-  return new Ratelimit({
-    redis,
-    limiter: Ratelimit.slidingWindow(requests, "1 m"),
-    analytics: true,
-    prefix: `ratelimit:public:${prefix}`,
+function lazyRateLimit(create: () => Ratelimit): Ratelimit {
+  let rateLimit: Ratelimit | undefined;
+
+  return new Proxy({} as Ratelimit, {
+    get(_target, property) {
+      rateLimit ??= create();
+      const value = Reflect.get(rateLimit, property, rateLimit) as unknown;
+
+      return typeof value === "function" ? value.bind(rateLimit) : value;
+    },
   });
+}
+
+export const locationSearchRateLimit = lazyRateLimit(
+  () =>
+    new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(90, "1 m"),
+      analytics: true,
+      prefix: "ratelimit:locations",
+    }),
+);
+
+function publicReadLimiter(requests: number, prefix: string) {
+  return lazyRateLimit(
+    () =>
+      new Ratelimit({
+        redis,
+        limiter: Ratelimit.slidingWindow(requests, "1 m"),
+        analytics: true,
+        prefix: `ratelimit:public:${prefix}`,
+      }),
+  );
 }
 
 export const keywordSuggestionRateLimit = publicReadLimiter(90, "keywords");
@@ -26,59 +59,80 @@ export const schoolSearchRateLimit = publicReadLimiter(90, "schools");
 export const publicJobSearchRateLimit = publicReadLimiter(120, "jobs");
 export const publicJobDetailRateLimit = publicReadLimiter(180, "job-details");
 
-export const applicationSubmissionRateLimit = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(20, "1 h"),
-  analytics: true,
-  prefix: "ratelimit:applications",
-});
+export const applicationSubmissionRateLimit = lazyRateLimit(
+  () =>
+    new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(20, "1 h"),
+      analytics: true,
+      prefix: "ratelimit:applications",
+    }),
+);
 
-export const signupRateLimit = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(6, "1 h"),
-  analytics: true,
-  prefix: "ratelimit:auth:signup",
-});
+export const signupRateLimit = lazyRateLimit(
+  () =>
+    new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(6, "1 h"),
+      analytics: true,
+      prefix: "ratelimit:auth:signup",
+    }),
+);
 
-export const passwordResetRateLimit = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(5, "1 h"),
-  analytics: true,
-  prefix: "ratelimit:auth:password-reset",
-});
+export const passwordResetRateLimit = lazyRateLimit(
+  () =>
+    new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(5, "1 h"),
+      analytics: true,
+      prefix: "ratelimit:auth:password-reset",
+    }),
+);
 
-export const emailOtpRequestRateLimit = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(6, "1 h"),
-  analytics: true,
-  prefix: "ratelimit:auth:email-otp-request",
-});
+export const emailOtpRequestRateLimit = lazyRateLimit(
+  () =>
+    new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(6, "1 h"),
+      analytics: true,
+      prefix: "ratelimit:auth:email-otp-request",
+    }),
+);
 
-export const emailOtpVerifyRateLimit = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(20, "15 m"),
-  analytics: true,
-  prefix: "ratelimit:auth:email-otp-verify",
-});
+export const emailOtpVerifyRateLimit = lazyRateLimit(
+  () =>
+    new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(20, "15 m"),
+      analytics: true,
+      prefix: "ratelimit:auth:email-otp-verify",
+    }),
+);
 
-export const roleSelectionRateLimit = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(10, "1 h"),
-  analytics: true,
-  prefix: "ratelimit:auth:role-selection",
-});
+export const roleSelectionRateLimit = lazyRateLimit(
+  () =>
+    new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(10, "1 h"),
+      analytics: true,
+      prefix: "ratelimit:auth:role-selection",
+    }),
+);
 
 function mutationLimiter(
   requests: number,
   duration: Parameters<typeof Ratelimit.slidingWindow>[1],
   prefix: string,
 ) {
-  return new Ratelimit({
-    redis,
-    limiter: Ratelimit.slidingWindow(requests, duration),
-    analytics: true,
-    prefix: `ratelimit:mutations:${prefix}`,
-  });
+  return lazyRateLimit(
+    () =>
+      new Ratelimit({
+        redis,
+        limiter: Ratelimit.slidingWindow(requests, duration),
+        analytics: true,
+        prefix: `ratelimit:mutations:${prefix}`,
+      }),
+  );
 }
 
 export const contactSubmissionRateLimit = mutationLimiter(5, "1 h", "contact");
@@ -136,5 +190,3 @@ export const accountPrivacyRateLimit = mutationLimiter(
   "1 h",
   "account-privacy",
 );
-
-export { redis };
