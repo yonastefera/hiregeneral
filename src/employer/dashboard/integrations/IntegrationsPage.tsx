@@ -40,7 +40,6 @@ export function IntegrationsPage({
 
       <section
         className={`rounded-2xl bg-white p-5 ${canExport ? "" : "pointer-events-none opacity-50"}`}
-        aria-disabled={!canExport}
       >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>

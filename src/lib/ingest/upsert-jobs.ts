@@ -90,6 +90,16 @@ export async function publishStagedImportedJobs(params: {
     throw new Error(`Supabase atomic publish failed: ${error.message}`);
   }
 
+  const { error: enrichmentError } = await supabaseAdmin.rpc(
+    "process_job_knowledge_queue",
+    { p_limit: 500 },
+  );
+  if (enrichmentError && enrichmentError.code !== "PGRST202") {
+    console.error(
+      `[job knowledge enrichment] ${enrichmentError.code ?? "unknown_error"}`,
+    );
+  }
+
   const result = Array.isArray(data) ? data[0] : data;
 
   return {

@@ -1615,6 +1615,15 @@ export type Database = {
         Args: { p_days?: number };
         Returns: Json;
       };
+      process_job_knowledge_queue: {
+        Args: { p_limit?: number };
+        Returns: {
+          mapped_skills: number;
+          mapped_titles: number;
+          processed_jobs: number;
+          remaining_jobs: number;
+        }[];
+      };
       can_access_employer_application: {
         Args: { p_application_id: string; p_user_id?: string };
         Returns: boolean;
