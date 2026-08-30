@@ -31,9 +31,13 @@ test("email sign-in requests a code and verifies it", async ({ page }) => {
     "seeker@example.com",
   );
   await page.locator('input[autocomplete="one-time-code"]').fill("123456");
+  const jobsRequest = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return url.pathname === "/jobs";
+  });
   await page.getByRole("button", { name: "Verify and continue" }).click();
 
-  await expect(page).toHaveURL(/\/jobs$/);
+  await jobsRequest;
   expect(requests).toEqual([
     { email: "seeker@example.com" },
     { email: "seeker@example.com", token: "123456" },
@@ -65,11 +69,16 @@ test("new employer intent chooses a workspace after verification", async ({
   await page.getByLabel("Email").fill("new-employer@example.com");
   await page.getByRole("button", { name: "Continue with email" }).click();
   await page.locator('input[autocomplete="one-time-code"]').fill("654321");
+  const chooseRoleRequest = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return (
+      url.pathname === "/auth/choose-role" &&
+      url.searchParams.get("next") === "/employers/dashboard"
+    );
+  });
   await page.getByRole("button", { name: "Verify and continue" }).click();
 
-  await expect(page).toHaveURL(
-    /\/auth\/choose-role\?next=%2Femployers%2Fdashboard$/,
-  );
+  await chooseRoleRequest;
 });
 
 test("invalid codes receive a safe, non-diagnostic error", async ({ page }) => {
