@@ -29,6 +29,7 @@ import {
   workModeOptions,
   type JobsSearchState,
 } from "./search-options";
+import SaveSearchButton from "./SaveSearchButton";
 
 const KeywordAutocomplete = dynamic(
   () => import("@/components/search/KeywordAutocomplete"),
@@ -590,6 +591,18 @@ export default function JobsPageClient({
               </p>
             )}
           </div>
+
+          <SaveSearchButton
+            state={{
+              query: submittedQuery,
+              location: submittedLocation,
+              dateFilter,
+              distance,
+              workMode,
+              easyApply,
+              page: 1,
+            }}
+          />
         </aside>
 
         <div

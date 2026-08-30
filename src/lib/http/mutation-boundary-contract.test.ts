@@ -208,6 +208,26 @@ const contracts: Record<string, Boundary> = {
     abuseControl: ["notificationSettingsRateLimit", "enforceRateLimit({"],
     safeError: ['error: "Could not save notification settings."'],
   },
+  "app/api/saved-searches/[id]/route.ts": {
+    authentication: ["supabase.auth.getUser()", 'error: "Unauthorized"'],
+    authorization: ['.eq("id", auth.id)', '.eq("user_id", auth.user.id)'],
+    validation: [
+      "boundedJsonBody(request)",
+      "updateSavedSearchSchema.safeParse",
+    ],
+    abuseControl: ["savedSearchRateLimit", "enforceRateLimit({"],
+    safeError: ['safeServerError("Could not update this saved search.")'],
+  },
+  "app/api/saved-searches/route.ts": {
+    authentication: ["supabase.auth.getUser()", "status: 401"],
+    authorization: ["toSavedSearchInsert(parsed.data, user.id)"],
+    validation: [
+      "boundedJsonBody(request)",
+      "savedSearchFieldsSchema.safeParse",
+    ],
+    abuseControl: ["savedSearchRateLimit", "enforceRateLimit({"],
+    safeError: ['safeServerError("Could not save this search.")'],
+  },
   "app/api/saved/route.ts": {
     authentication: ["supabase.auth.getUser()", "status: 401"],
     authorization: ["user_id: user.id", '.eq("user_id", user.id)'],

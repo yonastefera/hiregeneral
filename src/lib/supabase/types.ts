@@ -1236,6 +1236,87 @@ export type Database = {
           },
         ];
       };
+      saved_search_alert_jobs: {
+        Row: {
+          delivered_at: string;
+          job_id: string;
+          saved_search_id: string;
+        };
+        Insert: {
+          delivered_at?: string;
+          job_id: string;
+          saved_search_id: string;
+        };
+        Update: {
+          delivered_at?: string;
+          job_id?: string;
+          saved_search_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "saved_search_alert_jobs_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "saved_search_alert_jobs_saved_search_id_fkey";
+            columns: ["saved_search_id"];
+            isOneToOne: false;
+            referencedRelation: "saved_searches";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      saved_searches: {
+        Row: {
+          alert_frequency: string;
+          created_at: string;
+          distance_miles: number;
+          easy_apply: boolean;
+          id: string;
+          last_alerted_at: string | null;
+          location: string;
+          name: string;
+          posted_days: number;
+          query: string;
+          updated_at: string;
+          user_id: string;
+          work_mode: string;
+        };
+        Insert: {
+          alert_frequency?: string;
+          created_at?: string;
+          distance_miles?: number;
+          easy_apply?: boolean;
+          id?: string;
+          last_alerted_at?: string | null;
+          location?: string;
+          name: string;
+          posted_days?: number;
+          query?: string;
+          updated_at?: string;
+          user_id: string;
+          work_mode?: string;
+        };
+        Update: {
+          alert_frequency?: string;
+          created_at?: string;
+          distance_miles?: number;
+          easy_apply?: boolean;
+          id?: string;
+          last_alerted_at?: string | null;
+          location?: string;
+          name?: string;
+          posted_days?: number;
+          query?: string;
+          updated_at?: string;
+          user_id?: string;
+          work_mode?: string;
+        };
+        Relationships: [];
+      };
       schools: {
         Row: {
           city: string | null;

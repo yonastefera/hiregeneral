@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import SavedSearchesPanel from "./SavedSearchesPanel";
 
 type NotificationPreferenceKey =
   | "jobAlerts"
@@ -290,6 +291,8 @@ export default function NotificationSettings() {
                 {saving ? "Saving..." : "Save settings"}
               </Button>
             </div>
+
+            <SavedSearchesPanel />
           </>
         )}
       </section>

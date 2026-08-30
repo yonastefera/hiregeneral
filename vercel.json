@@ -7,6 +7,10 @@
     {
       "path": "/api/internal/account-deletions",
       "schedule": "30 5 * * *"
+    },
+    {
+      "path": "/api/internal/job-alerts",
+      "schedule": "15 13 * * *"
     }
   ]
 }

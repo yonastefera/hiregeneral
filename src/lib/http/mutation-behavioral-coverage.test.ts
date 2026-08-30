@@ -53,6 +53,9 @@ const behavioralCoverage: Record<string, string> = {
   "app/api/messages/route.ts": "app/api/messages/route.test.ts",
   "app/api/notification-settings/route.ts":
     "app/api/notification-settings/route.test.ts",
+  "app/api/saved-searches/[id]/route.ts":
+    "app/api/saved-searches/route.test.ts",
+  "app/api/saved-searches/route.ts": "app/api/saved-searches/route.test.ts",
   "app/api/saved/route.ts": "app/api/saved/route.test.ts",
   "app/api/webhooks/stripe/route.ts": "app/api/webhooks/stripe/route.test.ts",
 };
