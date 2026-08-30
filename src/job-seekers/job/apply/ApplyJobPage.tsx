@@ -4,8 +4,10 @@ import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import ApplyJobClient from "./ApplyJobClient";
+import { buildApplicationDefaults } from "./application-defaults";
 import { getApplyJobData } from "./apply-data";
 import { getJobTitle } from "./apply-utils";
+import { createClient } from "@/lib/supabase/server";
 
 type ApplyJobPageProps = {
   jobId: string;
@@ -19,8 +21,25 @@ export default async function ApplyJobPage({ jobId }: ApplyJobPageProps) {
   }
 
   const title = getJobTitle(job);
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  let defaults = null;
 
-  return <ApplyJobClient job={job} title={title} />;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select(
+        "full_name, email, phone, location, level_of_experience, profile_links, resume_url, resume_file_name",
+      )
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    defaults = buildApplicationDefaults(profile, user.email ?? "", user.id);
+  }
+
+  return <ApplyJobClient job={job} title={title} defaults={defaults} />;
 }
 
 export function ApplyJobNotFoundFallback() {

@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils";
 import type { Job } from "@/lib/db/types";
 import ApplyReview from "./ApplyReview";
 import ApplySidebar from "./ApplySidebar";
+import type { ApplicationDefaults } from "./application-defaults";
 import {
   ACCEPTED_RESUME_EXTENSIONS,
   APPLICATION_STEPS,
@@ -52,6 +53,7 @@ import {
 type ApplyJobClientProps = {
   job: Job;
   title: string;
+  defaults: ApplicationDefaults | null;
 };
 
 const initialValues: ApplyFormValues = {
@@ -68,7 +70,11 @@ const initialValues: ApplyFormValues = {
   agree: false,
 };
 
-export default function ApplyJobClient({ job, title }: ApplyJobClientProps) {
+export default function ApplyJobClient({
+  job,
+  title,
+  defaults,
+}: ApplyJobClientProps) {
   const router = useRouter();
 
   const [authChecked, setAuthChecked] = useState(false);
@@ -76,10 +82,27 @@ export default function ApplyJobClient({ job, title }: ApplyJobClientProps) {
   const [userEmail, setUserEmail] = useState("");
 
   const [step, setStep] = useState<ApplicationStep>(1);
-  const [values, setValues] = useState<ApplyFormValues>(initialValues);
+  const [values, setValues] = useState<ApplyFormValues>(() => ({
+    ...initialValues,
+    ...(defaults
+      ? {
+          fullName: defaults.fullName,
+          email: defaults.email,
+          phone: defaults.phone,
+          location: defaults.location,
+          linkedin: defaults.linkedin,
+          portfolio: defaults.portfolio,
+          yearsExp: defaults.yearsExp,
+        }
+      : {}),
+  }));
   const [errors, setErrors] = useState<ApplyFormErrors>({});
 
   const [file, setFile] = useState<File | null>(null);
+  const [useStoredResume, setUseStoredResume] = useState(
+    Boolean(defaults?.resumePath),
+  );
+  const [parsingResume, setParsingResume] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
@@ -102,7 +125,7 @@ export default function ApplyJobClient({ job, title }: ApplyJobClientProps) {
       if (user?.email) {
         setValues((current) => ({
           ...current,
-          email: user.email ?? "",
+          email: current.email || user.email || "",
         }));
       }
 
@@ -148,6 +171,7 @@ export default function ApplyJobClient({ job, title }: ApplyJobClientProps) {
     }
 
     setFile(picked);
+    setUseStoredResume(false);
     setErrors((current) => ({
       ...current,
       resume: undefined,
@@ -160,6 +184,7 @@ export default function ApplyJobClient({ job, title }: ApplyJobClientProps) {
       step,
       values,
       file,
+      hasStoredResume: useStoredResume && Boolean(defaults?.resumePath),
     });
 
     setErrors(nextErrors);
@@ -192,6 +217,7 @@ export default function ApplyJobClient({ job, title }: ApplyJobClientProps) {
       step: 4,
       values,
       file,
+      hasStoredResume: useStoredResume && Boolean(defaults?.resumePath),
     });
 
     setErrors(nextErrors);
@@ -201,7 +227,7 @@ export default function ApplyJobClient({ job, title }: ApplyJobClientProps) {
       return;
     }
 
-    if (!userId || !file) {
+    if (!userId || (!file && !useStoredResume)) {
       toast.error("Please sign in and attach your resume.");
       return;
     }
@@ -209,17 +235,18 @@ export default function ApplyJobClient({ job, title }: ApplyJobClientProps) {
     setSubmitting(true);
 
     try {
-      const extension = getFileExtension(file.name).replace(".", "");
-      const path = `${userId}/${job.id}-${Date.now()}.${extension}`;
+      let path = defaults?.resumePath ?? "";
 
-      const { error: uploadError } = await supabase.storage
-        .from("resumes")
-        .upload(path, file, {
-          upsert: false,
-          contentType: file.type,
-        });
+      if (file) {
+        const extension = getFileExtension(file.name).replace(".", "");
+        path = `${userId}/${job.id}-${Date.now()}.${extension}`;
+        const { error: uploadError } = await supabase.storage
+          .from("resumes")
+          .upload(path, file, { upsert: false, contentType: file.type });
+        if (uploadError) throw uploadError;
+      }
 
-      if (uploadError) throw uploadError;
+      if (!path) throw new Error("Attach your resume to continue.");
 
       const response = await fetch("/api/applications", {
         method: "POST",
@@ -265,6 +292,40 @@ export default function ApplyJobClient({ job, title }: ApplyJobClientProps) {
       toast.error(message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const parseStoredResume = async () => {
+    setParsingResume(true);
+    try {
+      const response = await fetch("/api/resume/parse");
+      const body = await response.json().catch(() => null);
+      if (!response.ok)
+        throw new Error(body?.error ?? "Could not parse resume.");
+      const suggestions = body.suggestions as {
+        email?: string | null;
+        phone?: string | null;
+        linkedin?: string | null;
+        portfolio?: string | null;
+        yearsExperience?: string | null;
+      };
+      setValues((current) => ({
+        ...current,
+        email: current.email || suggestions.email || "",
+        phone: current.phone || suggestions.phone || "",
+        linkedin: current.linkedin || suggestions.linkedin || "",
+        portfolio: current.portfolio || suggestions.portfolio || "",
+        yearsExp: current.yearsExp || suggestions.yearsExperience || "",
+      }));
+      toast.success(
+        "Resume suggestions added to empty fields. Please review them.",
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not parse resume.",
+      );
+    } finally {
+      setParsingResume(false);
     }
   };
 
@@ -606,7 +667,55 @@ export default function ApplyJobClient({ job, title }: ApplyJobClientProps) {
                 PDF, DOC, or DOCX up to 5 MB.
               </p>
 
-              {!file ? (
+              {defaults?.resumePath && useStoredResume && !file && (
+                <div className="mt-6 rounded-lg border border-primary/30 bg-primary/5 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="grid size-10 place-items-center rounded-md bg-primary/10 text-primary">
+                        <FileText aria-hidden="true" className="size-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                          {defaults.resumeName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Saved securely in your profile
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={parsingResume}
+                      onClick={parseStoredResume}
+                    >
+                      {parsingResume && (
+                        <Loader2
+                          className="mr-2 size-4 animate-spin"
+                          aria-hidden="true"
+                        />
+                      )}
+                      Fill empty fields
+                    </Button>
+                  </div>
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    PDF and DOCX parsing happens on Hire General without sending
+                    your resume to an AI provider. Review all suggestions before
+                    submitting.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="mt-1 h-auto p-0 text-xs"
+                    onClick={() => setUseStoredResume(false)}
+                  >
+                    Upload a different resume
+                  </Button>
+                </div>
+              )}
+
+              {!file && !useStoredResume ? (
                 <label
                   htmlFor="resume"
                   className="mt-6 flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-background px-6 py-12 text-center transition-colors hover:border-primary/50 hover:bg-secondary/40"
@@ -637,7 +746,7 @@ export default function ApplyJobClient({ job, title }: ApplyJobClientProps) {
                     }
                   />
                 </label>
-              ) : (
+              ) : file ? (
                 <div className="mt-6 flex items-center justify-between gap-3 rounded-lg border border-border bg-background p-4">
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="grid size-10 place-items-center rounded-md bg-primary/10 text-primary">
@@ -661,9 +770,12 @@ export default function ApplyJobClient({ job, title }: ApplyJobClientProps) {
                     size="icon"
                     onClick={() => {
                       setFile(null);
+                      setUseStoredResume(Boolean(defaults?.resumePath));
                       setErrors((current) => ({
                         ...current,
-                        resume: "Attach your resume to continue.",
+                        resume: defaults?.resumePath
+                          ? undefined
+                          : "Attach your resume to continue.",
                       }));
                     }}
                     aria-label="Remove file"
@@ -671,12 +783,26 @@ export default function ApplyJobClient({ job, title }: ApplyJobClientProps) {
                     <X aria-hidden="true" className="size-4" />
                   </Button>
                 </div>
-              )}
+              ) : null}
 
               {errors.resume && (
                 <p id="resume-error" className="mt-3 text-sm text-destructive">
                   {errors.resume}
                 </p>
+              )}
+
+              {!file && !useStoredResume && defaults?.resumePath && (
+                <Button
+                  type="button"
+                  variant="link"
+                  className="mt-3 h-auto p-0"
+                  onClick={() => {
+                    setUseStoredResume(true);
+                    setErrors((current) => ({ ...current, resume: undefined }));
+                  }}
+                >
+                  Use {defaults.resumeName}
+                </Button>
               )}
             </div>
           )}
@@ -799,7 +925,11 @@ export default function ApplyJobClient({ job, title }: ApplyJobClientProps) {
           {step === 4 && (
             <ApplyReview
               values={values}
-              resumeName={file?.name ?? "—"}
+              resumeName={
+                file?.name ??
+                (useStoredResume ? defaults?.resumeName : null) ??
+                "—"
+              }
               agreeError={errors.agree}
               onAgreeChange={(checked) => updateValue("agree", checked)}
               onEdit={(targetStep) => setStep(targetStep as ApplicationStep)}

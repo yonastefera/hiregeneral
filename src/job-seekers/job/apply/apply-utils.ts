@@ -122,10 +122,12 @@ export function validateApplyStep({
   step,
   values,
   file,
+  hasStoredResume = false,
 }: {
   step: ApplicationStep;
   values: ApplyFormValues;
   file: File | null;
+  hasStoredResume?: boolean;
 }) {
   const errors: ApplyFormErrors = {};
 
@@ -142,7 +144,7 @@ export function validateApplyStep({
   }
 
   if (step === 2) {
-    if (!file) {
+    if (!file && !hasStoredResume) {
       errors.resume = "Attach your resume to continue.";
     }
   }

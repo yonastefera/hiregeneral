@@ -69,6 +69,16 @@ export const applicationSubmissionRateLimit = lazyRateLimit(
     }),
 );
 
+export const resumeParsingRateLimit = lazyRateLimit(
+  () =>
+    new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(10, "1 h"),
+      analytics: true,
+      prefix: "ratelimit:resume-parsing",
+    }),
+);
+
 export const signupRateLimit = lazyRateLimit(
   () =>
     new Ratelimit({
