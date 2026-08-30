@@ -34,6 +34,8 @@ import type { Job } from "@/lib/db/types";
 import ApplyReview from "./ApplyReview";
 import ApplySidebar from "./ApplySidebar";
 import type { ApplicationDefaults } from "./application-defaults";
+import ApplicationAssistant from "./ApplicationAssistant";
+import type { ApplicationAssistantResult } from "@/lib/applications/application-assistant";
 import {
   ACCEPTED_RESUME_EXTENSIONS,
   APPLICATION_STEPS,
@@ -54,6 +56,7 @@ type ApplyJobClientProps = {
   job: Job;
   title: string;
   defaults: ApplicationDefaults | null;
+  assistant: ApplicationAssistantResult | null;
 };
 
 const initialValues: ApplyFormValues = {
@@ -74,6 +77,7 @@ export default function ApplyJobClient({
   job,
   title,
   defaults,
+  assistant,
 }: ApplyJobClientProps) {
   const router = useRouter();
 
@@ -918,6 +922,18 @@ export default function ApplyJobClient({
                     placeholder={`Tell ${job.company_name} why you're a great fit for the ${title} role…`}
                   />
                 </div>
+
+                {assistant && (
+                  <div className="md:col-span-2">
+                    <ApplicationAssistant
+                      result={assistant}
+                      onUseStarter={() => {
+                        updateValue("coverNote", assistant.starter);
+                        document.getElementById("cover")?.focus();
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           )}
