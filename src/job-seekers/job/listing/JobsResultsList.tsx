@@ -75,6 +75,38 @@ async function loadMatchExplanations(data: JobsPageData) {
   } = await supabase.auth.getUser();
   if (!user) return explanations;
 
+  const { data: ranked, error: rankingError } = await supabase.rpc(
+    "rank_jobs_for_current_profile",
+    { p_job_ids: data.jobs.map((job) => job.id) },
+  );
+  if (!rankingError && Array.isArray(ranked)) {
+    for (const item of ranked) {
+      if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+      const record = item as Record<string, unknown>;
+      if (
+        typeof record.jobId !== "string" ||
+        typeof record.score !== "number" ||
+        !Array.isArray(record.reasons)
+      ) {
+        continue;
+      }
+      const score = Math.min(100, Math.max(0, record.score));
+      explanations.set(record.jobId, {
+        score,
+        label:
+          score >= 70
+            ? "Strong match"
+            : score >= 45
+              ? "Good match"
+              : "Potential match",
+        reasons: record.reasons
+          .filter((reason): reason is string => typeof reason === "string")
+          .slice(0, 3),
+      });
+    }
+    return explanations;
+  }
+
   const { data: profile } = await supabase
     .from("profiles")
     .select("headline, level_of_experience, location, skills")
@@ -91,8 +123,14 @@ async function loadMatchExplanations(data: JobsPageData) {
 }
 
 export async function JobsResultsList({ state, data }: JobsResultsListProps) {
-  const jobs = data.jobs.map(toJobCardShape);
   const matchExplanations = await loadMatchExplanations(data);
+  const jobs = [...data.jobs]
+    .sort(
+      (left, right) =>
+        (matchExplanations.get(right.id)?.score ?? 0) -
+        (matchExplanations.get(left.id)?.score ?? 0),
+    )
+    .map(toJobCardShape);
   const totalJobs = data.totalJobs;
   const newJobs = data.newJobs;
   const totalPages = data.totalPages;

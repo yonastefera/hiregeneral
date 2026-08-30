@@ -1640,6 +1640,10 @@ export type Database = {
         };
         Returns: Json;
       };
+      rank_jobs_for_current_profile: {
+        Args: { p_job_ids: string[] };
+        Returns: Json;
+      };
       can_access_employer_application: {
         Args: { p_application_id: string; p_user_id?: string };
         Returns: boolean;
