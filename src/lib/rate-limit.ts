@@ -58,6 +58,10 @@ export const salaryLookupRateLimit = publicReadLimiter(45, "salaries");
 export const schoolSearchRateLimit = publicReadLimiter(90, "schools");
 export const publicJobSearchRateLimit = publicReadLimiter(120, "jobs");
 export const publicJobDetailRateLimit = publicReadLimiter(180, "job-details");
+export const employerCandidateSearchRateLimit = publicReadLimiter(
+  120,
+  "employer-candidates",
+);
 
 export const applicationSubmissionRateLimit = lazyRateLimit(
   () =>

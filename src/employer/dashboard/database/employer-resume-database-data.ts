@@ -18,6 +18,13 @@ type EmployerResumeDatabaseParams = {
   query?: string | null;
   resumeOnly?: boolean;
   limit?: number;
+  skills?: string[];
+  location?: string | null;
+  experience?: string | null;
+  degree?: string | null;
+  industry?: string | null;
+  relocation?: boolean;
+  sort?: "match" | "recent";
 };
 
 type ResumeJobRow = {
@@ -252,7 +259,7 @@ function scoreCandidate(
 ) {
   const profileSkills = (profile.skills ?? []).map(normalize);
   const jobSkills = new Set((job?.skills ?? []).map(normalize));
-  const overlap = profileSkills.filter((skill) => jobSkills.has(skill)).length;
+  const matchedSkills = profileSkills.filter((skill) => jobSkills.has(skill));
   const headline = normalize(profile.headline ?? "");
   const titleWords =
     job?.title
@@ -260,9 +267,28 @@ function scoreCandidate(
       .map((word) => normalize(word))
       .filter((word) => word.length > 3) ?? [];
   const titleOverlap = titleWords.some((word) => headline.includes(word));
-  const resumeBonus = profile.resume_url ? 5 : 0;
+  const skillScore = jobSkills.size
+    ? Math.round((matchedSkills.length / jobSkills.size) * 75)
+    : 0;
+  const profileScore =
+    (profile.resume_url ? 5 : 0) +
+    (profile.work_experience?.length ? 3 : 0) +
+    (profile.education?.length ? 2 : 0);
+  const reasons: string[] = [];
 
-  return Math.min(99, 68 + overlap * 7 + (titleOverlap ? 10 : 0) + resumeBonus);
+  if (matchedSkills.length) {
+    reasons.push(
+      `${matchedSkills.length} required skill${matchedSkills.length === 1 ? "" : "s"} matched`,
+    );
+  }
+  if (titleOverlap) reasons.push("Headline aligns with the role title");
+  if (profile.resume_url) reasons.push("Resume available");
+  if (!reasons.length) reasons.push("Limited structured matching evidence");
+
+  return {
+    score: Math.min(100, skillScore + (titleOverlap ? 15 : 0) + profileScore),
+    reasons,
+  };
 }
 
 function formatProfileDate(value: string | null | undefined) {
@@ -340,6 +366,7 @@ function mapCandidate(
   invitedProfileIds: Set<string>,
 ): ResumeMatch {
   const name = profile.full_name?.trim() || "HireGeneral candidate";
+  const match = scoreCandidate(job, profile);
 
   return {
     id: profile.id,
@@ -348,7 +375,8 @@ function mapCandidate(
     title: profile.headline || "Candidate profile",
     location: profile.location || "Location not provided",
     skills: (profile.skills ?? []).filter(Boolean).slice(0, 8),
-    match: scoreCandidate(job, profile),
+    match: match.score,
+    matchReasons: match.reasons,
     openToOffers: true,
     email: profile.email,
     phone: profile.phone,
@@ -435,6 +463,12 @@ async function loadCandidateProfiles(
     includeRecruiter: boolean;
     publicOnly: boolean;
     limit: number;
+    skills?: string[];
+    location?: string | null;
+    experience?: string | null;
+    degree?: string | null;
+    industry?: string | null;
+    relocation?: boolean;
   },
 ) {
   const admin = createSupabaseAdminClient();
@@ -458,6 +492,15 @@ async function loadCandidateProfiles(
     if (params.resumeOnly) {
       query = query.not("resume_url", "is", null);
     }
+
+    if (params.skills?.length) query = query.contains("skills", params.skills);
+    if (params.location)
+      query = query.ilike("location", `%${params.location}%`);
+    if (params.experience)
+      query = query.ilike("level_of_experience", params.experience);
+    if (params.degree) query = query.ilike("highest_degree", params.degree);
+    if (params.industry) query = query.ilike("industry", params.industry);
+    if (params.relocation) query = query.eq("open_to_relocation", true);
 
     return query.order("updated_at", { ascending: false }).limit(params.limit);
   }
@@ -524,6 +567,14 @@ export async function getEmployerResumeDatabaseData(
   const searchTerm = normalizeSearchTerm(params.query) ?? null;
   const limit = Math.min(Math.max(params.limit ?? 60, 1), 100);
   const resumeOnly = params.resumeOnly ?? true;
+  const structuredFilters = {
+    skills: (params.skills ?? []).slice(0, 10),
+    location: normalizeSearchTerm(params.location) ?? null,
+    experience: normalizeSearchTerm(params.experience) ?? null,
+    degree: normalizeSearchTerm(params.degree) ?? null,
+    industry: normalizeSearchTerm(params.industry) ?? null,
+    relocation: params.relocation,
+  };
 
   const invitePromise = selectedJob
     ? supabase
@@ -540,6 +591,7 @@ export async function getEmployerResumeDatabaseData(
       includeRecruiter: false,
       publicOnly: true,
       limit: profileLimit,
+      ...structuredFilters,
     }),
     invitePromise,
   ]);
@@ -555,6 +607,7 @@ export async function getEmployerResumeDatabaseData(
       includeRecruiter: true,
       publicOnly: true,
       limit: profileLimit,
+      ...structuredFilters,
     });
   }
 
@@ -588,7 +641,12 @@ export async function getEmployerResumeDatabaseData(
     .filter((profile) => profileMatches(profile, searchTerm))
     .filter((profile) => Boolean(getStoredResumeUrl(profile.resume_url)))
     .map((profile) => mapCandidate(profile, selectedJob, invitedProfileIds));
-  const filteredProfiles = mappedProfiles.sort((a, b) => b.match - a.match);
+  const filteredProfiles = mappedProfiles.sort((a, b) =>
+    params.sort === "recent"
+      ? new Date(b.resumeUploadedAt ?? 0).getTime() -
+        new Date(a.resumeUploadedAt ?? 0).getTime()
+      : b.match - a.match,
+  );
   const candidatesWithResume = await Promise.all(
     filteredProfiles.map(async (candidate) => ({
       ...candidate,

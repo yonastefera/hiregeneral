@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { DatabaseToolbar } from "./DatabaseToolbar";
 import {
   defaultResumeInviteMessage,
+  initialCandidateSearchFilters,
+  type CandidateSearchFilters,
   type ResumeDatabaseData,
   type ResumeMatch,
 } from "./database-content";
@@ -21,7 +23,10 @@ export function DatabasePage({ initialData }: DatabasePageProps) {
     initialData.selectedJobId ?? "",
   );
   const [query, setQuery] = useState("");
-  const [resumeOnly, setResumeOnly] = useState(false);
+  const [resumeOnly, setResumeOnly] = useState(true);
+  const [filters, setFilters] = useState<CandidateSearchFilters>(
+    initialCandidateSearchFilters,
+  );
   const [data, setData] = useState(initialData);
   const [activeResume, setActiveResume] = useState<ResumeMatch | null>(null);
   const [invitingCandidateId, setInvitingCandidateId] = useState<string | null>(
@@ -48,6 +53,16 @@ export function DatabasePage({ initialData }: DatabasePageProps) {
         if (selectedJob) params.set("jobId", selectedJob);
         if (query.trim()) params.set("query", query.trim());
         if (resumeOnly) params.set("resumeOnly", "true");
+        filters.skills.forEach((skill) => params.append("skill", skill));
+        if (filters.location.trim())
+          params.set("location", filters.location.trim());
+        if (filters.experience.trim())
+          params.set("experience", filters.experience.trim());
+        if (filters.degree.trim()) params.set("degree", filters.degree.trim());
+        if (filters.industry.trim())
+          params.set("industry", filters.industry.trim());
+        if (filters.relocation === "yes") params.set("relocation", "true");
+        params.set("sort", filters.sort);
 
         try {
           const response = await fetch(`/api/employers/database?${params}`, {
@@ -85,14 +100,20 @@ export function DatabasePage({ initialData }: DatabasePageProps) {
           }
         }
       },
-      query.trim() ? 250 : 0,
+      query.trim() ||
+        filters.location.trim() ||
+        filters.experience.trim() ||
+        filters.degree.trim() ||
+        filters.industry.trim()
+        ? 250
+        : 0,
     );
 
     return () => {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [query, resumeOnly, selectedJob]);
+  }, [filters, query, resumeOnly, selectedJob]);
 
   async function sendInvite(candidate: ResumeMatch) {
     if (!selectedJob) {
@@ -174,6 +195,8 @@ export function DatabasePage({ initialData }: DatabasePageProps) {
         resumeOnly={resumeOnly}
         onResumeOnlyChange={setResumeOnly}
         candidateCount={data.totalCandidates}
+        filters={filters}
+        onFiltersChange={setFilters}
       />
 
       {error ? (

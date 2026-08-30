@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getDatabase: vi.fn(),
   loadEntitlements: vi.fn(),
   requireEmployer: vi.fn(),
+  searchLimit: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/require-employer-user", () => ({
@@ -22,6 +23,9 @@ vi.mock("@/employer/dashboard/candidates/employer-candidates-data", () => ({
 vi.mock("@/employer/dashboard/database/employer-resume-database-data", () => ({
   getEmployerResumeDatabaseData: mocks.getDatabase,
 }));
+vi.mock("@/lib/rate-limit", () => ({
+  employerCandidateSearchRateLimit: { limit: mocks.searchLimit },
+}));
 
 import { GET as candidates } from "@/app/api/employers/candidates/route";
 import { GET as database } from "@/app/api/employers/database/route";
@@ -34,6 +38,7 @@ beforeEach(() => {
   mocks.loadEntitlements.mockResolvedValue({ candidateDatabase: true });
   mocks.getCandidates.mockResolvedValue({ candidates: [] });
   mocks.getDatabase.mockResolvedValue({ candidates: [] });
+  mocks.searchLimit.mockResolvedValue({ success: true });
 });
 
 describe("employer candidate access", () => {

@@ -26,6 +26,7 @@ export type ResumeMatch = {
   location: string;
   skills: string[];
   match: number;
+  matchReasons: string[];
   openToOffers: boolean;
   email: string | null;
   phone: string | null;
@@ -55,6 +56,26 @@ export type ResumeDatabaseData = {
   selectedJobId: string | null;
   candidates: ResumeMatch[];
   totalCandidates: number;
+};
+
+export type CandidateSearchFilters = {
+  skills: string[];
+  location: string;
+  experience: string;
+  degree: string;
+  industry: string;
+  relocation: "any" | "yes";
+  sort: "match" | "recent";
+};
+
+export const initialCandidateSearchFilters: CandidateSearchFilters = {
+  skills: [],
+  location: "",
+  experience: "",
+  degree: "",
+  industry: "",
+  relocation: "any",
+  sort: "match",
 };
 
 export const defaultResumeInviteMessage =

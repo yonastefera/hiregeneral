@@ -71,6 +71,12 @@ export function ResumeMatchCard({
         ))}
       </div>
 
+      <ul className="mt-3 space-y-1 text-[11px] text-neutral-500">
+        {candidate.matchReasons.slice(0, 2).map((reason) => (
+          <li key={reason}>• {reason}</li>
+        ))}
+      </ul>
+
       <div className="mt-4 flex gap-1.5">
         <button
           type="button"
