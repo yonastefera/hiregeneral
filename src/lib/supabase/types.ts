@@ -1624,6 +1624,22 @@ export type Database = {
           remaining_jobs: number;
         }[];
       };
+      search_jobs_knowledge_public: {
+        Args: {
+          p_balance?: string;
+          p_category?: string | null;
+          p_company?: string | null;
+          p_days_ago?: number;
+          p_employment_type?: string | null;
+          p_exclude_id?: string | null;
+          p_location?: string | null;
+          p_page?: number;
+          p_page_size?: number;
+          p_query: string;
+          p_work_mode?: string | null;
+        };
+        Returns: Json;
+      };
       can_access_employer_application: {
         Args: { p_application_id: string; p_user_id?: string };
         Returns: boolean;

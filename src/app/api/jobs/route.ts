@@ -32,7 +32,7 @@ const MAX_PAGE_SIZE = 25;
 const EASY_APPLY_SCAN_PAGE_SIZE = 25;
 const EASY_APPLY_MAX_SCAN_PAGES = 40;
 
-const JOBS_API_CACHE_VERSION = process.env.JOBS_API_CACHE_VERSION ?? "5";
+const JOBS_API_CACHE_VERSION = process.env.JOBS_API_CACHE_VERSION ?? "6";
 const JOBS_BROWSE_CACHE_TTL_SECONDS = 60 * 3; // 3 minutes
 const JOBS_SEARCH_CACHE_TTL_SECONDS = 60; // 1 minute
 const JOBS_FILTER_CACHE_TTL_SECONDS = 60 * 2; // 2 minutes
@@ -461,6 +461,51 @@ async function searchJobsPublic(params: {
   return (data ?? []) as JobsPublicRpcRow[];
 }
 
+async function searchJobsKnowledgePublic(params: {
+  query: string;
+  daysAgo: number;
+  location: string;
+  workMode: string;
+  employmentType: string;
+  category: string;
+  company: string;
+  excludeId: string;
+  page: number;
+  pageSize: number;
+  balance: string;
+}): Promise<DirectJobsResult> {
+  const { data, error } = await supabasePublic.rpc(
+    "search_jobs_knowledge_public",
+    {
+      p_query: params.query.trim(),
+      p_days_ago: params.daysAgo,
+      p_location: params.location.trim() || null,
+      p_work_mode: params.workMode || null,
+      p_employment_type: params.employmentType || null,
+      p_category: params.category || null,
+      p_company: params.company.trim() || null,
+      p_exclude_id: params.excludeId || null,
+      p_page: params.page,
+      p_page_size: params.pageSize,
+      p_balance: params.balance,
+    },
+  );
+
+  if (error) throw error;
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error("Knowledge search returned an invalid response.");
+  }
+
+  const payload = data as Record<string, unknown>;
+  return {
+    rows: Array.isArray(payload.rows)
+      ? (payload.rows as JobsPublicRpcRow[])
+      : [],
+    total: toCount(payload.total as number | string | null),
+    newJobs: toCount(payload.newJobs as number | string | null),
+  };
+}
+
 async function searchJobsDirect(params: {
   query: string;
   daysAgo: number;
@@ -735,7 +780,7 @@ export async function GET(req: NextRequest) {
         total = easyApplyResult.total;
         newJobs = easyApplyResult.newJobs;
       } else {
-        rows = await searchJobsPublic({
+        const knowledgeResult = await searchJobsKnowledgePublic({
           query,
           daysAgo,
           location,
@@ -748,9 +793,9 @@ export async function GET(req: NextRequest) {
           pageSize,
           balance,
         });
-
-        total = toCount(rows[0]?.total_count);
-        newJobs = toCount(rows[0]?.new_jobs_count);
+        rows = knowledgeResult.rows;
+        total = knowledgeResult.total;
+        newJobs = knowledgeResult.newJobs;
       }
     } catch (rpcError) {
       if (!shouldUseDirectJobsFallback(rpcError)) {

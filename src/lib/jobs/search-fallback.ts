@@ -10,6 +10,7 @@ export function shouldUseDirectJobsFallback(error: unknown) {
     record.code === "PGRST202" ||
     record.code === "42883" ||
     message.includes("statement timeout") ||
-    message.includes("search_jobs_public")
+    message.includes("search_jobs_public") ||
+    message.includes("search_jobs_knowledge_public")
   );
 }
