@@ -82,6 +82,44 @@ export type Database = {
           },
         ];
       };
+      application_status_events: {
+        Row: {
+          application_id: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          note: string | null;
+          status: string;
+          visible_to_applicant: boolean;
+        };
+        Insert: {
+          application_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          note?: string | null;
+          status: string;
+          visible_to_applicant?: boolean;
+        };
+        Update: {
+          application_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          note?: string | null;
+          status?: string;
+          visible_to_applicant?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "application_status_events_application_id_fkey";
+            columns: ["application_id"];
+            isOneToOne: false;
+            referencedRelation: "applications";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       auth_role_audit_log: {
         Row: {
           created_at: string;
@@ -1444,6 +1482,14 @@ export type Database = {
           p_subscription_id: string;
         };
         Returns: boolean;
+      };
+      employer_update_application_status: {
+        Args: {
+          p_application_id: string;
+          p_note?: string | null;
+          p_status: string;
+        };
+        Returns: Database["public"]["Tables"]["applications"]["Row"];
       };
       assign_initial_role: {
         Args: {

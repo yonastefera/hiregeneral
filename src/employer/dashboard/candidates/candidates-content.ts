@@ -1,4 +1,9 @@
-export type CandidateStatus = "New" | "Reviewed" | "Interview";
+export type CandidateStatus =
+  | "submitted"
+  | "reviewing"
+  | "interview"
+  | "offer"
+  | "rejected";
 
 export type Candidate = {
   id: string;

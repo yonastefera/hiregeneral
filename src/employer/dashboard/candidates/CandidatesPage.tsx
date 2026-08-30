@@ -106,7 +106,18 @@ export function CandidatesPage({ initialData }: CandidatesPageProps) {
 
       <div className={loading ? "space-y-2 opacity-60" : "space-y-2"}>
         {data.candidates.map((candidate) => (
-          <CandidateCard key={candidate.id} candidate={candidate} />
+          <CandidateCard
+            key={candidate.id}
+            candidate={candidate}
+            onStatusChanged={(status) =>
+              setData((current) => ({
+                ...current,
+                candidates: current.candidates.map((item) =>
+                  item.id === candidate.id ? { ...item, status } : item,
+                ),
+              }))
+            }
+          />
         ))}
 
         {!loading && data.candidates.length === 0 ? (

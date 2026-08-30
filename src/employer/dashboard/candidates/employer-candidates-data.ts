@@ -59,11 +59,11 @@ function relativeTime(value: string) {
 
 function mapCandidateStatus(status: string): CandidateStatus {
   const normalized = status.toLowerCase();
-
-  if (normalized.includes("interview")) return "Interview";
-  if (normalized.includes("review")) return "Reviewed";
-
-  return "New";
+  if (normalized === "reviewing") return "reviewing";
+  if (normalized === "interview") return "interview";
+  if (normalized === "offer") return "offer";
+  if (normalized === "rejected") return "rejected";
+  return "submitted";
 }
 
 function normalizeSearchTerm(value: string | null | undefined) {

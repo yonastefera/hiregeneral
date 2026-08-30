@@ -3,7 +3,13 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { BriefcaseBusiness, Clock3, Loader2, MapPin } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  CheckCircle2,
+  Clock3,
+  Loader2,
+  MapPin,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +29,14 @@ interface Application {
   id: string;
   status: ApplicationStatus;
   created_at: string;
+  updated_at: string;
   cover_note: string | null;
+  application_status_events: Array<{
+    id: string;
+    status: ApplicationStatus;
+    note: string | null;
+    created_at: string;
+  }>;
   jobs: {
     id: string;
     title: string;
@@ -59,6 +72,14 @@ function StatusBadge({ status }: { status: string }) {
       {cfg.label}
     </span>
   );
+}
+
+function formatTimelineDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(value));
 }
 
 export default function ApplicationsPage() {
@@ -223,6 +244,40 @@ export default function ApplicationsPage() {
                         <p className="mt-3 line-clamp-2 text-sm text-muted-foreground">
                           {app.cover_note}
                         </p>
+                      )}
+
+                      {app.application_status_events?.length > 0 && (
+                        <div className="mt-5 border-t border-border pt-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Application timeline
+                          </p>
+                          <ol className="mt-3 space-y-3">
+                            {app.application_status_events.map((event) => (
+                              <li key={event.id} className="flex gap-3">
+                                <CheckCircle2
+                                  aria-hidden="true"
+                                  className="mt-0.5 size-4 shrink-0 text-primary"
+                                />
+                                <div>
+                                  <div className="flex flex-wrap items-baseline gap-2">
+                                    <span className="text-sm font-medium text-foreground">
+                                      {STATUS_CONFIG[event.status]?.label ??
+                                        "Updated"}
+                                    </span>
+                                    <time className="text-xs text-muted-foreground">
+                                      {formatTimelineDate(event.created_at)}
+                                    </time>
+                                  </div>
+                                  {event.note && (
+                                    <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
+                                      {event.note}
+                                    </p>
+                                  )}
+                                </div>
+                              </li>
+                            ))}
+                          </ol>
+                        </div>
                       )}
 
                       <div className="mt-4 flex gap-2">

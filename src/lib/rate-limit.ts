@@ -152,6 +152,11 @@ export const employerCompanyRateLimit = mutationLimiter(
   "employer-company",
 );
 export const employerJobRateLimit = mutationLimiter(30, "1 h", "employer-jobs");
+export const employerApplicationRateLimit = mutationLimiter(
+  120,
+  "1 h",
+  "employer-applications",
+);
 export const employerInviteRateLimit = mutationLimiter(
   30,
   "1 h",

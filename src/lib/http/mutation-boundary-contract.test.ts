@@ -157,6 +157,19 @@ const contracts: Record<string, Boundary> = {
     abuseControl: ["employerInviteRateLimit", "enforceDuplicateCooldown({"],
     safeError: ['safeServerError("Could not send the invitation.")'],
   },
+  "app/api/employers/applications/[id]/route.ts": {
+    authentication: ["requireEmployerUser()", "if (!auth.user)"],
+    authorization: [
+      "employer_update_application_status",
+      "p_application_id: id",
+    ],
+    validation: [
+      "boundedJsonBody(request)",
+      "employerApplicationUpdateSchema.safeParse",
+    ],
+    abuseControl: ["employerApplicationRateLimit.limit", "status: 429"],
+    safeError: ['safeServerError("Could not update this application.")'],
+  },
   "app/api/employers/jobs/route.ts": {
     authentication: ["requireEmployerUser()"],
     authorization: ['.eq("owner_id", user.id)', "recruiter_id: user.id"],

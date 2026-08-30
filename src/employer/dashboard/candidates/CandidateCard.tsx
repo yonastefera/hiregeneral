@@ -1,22 +1,75 @@
-import { Briefcase, MapPin, Star } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { Briefcase, Loader2, MapPin, Star } from "lucide-react";
+import { toast } from "sonner";
 
 import type { Candidate, CandidateStatus } from "./candidates-content";
 
 type CandidateCardProps = {
   candidate: Candidate;
+  onStatusChanged: (status: CandidateStatus) => void;
 };
 
 const statusClassNames: Record<CandidateStatus, string> = {
-  New: "bg-emerald-50 text-emerald-700",
-  Interview: "bg-violet-50 text-violet-700",
-  Reviewed: "bg-neutral-100 text-neutral-600",
+  submitted: "bg-emerald-50 text-emerald-700",
+  reviewing: "bg-amber-50 text-amber-700",
+  interview: "bg-violet-50 text-violet-700",
+  offer: "bg-teal-50 text-teal-700",
+  rejected: "bg-rose-50 text-rose-700",
 };
 
-export function CandidateCard({ candidate }: CandidateCardProps) {
+const statusLabels: Record<CandidateStatus, string> = {
+  submitted: "New",
+  reviewing: "Reviewing",
+  interview: "Interview",
+  offer: "Offer",
+  rejected: "Not selected",
+};
+
+export function CandidateCard({
+  candidate,
+  onStatusChanged,
+}: CandidateCardProps) {
+  const [status, setStatus] = useState<CandidateStatus>(candidate.status);
+  const [note, setNote] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const initials = candidate.name
     .split(" ")
     .map((namePart) => namePart[0])
     .join("");
+
+  const saveStatus = async () => {
+    if (status === "submitted") return;
+    setSaving(true);
+    try {
+      const response = await fetch(
+        `/api/employers/applications/${candidate.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status, note: note.trim() || null }),
+        },
+      );
+      const body = await response.json().catch(() => null);
+      if (!response.ok)
+        throw new Error(body?.error ?? "Could not update application.");
+      onStatusChanged(status);
+      setNote("");
+      setEditing(false);
+      toast.success("Candidate status updated.");
+    } catch (error) {
+      setStatus(candidate.status);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not update application.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <article className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-4 transition-colors hover:bg-white/80">
@@ -63,13 +116,15 @@ export function CandidateCard({ candidate }: CandidateCardProps) {
           <div className="text-[12px] font-medium">{candidate.applied}</div>
         </div>
 
-        <span
+        <button
+          type="button"
+          onClick={() => setEditing((current) => !current)}
           className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${
             statusClassNames[candidate.status]
           }`}
         >
-          {candidate.status}
-        </span>
+          {statusLabels[candidate.status]}
+        </button>
 
         {candidate.resumeUrl ? (
           <a
@@ -88,14 +143,47 @@ export function CandidateCard({ candidate }: CandidateCardProps) {
             View
           </button>
         )}
-
-        <button
-          type="button"
-          className="rounded-lg bg-neutral-900 px-3.5 py-2 text-[12px] font-semibold text-white transition hover:bg-neutral-800"
-        >
-          Message
-        </button>
       </div>
+
+      {editing ? (
+        <div className="basis-full rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+          <div className="flex flex-wrap gap-2">
+            <select
+              value={status}
+              onChange={(event) =>
+                setStatus(event.target.value as CandidateStatus)
+              }
+              className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm"
+              aria-label="Candidate status"
+            >
+              <option value="reviewing">Reviewing</option>
+              <option value="interview">Interview</option>
+              <option value="offer">Offer</option>
+              <option value="rejected">Not selected</option>
+            </select>
+            <input
+              value={note}
+              maxLength={1000}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="Optional response visible to the candidate"
+              className="min-w-64 flex-1 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm"
+            />
+            <button
+              type="button"
+              disabled={saving}
+              onClick={saveStatus}
+              className="inline-flex items-center rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            >
+              {saving ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+              Update
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-neutral-500">
+            Status changes and this response appear in the candidate&apos;s
+            timeline.
+          </p>
+        </div>
+      ) : null}
     </article>
   );
 }

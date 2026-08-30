@@ -193,7 +193,10 @@ export async function GET() {
     .from("applications")
     .select(
       `
-      id, status, created_at, resume_url, cover_note,
+      id, status, created_at, updated_at, resume_url, cover_note,
+      application_status_events (
+        id, status, note, created_at
+      ),
       jobs (
         id, title, company_name, company_logo_url,
         location, employment_type, work_mode, slug
@@ -201,6 +204,10 @@ export async function GET() {
     `,
     )
     .eq("user_id", user.id)
+    .order("created_at", {
+      referencedTable: "application_status_events",
+      ascending: true,
+    })
     .order("created_at", { ascending: false });
 
   if (error) {
