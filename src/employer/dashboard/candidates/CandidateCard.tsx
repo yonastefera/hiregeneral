@@ -138,6 +138,7 @@ export function CandidateCard({
 
         <button
           type="button"
+          aria-label={`Change pipeline stage for ${candidate.name}`}
           onClick={() =>
             pipelineStages.length > 0 && setEditing((current) => !current)
           }

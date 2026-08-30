@@ -81,7 +81,15 @@ test("seeker applies once and duplicate submission is rejected", async ({
     await page.getByRole("option", { name: "2–4 years" }).click();
     await page.getByLabel("Work authorization *").click();
     await page.getByRole("option", { name: "U.S. Citizen" }).click();
-    await page.getByLabel("Cover note").fill("Authenticated E2E application.");
+    await expect(
+      page.getByRole("heading", {
+        name: "Evidence-based application coach",
+      }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Use factual starter" }).click();
+    await expect(page.getByLabel("Cover note")).toHaveValue(
+      /I am interested in the .+ role at .+\./,
+    );
     await page.getByRole("button", { name: /Continue/ }).click();
 
     await page.getByRole("checkbox").check();
