@@ -83,6 +83,17 @@ function introduced for Phase 2 ingestion.
 | ----------------- | ---------------------- | ---------------------------------- |
 | 2026-08-29        | `svzsorgmgvvmikrwboaq` | All 35 distinctive markers present |
 
+Phase 3 introduced the following forward migrations:
+
+- `20260829223000_saved_searches_and_alerts.sql` — applied and verified in the
+  test and production projects on 2026-08-29.
+- `20260829234500_application_timeline_and_responses.sql` — apply to the test
+  project first, verify with
+  `docs/operations/verify-user-differentiation.sql`, then apply to production.
+
+Do not mark the second migration as production-applied until its verification
+query returns only `true` values.
+
 ## Reconciliation checklist
 
 - Match every remote version to an immutable repository migration or document
