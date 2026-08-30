@@ -170,6 +170,19 @@ const contracts: Record<string, Boundary> = {
     abuseControl: ["employerApplicationRateLimit.limit", "status: 429"],
     safeError: ['safeServerError("Could not update this application.")'],
   },
+  "app/api/employers/applications/[id]/scorecards/route.ts": {
+    authentication: ["requireEmployerUser()", "if (!auth.user)"],
+    authorization: [
+      "can_access_employer_application",
+      "reviewer_id: auth.user.id",
+    ],
+    validation: [
+      "boundedJsonBody(request)",
+      "interviewScorecardSchema.safeParse",
+    ],
+    abuseControl: ["employerScorecardRateLimit.limit", "status: 429"],
+    safeError: ['safeServerError("Could not save the interview scorecard.")'],
+  },
   "app/api/employers/pipeline/route.ts": {
     authentication: ["requireEmployerUser()", "if (!auth.user)"],
     authorization: ["employer_replace_pipeline_stages", "auth.user.id"],
@@ -179,6 +192,13 @@ const contracts: Record<string, Boundary> = {
     ],
     abuseControl: ["employerPipelineRateLimit.limit", "status: 429"],
     safeError: ['safeServerError("Could not update the candidate pipeline.")'],
+  },
+  "app/api/employers/team/route.ts": {
+    authentication: ["requireEmployerUser()", "if (!auth.user)"],
+    authorization: ["managedCompany", '.neq("role", "owner")'],
+    validation: ["boundedJsonBody(request)", "addTeamMemberSchema.safeParse"],
+    abuseControl: ["employerTeamRateLimit.limit", "status: 429"],
+    safeError: ['safeServerError("Could not add this teammate.")'],
   },
   "app/api/employers/jobs/route.ts": {
     authentication: ["requireEmployerUser()"],

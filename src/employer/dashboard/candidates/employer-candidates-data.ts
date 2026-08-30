@@ -177,12 +177,12 @@ async function resolveEmployerContext(params: GetEmployerCandidatesParams) {
 
 async function loadJobFilters(
   supabase: SupabaseServerClient,
-  recruiterId: string,
+  companyId: string,
 ): Promise<CandidateJobFilter[]> {
   const { data, error } = await supabase
     .from("jobs")
     .select("id, title")
-    .eq("recruiter_id", recruiterId)
+    .eq("company_id", companyId)
     .order("created_at", { ascending: false })
     .limit(100);
 
@@ -217,7 +217,23 @@ export async function getEmployerCandidates(
   const normalizedJobId =
     params.jobId && params.jobId !== "all" ? params.jobId : null;
   const searchTerm = normalizeSearchTerm(params.query);
-  const filtersPromise = loadJobFilters(supabase, recruiterId);
+  const { data: membership } = await supabase
+    .from("employer_team_members")
+    .select("company_id")
+    .eq("user_id", recruiterId)
+    .limit(1)
+    .maybeSingle();
+  const companyId = membership?.company_id ?? null;
+
+  if (!companyId) {
+    return {
+      candidates: [],
+      filters: [{ label: "All jobs", value: "all" }],
+      pipelineStages: [],
+    };
+  }
+
+  const filtersPromise = loadJobFilters(supabase, companyId);
   const pipelineStagesPromise = loadPipelineStages(supabase, recruiterId);
 
   let query = supabase
@@ -237,7 +253,7 @@ export async function getEmployerCandidates(
       jobs!inner(id, title, recruiter_id)
     `,
     )
-    .eq("jobs.recruiter_id", recruiterId);
+    .eq("jobs.company_id", companyId);
 
   if (normalizedJobId) {
     query = query.eq("job_id", normalizedJobId);

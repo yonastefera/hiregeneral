@@ -99,12 +99,14 @@ export function CandidatesPage({ initialData }: CandidatesPageProps) {
         onQueryChange={setQuery}
       />
 
-      <PipelineEditor
-        stages={data.pipelineStages}
-        onSaved={(pipelineStages) =>
-          setData((current) => ({ ...current, pipelineStages }))
-        }
-      />
+      {data.pipelineStages.length > 0 ? (
+        <PipelineEditor
+          stages={data.pipelineStages}
+          onSaved={(pipelineStages) =>
+            setData((current) => ({ ...current, pipelineStages }))
+          }
+        />
+      ) : null}
 
       {error ? (
         <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">

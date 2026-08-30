@@ -46,8 +46,11 @@ const behavioralCoverage: Record<string, string> = {
   "app/api/employers/invite/route.ts": "app/api/employers/invite/route.test.ts",
   "app/api/employers/applications/[id]/route.ts":
     "app/api/employers/applications/[id]/route.test.ts",
+  "app/api/employers/applications/[id]/scorecards/route.ts":
+    "app/api/employers/applications/[id]/scorecards/route.test.ts",
   "app/api/employers/pipeline/route.ts":
     "app/api/employers/pipeline/route.test.ts",
+  "app/api/employers/team/route.ts": "app/api/employers/team/route.test.ts",
   "app/api/employers/jobs/route.ts": "app/api/employers/jobs/route.test.ts",
   "app/api/employers/messages/route.ts":
     "app/api/employers/messages/route.test.ts",

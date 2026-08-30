@@ -9,6 +9,7 @@ import {
   PlusSquare,
   Send,
   Users,
+  UsersRound,
 } from "lucide-react";
 
 export type DashboardNavItem = {
@@ -72,6 +73,11 @@ export const dashboardNavGroups: DashboardNavGroup[] = [
         href: "/employers/dashboard/messages",
         label: "Messages",
         icon: MessageSquare,
+      },
+      {
+        href: "/employers/dashboard/team",
+        label: "Hiring team",
+        icon: UsersRound,
       },
       {
         href: "/employers/dashboard/company",

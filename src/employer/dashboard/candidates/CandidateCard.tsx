@@ -9,6 +9,7 @@ import type {
   CandidatePipelineStage,
   CandidateStatus,
 } from "./candidates-content";
+import { ScorecardPanel } from "./ScorecardPanel";
 
 type CandidateCardProps = {
   candidate: Candidate;
@@ -46,6 +47,7 @@ export function CandidateCard({
   const [note, setNote] = useState("");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [scorecardOpen, setScorecardOpen] = useState(false);
   const stageLabel =
     pipelineStages.find((stage) => stage.id === candidate.pipelineStageId)
       ?.name ?? statusLabels[candidate.status];
@@ -136,7 +138,9 @@ export function CandidateCard({
 
         <button
           type="button"
-          onClick={() => setEditing((current) => !current)}
+          onClick={() =>
+            pipelineStages.length > 0 && setEditing((current) => !current)
+          }
           className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${
             statusClassNames[candidate.status]
           }`}
@@ -161,6 +165,13 @@ export function CandidateCard({
             View
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => setScorecardOpen((current) => !current)}
+          className="rounded-lg bg-neutral-900 px-3.5 py-2 text-[12px] font-semibold text-white"
+        >
+          Scorecard
+        </button>
       </div>
 
       {editing ? (
@@ -204,6 +215,12 @@ export function CandidateCard({
             Status changes and this response appear in the candidate&apos;s
             timeline.
           </p>
+        </div>
+      ) : null}
+
+      {scorecardOpen ? (
+        <div className="basis-full rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+          <ScorecardPanel applicationId={candidate.id} />
         </div>
       ) : null}
     </article>

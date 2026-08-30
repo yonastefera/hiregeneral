@@ -162,6 +162,16 @@ export const employerPipelineRateLimit = mutationLimiter(
   "1 h",
   "employer-pipeline",
 );
+export const employerScorecardRateLimit = mutationLimiter(
+  60,
+  "1 h",
+  "scorecards",
+);
+export const employerTeamRateLimit = mutationLimiter(
+  30,
+  "1 h",
+  "employer-team",
+);
 export const employerInviteRateLimit = mutationLimiter(
   30,
   "1 h",

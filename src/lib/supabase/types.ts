@@ -429,6 +429,75 @@ export type Database = {
         };
         Relationships: [];
       };
+      employer_team_members: {
+        Row: {
+          company_id: string;
+          created_at: string;
+          id: string;
+          invited_by: string | null;
+          role: string;
+          user_id: string;
+        };
+        Insert: {
+          company_id: string;
+          created_at?: string;
+          id?: string;
+          invited_by?: string | null;
+          role: string;
+          user_id: string;
+        };
+        Update: {
+          company_id?: string;
+          created_at?: string;
+          id?: string;
+          invited_by?: string | null;
+          role?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      interview_scorecards: {
+        Row: {
+          application_id: string;
+          created_at: string;
+          criteria: Json;
+          id: string;
+          interview_round: string;
+          overall_rating: number;
+          recommendation: string;
+          reviewer_id: string;
+          submitted_at: string;
+          summary: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          application_id: string;
+          created_at?: string;
+          criteria: Json;
+          id?: string;
+          interview_round: string;
+          overall_rating: number;
+          recommendation: string;
+          reviewer_id: string;
+          submitted_at?: string;
+          summary?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          application_id?: string;
+          created_at?: string;
+          criteria?: Json;
+          id?: string;
+          interview_round?: string;
+          overall_rating?: number;
+          recommendation?: string;
+          reviewer_id?: string;
+          submitted_at?: string;
+          summary?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       employer_candidate_invites: {
         Row: {
           candidate_id: string;
@@ -1541,6 +1610,18 @@ export type Database = {
           p_stage_id: string;
         };
         Returns: Database["public"]["Tables"]["applications"]["Row"];
+      };
+      can_access_employer_application: {
+        Args: { p_application_id: string; p_user_id?: string };
+        Returns: boolean;
+      };
+      can_manage_company_team: {
+        Args: { p_company_id: string; p_user_id?: string };
+        Returns: boolean;
+      };
+      is_company_team_member: {
+        Args: { p_company_id: string; p_user_id?: string };
+        Returns: boolean;
       };
       employer_replace_pipeline_stages: {
         Args: { p_stages: Json };
