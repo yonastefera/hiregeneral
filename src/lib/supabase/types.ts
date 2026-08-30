@@ -1644,6 +1644,10 @@ export type Database = {
         Args: { p_job_ids: string[] };
         Returns: Json;
       };
+      current_profile_skill_opportunities: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
       can_access_employer_application: {
         Args: { p_application_id: string; p_user_id?: string };
         Returns: boolean;

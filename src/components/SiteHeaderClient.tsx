@@ -59,6 +59,7 @@ const publicNavLinks: HeaderNavLink[] = [
 
 const jobSeekerNavLinks: HeaderNavLink[] = [
   { label: "Saved", href: "/saved" },
+  { label: "Career insights", href: "/career-insights" },
   { label: "Messages", href: "/messages" },
   { label: "Profile", href: "/profile" },
 ];
