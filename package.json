@@ -15,6 +15,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:authenticated": "node scripts/run-authenticated-e2e.mjs",
+    "test:load": "tsx scripts/load-test.ts",
     "test:rls": "vitest run --config vitest.rls.config.ts",
     "test:migrations": "node scripts/validate-migrations.mjs",
     "test:migrations:integration": "node scripts/test-migrations-integration.mjs",
