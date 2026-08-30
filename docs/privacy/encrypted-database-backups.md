@@ -1,7 +1,7 @@
 # Encrypted Supabase database backups
 
 HireGeneral's Supabase Free project does not include managed downloadable
-backups. The repository therefore provides a daily GitHub Actions workflow that
+backups. The repository therefore provides a weekly GitHub Actions workflow that
 creates two client-side `age`-encrypted artifacts retained for seven days:
 
 - a PostgreSQL custom-format dump covering `public`, `auth`, and `storage`;
@@ -66,7 +66,7 @@ data in the repository, Vercel, tickets, or chat.
    the run uploads one `.dump.age`, one `.tar.age`, and a checksum for each.
    Do not publish or extract either artifact.
 
-The workflow then runs daily at 07:17 UTC. GitHub schedules can be delayed, so
+The workflow then runs every Sunday at 07:17 UTC. GitHub schedules can be delayed, so
 alert on a missing successful run rather than relying on an exact start time.
 
 ## Restore drill against the test project
