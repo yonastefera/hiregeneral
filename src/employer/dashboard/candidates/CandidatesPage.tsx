@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { CandidateCard } from "./CandidateCard";
 import { CandidatesToolbar } from "./CandidatesToolbar";
+import { PipelineEditor } from "./PipelineEditor";
 import type { EmployerCandidatesData } from "./candidates-content";
 
 type CandidatesPageProps = {
@@ -98,6 +99,13 @@ export function CandidatesPage({ initialData }: CandidatesPageProps) {
         onQueryChange={setQuery}
       />
 
+      <PipelineEditor
+        stages={data.pipelineStages}
+        onSaved={(pipelineStages) =>
+          setData((current) => ({ ...current, pipelineStages }))
+        }
+      />
+
       {error ? (
         <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
           {error}
@@ -109,11 +117,14 @@ export function CandidatesPage({ initialData }: CandidatesPageProps) {
           <CandidateCard
             key={candidate.id}
             candidate={candidate}
-            onStatusChanged={(status) =>
+            pipelineStages={data.pipelineStages}
+            onStatusChanged={(status, pipelineStageId) =>
               setData((current) => ({
                 ...current,
                 candidates: current.candidates.map((item) =>
-                  item.id === candidate.id ? { ...item, status } : item,
+                  item.id === candidate.id
+                    ? { ...item, status, pipelineStageId }
+                    : item,
                 ),
               }))
             }

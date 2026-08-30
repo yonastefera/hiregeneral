@@ -160,15 +160,25 @@ const contracts: Record<string, Boundary> = {
   "app/api/employers/applications/[id]/route.ts": {
     authentication: ["requireEmployerUser()", "if (!auth.user)"],
     authorization: [
-      "employer_update_application_status",
+      "employer_move_application_to_stage",
       "p_application_id: id",
     ],
     validation: [
       "boundedJsonBody(request)",
-      "employerApplicationUpdateSchema.safeParse",
+      "moveToPipelineStageSchema.safeParse",
     ],
     abuseControl: ["employerApplicationRateLimit.limit", "status: 429"],
     safeError: ['safeServerError("Could not update this application.")'],
+  },
+  "app/api/employers/pipeline/route.ts": {
+    authentication: ["requireEmployerUser()", "if (!auth.user)"],
+    authorization: ["employer_replace_pipeline_stages", "auth.user.id"],
+    validation: [
+      "boundedJsonBody(request)",
+      "pipelineConfigurationSchema.safeParse",
+    ],
+    abuseControl: ["employerPipelineRateLimit.limit", "status: 429"],
+    safeError: ['safeServerError("Could not update the candidate pipeline.")'],
   },
   "app/api/employers/jobs/route.ts": {
     authentication: ["requireEmployerUser()"],

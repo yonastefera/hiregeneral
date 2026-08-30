@@ -195,7 +195,7 @@ export async function GET() {
       `
       id, status, created_at, updated_at, resume_url, cover_note,
       application_status_events (
-        id, status, note, created_at
+        id, status, stage_name, note, created_at
       ),
       jobs (
         id, title, company_name, company_logo_url,

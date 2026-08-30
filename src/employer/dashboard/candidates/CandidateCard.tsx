@@ -4,11 +4,16 @@ import { useState } from "react";
 import { Briefcase, Loader2, MapPin, Star } from "lucide-react";
 import { toast } from "sonner";
 
-import type { Candidate, CandidateStatus } from "./candidates-content";
+import type {
+  Candidate,
+  CandidatePipelineStage,
+  CandidateStatus,
+} from "./candidates-content";
 
 type CandidateCardProps = {
   candidate: Candidate;
-  onStatusChanged: (status: CandidateStatus) => void;
+  pipelineStages: CandidatePipelineStage[];
+  onStatusChanged: (status: CandidateStatus, stageId: string) => void;
 };
 
 const statusClassNames: Record<CandidateStatus, string> = {
@@ -29,19 +34,28 @@ const statusLabels: Record<CandidateStatus, string> = {
 
 export function CandidateCard({
   candidate,
+  pipelineStages,
   onStatusChanged,
 }: CandidateCardProps) {
-  const [status, setStatus] = useState<CandidateStatus>(candidate.status);
+  const initialStageId =
+    candidate.pipelineStageId ??
+    pipelineStages.find((stage) => stage.applicationStatus === candidate.status)
+      ?.id ??
+    "";
+  const [stageId, setStageId] = useState(initialStageId);
   const [note, setNote] = useState("");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const stageLabel =
+    pipelineStages.find((stage) => stage.id === candidate.pipelineStageId)
+      ?.name ?? statusLabels[candidate.status];
   const initials = candidate.name
     .split(" ")
     .map((namePart) => namePart[0])
     .join("");
 
   const saveStatus = async () => {
-    if (status === "submitted") return;
+    if (!stageId) return;
     setSaving(true);
     try {
       const response = await fetch(
@@ -49,18 +63,22 @@ export function CandidateCard({
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status, note: note.trim() || null }),
+          body: JSON.stringify({ stageId, note: note.trim() || null }),
         },
       );
       const body = await response.json().catch(() => null);
       if (!response.ok)
         throw new Error(body?.error ?? "Could not update application.");
-      onStatusChanged(status);
+      const selectedStage = pipelineStages.find(
+        (stage) => stage.id === stageId,
+      );
+      if (!selectedStage) throw new Error("Choose a valid pipeline stage.");
+      onStatusChanged(selectedStage.applicationStatus, stageId);
       setNote("");
       setEditing(false);
       toast.success("Candidate status updated.");
     } catch (error) {
-      setStatus(candidate.status);
+      setStageId(initialStageId);
       toast.error(
         error instanceof Error
           ? error.message
@@ -123,7 +141,7 @@ export function CandidateCard({
             statusClassNames[candidate.status]
           }`}
         >
-          {statusLabels[candidate.status]}
+          {stageLabel}
         </button>
 
         {candidate.resumeUrl ? (
@@ -149,17 +167,21 @@ export function CandidateCard({
         <div className="basis-full rounded-xl border border-neutral-200 bg-neutral-50 p-3">
           <div className="flex flex-wrap gap-2">
             <select
-              value={status}
-              onChange={(event) =>
-                setStatus(event.target.value as CandidateStatus)
-              }
+              value={stageId}
+              onChange={(event) => setStageId(event.target.value)}
               className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm"
               aria-label="Candidate status"
             >
-              <option value="reviewing">Reviewing</option>
-              <option value="interview">Interview</option>
-              <option value="offer">Offer</option>
-              <option value="rejected">Not selected</option>
+              <option value="" disabled>
+                Choose a stage
+              </option>
+              {pipelineStages.map((stage) =>
+                stage.id ? (
+                  <option key={stage.id} value={stage.id}>
+                    {stage.name}
+                  </option>
+                ) : null,
+              )}
             </select>
             <input
               value={note}

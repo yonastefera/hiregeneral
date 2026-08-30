@@ -18,6 +18,14 @@ export type Candidate = {
   match: number | null;
   email: string | null;
   resumeUrl: string | null;
+  pipelineStageId: string | null;
+};
+
+export type CandidatePipelineStage = {
+  id: string | null;
+  name: string;
+  position: number;
+  applicationStatus: Exclude<CandidateStatus, "submitted">;
 };
 
 export type CandidateJobFilter = {
@@ -28,4 +36,5 @@ export type CandidateJobFilter = {
 export type EmployerCandidatesData = {
   candidates: Candidate[];
   filters: CandidateJobFilter[];
+  pipelineStages: CandidatePipelineStage[];
 };

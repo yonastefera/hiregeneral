@@ -19,6 +19,7 @@ vi.mock("@/lib/rate-limit", () => ({
 import { PATCH } from "./route";
 
 const applicationId = "22222222-2222-4222-8222-222222222222";
+const stageId = "33333333-3333-4333-8333-333333333333";
 const context = { params: Promise.resolve({ id: applicationId }) };
 
 function request(body: unknown) {
@@ -47,30 +48,28 @@ describe("PATCH /api/employers/applications/[id]", () => {
       status: 401,
     });
 
-    expect(
-      (await PATCH(request({ status: "reviewing" }), context)).status,
-    ).toBe(401);
+    expect((await PATCH(request({ stageId }), context)).status).toBe(401);
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
-  it("rejects unsupported statuses", async () => {
+  it("rejects an invalid stage identifier", async () => {
     expect(
-      (await PATCH(request({ status: "withdrawn" }), context)).status,
+      (await PATCH(request({ stageId: "not-a-uuid" }), context)).status,
     ).toBe(400);
   });
 
   it("updates through the ownership-enforcing database function", async () => {
     const response = await PATCH(
-      request({ status: "interview", note: "Let's schedule a call." }),
+      request({ stageId, note: "Let's schedule a call." }),
       context,
     );
 
     expect(response.status).toBe(200);
     expect(mocks.rpc).toHaveBeenCalledWith(
-      "employer_update_application_status",
+      "employer_move_application_to_stage",
       {
         p_application_id: applicationId,
-        p_status: "interview",
+        p_stage_id: stageId,
         p_note: "Let's schedule a call.",
       },
     );
@@ -81,7 +80,7 @@ describe("PATCH /api/employers/applications/[id]", () => {
       data: null,
       error: { code: "42501", message: "private detail" },
     });
-    const response = await PATCH(request({ status: "reviewing" }), context);
+    const response = await PATCH(request({ stageId }), context);
 
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({

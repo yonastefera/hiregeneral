@@ -34,6 +34,7 @@ interface Application {
   application_status_events: Array<{
     id: string;
     status: ApplicationStatus;
+    stage_name: string | null;
     note: string | null;
     created_at: string;
   }>;
@@ -261,7 +262,8 @@ export default function ApplicationsPage() {
                                 <div>
                                   <div className="flex flex-wrap items-baseline gap-2">
                                     <span className="text-sm font-medium text-foreground">
-                                      {STATUS_CONFIG[event.status]?.label ??
+                                      {event.stage_name ??
+                                        STATUS_CONFIG[event.status]?.label ??
                                         "Updated"}
                                     </span>
                                     <time className="text-xs text-muted-foreground">

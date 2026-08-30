@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { employerApplicationUpdateSchema } from "@/lib/applications/status";
+import { moveToPipelineStageSchema } from "@/lib/applications/pipeline";
 import { requireEmployerUser } from "@/lib/auth/require-employer-user";
 import {
   boundedJsonBody,
@@ -31,12 +31,12 @@ export async function PATCH(
   const { id } = await context.params;
   const body = await boundedJsonBody(request);
   if (!body.ok) return body.response;
-  const parsed = employerApplicationUpdateSchema.safeParse(body.data);
+  const parsed = moveToPipelineStageSchema.safeParse(body.data);
   if (!parsed.success) {
     return NextResponse.json(
       {
         error:
-          "Choose a valid status and keep the response under 1,000 characters.",
+          "Choose a valid pipeline stage and keep the response under 1,000 characters.",
       },
       { status: 400 },
     );
@@ -44,10 +44,10 @@ export async function PATCH(
 
   try {
     const { data, error } = await auth.supabase.rpc(
-      "employer_update_application_status",
+      "employer_move_application_to_stage",
       {
         p_application_id: id,
-        p_status: parsed.data.status,
+        p_stage_id: parsed.data.stageId,
         p_note: parsed.data.note || null,
       },
     );

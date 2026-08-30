@@ -26,6 +26,7 @@ export type Database = {
           created_at: string;
           id: string;
           job_id: string;
+          pipeline_stage_id: string | null;
           requires_sponsorship: string;
           resume_url: string | null;
           status: string;
@@ -45,6 +46,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           job_id: string;
+          pipeline_stage_id?: string | null;
           requires_sponsorship?: string;
           resume_url?: string | null;
           status?: string;
@@ -64,6 +66,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           job_id?: string;
+          pipeline_stage_id?: string | null;
           requires_sponsorship?: string;
           resume_url?: string | null;
           status?: string;
@@ -80,6 +83,13 @@ export type Database = {
             referencedRelation: "jobs";
             referencedColumns: ["id"];
           },
+          {
+            foreignKeyName: "applications_pipeline_stage_id_fkey";
+            columns: ["pipeline_stage_id"];
+            isOneToOne: false;
+            referencedRelation: "employer_pipeline_stages";
+            referencedColumns: ["id"];
+          },
         ];
       };
       application_status_events: {
@@ -89,6 +99,7 @@ export type Database = {
           created_by: string | null;
           id: string;
           note: string | null;
+          stage_name: string | null;
           status: string;
           visible_to_applicant: boolean;
         };
@@ -98,6 +109,7 @@ export type Database = {
           created_by?: string | null;
           id?: string;
           note?: string | null;
+          stage_name?: string | null;
           status: string;
           visible_to_applicant?: boolean;
         };
@@ -107,6 +119,7 @@ export type Database = {
           created_by?: string | null;
           id?: string;
           note?: string | null;
+          stage_name?: string | null;
           status?: string;
           visible_to_applicant?: boolean;
         };
@@ -383,6 +396,36 @@ export type Database = {
           last_message_at?: string;
           participant_one?: string;
           participant_two?: string;
+        };
+        Relationships: [];
+      };
+      employer_pipeline_stages: {
+        Row: {
+          application_status: string;
+          created_at: string;
+          id: string;
+          name: string;
+          position: number;
+          recruiter_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          application_status: string;
+          created_at?: string;
+          id?: string;
+          name: string;
+          position: number;
+          recruiter_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          application_status?: string;
+          created_at?: string;
+          id?: string;
+          name?: string;
+          position?: number;
+          recruiter_id?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -1490,6 +1533,18 @@ export type Database = {
           p_status: string;
         };
         Returns: Database["public"]["Tables"]["applications"]["Row"];
+      };
+      employer_move_application_to_stage: {
+        Args: {
+          p_application_id: string;
+          p_note?: string | null;
+          p_stage_id: string;
+        };
+        Returns: Database["public"]["Tables"]["applications"]["Row"];
+      };
+      employer_replace_pipeline_stages: {
+        Args: { p_stages: Json };
+        Returns: Database["public"]["Tables"]["employer_pipeline_stages"]["Row"][];
       };
       assign_initial_role: {
         Args: {

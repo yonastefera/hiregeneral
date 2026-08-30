@@ -23,6 +23,7 @@ type ApplicationRow = {
   applicant_location: string | null;
   created_at: string;
   resume_url: string | null;
+  pipeline_stage_id: string | null;
   status: string;
   user_id: string;
   years_experience: string | null;
@@ -107,7 +108,35 @@ function mapCandidate(
     match: null,
     email: row.applicant_email,
     resumeUrl,
+    pipelineStageId: row.pipeline_stage_id,
   };
+}
+
+async function loadPipelineStages(
+  supabase: SupabaseServerClient,
+  recruiterId: string,
+) {
+  const { data, error } = await supabase
+    .from("employer_pipeline_stages")
+    .select("id, name, position, application_status")
+    .eq("recruiter_id", recruiterId)
+    .order("position");
+
+  if (error) {
+    console.error("[loadCandidatePipelineStages]", error);
+    return [];
+  }
+
+  return (data ?? []).map((stage) => ({
+    id: stage.id,
+    name: stage.name,
+    position: stage.position,
+    applicationStatus: stage.application_status as
+      | "reviewing"
+      | "interview"
+      | "offer"
+      | "rejected",
+  }));
 }
 
 async function createAuthorizedResumeUrl(row: ApplicationRow) {
@@ -181,6 +210,7 @@ export async function getEmployerCandidates(
     return {
       candidates: [],
       filters: [{ label: "All jobs", value: "all" }],
+      pipelineStages: [],
     };
   }
 
@@ -188,6 +218,7 @@ export async function getEmployerCandidates(
     params.jobId && params.jobId !== "all" ? params.jobId : null;
   const searchTerm = normalizeSearchTerm(params.query);
   const filtersPromise = loadJobFilters(supabase, recruiterId);
+  const pipelineStagesPromise = loadPipelineStages(supabase, recruiterId);
 
   let query = supabase
     .from("applications")
@@ -199,6 +230,7 @@ export async function getEmployerCandidates(
       applicant_location,
       created_at,
       resume_url,
+      pipeline_stage_id,
       status,
       user_id,
       years_experience,
@@ -221,6 +253,7 @@ export async function getEmployerCandidates(
     return {
       candidates: [],
       filters: await filtersPromise,
+      pipelineStages: await pipelineStagesPromise,
     };
   }
 
@@ -237,5 +270,6 @@ export async function getEmployerCandidates(
   return {
     candidates,
     filters: await filtersPromise,
+    pipelineStages: await pipelineStagesPromise,
   };
 }
