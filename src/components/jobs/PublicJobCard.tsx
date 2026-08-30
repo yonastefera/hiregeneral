@@ -6,12 +6,16 @@ import {
   Clock3,
   ExternalLink,
   MapPin,
+  ShieldCheck,
+  Sparkles,
 } from "lucide-react";
 
 import CompanyLogo from "@/components/jobs/CompanyLogo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { listingLocation, listingTitle } from "@/lib/jobs/display";
+import type { JobMatchExplanation } from "@/lib/jobs/match-explanation";
+import { getJobTrustIndicators } from "@/lib/jobs/trust-indicators";
 import { cn } from "@/lib/utils";
 import type { JobListing } from "@/data/jobPlatform";
 
@@ -19,12 +23,66 @@ type PublicJobCardProps = {
   job: JobListing;
   saveHref: string;
   returnHref?: string;
+  matchExplanation?: JobMatchExplanation;
 };
+
+function MatchAndTrust({
+  job,
+  matchExplanation,
+}: {
+  job: JobListing;
+  matchExplanation?: JobMatchExplanation;
+}) {
+  const indicators = getJobTrustIndicators(job);
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      {matchExplanation && (
+        <details className="group">
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-800 ring-1 ring-violet-200 [&::-webkit-details-marker]:hidden">
+            <Sparkles className="size-3.5" />
+            {matchExplanation.label} · {matchExplanation.score}%
+          </summary>
+          <div className="mt-2 rounded-xl border border-violet-100 bg-violet-50/60 p-3 text-xs text-violet-950">
+            <p className="font-semibold">Why this matches</p>
+            <ul className="mt-1.5 list-disc space-y-1 pl-4">
+              {matchExplanation.reasons.map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+            <p className="mt-2 text-[11px] text-violet-700">
+              Based only on your profile skills, title, location, and
+              experience.
+            </p>
+          </div>
+        </details>
+      )}
+
+      {indicators.map((indicator) => (
+        <span
+          key={indicator.label}
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1",
+            indicator.tone === "fresh" &&
+              "bg-emerald-50 text-emerald-800 ring-emerald-200",
+            indicator.tone === "trusted" &&
+              "bg-sky-50 text-sky-800 ring-sky-200",
+            indicator.tone === "neutral" &&
+              "bg-muted text-muted-foreground ring-border",
+          )}
+        >
+          <ShieldCheck className="size-3.5" /> {indicator.label}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 export function PublicJobCard({
   job,
   saveHref,
   returnHref,
+  matchExplanation,
 }: PublicJobCardProps) {
   const isExternal = Boolean(job.applyUrl);
   const displayTitle = listingTitle(job.title);
@@ -98,6 +156,8 @@ export function PublicJobCard({
         <p className="mt-4 line-clamp-2 text-base leading-7 text-muted-foreground sm:mt-3 sm:text-sm sm:leading-6">
           {job.summary}
         </p>
+
+        <MatchAndTrust job={job} matchExplanation={matchExplanation} />
 
         <div className="mt-4 hidden flex-wrap items-center gap-1.5 sm:flex">
           {job.salary && <Badge variant="success">{job.salary}</Badge>}
@@ -215,6 +275,8 @@ export function PublicJobCard({
           <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted-foreground">
             {job.summary}
           </p>
+
+          <MatchAndTrust job={job} matchExplanation={matchExplanation} />
 
           <div className="mt-4 flex flex-wrap items-center gap-1.5">
             {job.salary && <Badge variant="success">{job.salary}</Badge>}

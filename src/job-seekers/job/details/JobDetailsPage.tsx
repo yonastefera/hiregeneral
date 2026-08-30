@@ -17,6 +17,7 @@ import { notFound } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import type { Job } from "@/lib/db/types";
+import { getJobTrustIndicators } from "@/lib/jobs/trust-indicators";
 import { cn } from "@/lib/utils";
 import JobDetailsActions from "./JobDetailsActions";
 import JobPostingJsonLd from "./JobPostingJsonLd";
@@ -218,7 +219,7 @@ export default async function JobDetailsPage({
   jobId,
   backHref = "/jobs",
 }: JobDetailsPageProps) {
-  const { job, related } = await getJobDetailsPageData(jobId);
+  const { job, matchExplanation, related } = await getJobDetailsPageData(jobId);
 
   if (!job) {
     notFound();
@@ -255,6 +256,11 @@ export default async function JobDetailsPage({
   ].filter((pill): pill is { label: string; className: string } =>
     Boolean(pill),
   );
+  const trustIndicators = getJobTrustIndicators({
+    postedDaysAgo: postedDays,
+    applyUrl: job.apply_url ?? undefined,
+    sourceName: job.source_name ?? undefined,
+  });
 
   return (
     <main className="min-h-screen bg-[#f0f6f7] text-neutral-950 antialiased">
@@ -287,24 +293,24 @@ export default async function JobDetailsPage({
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="relative">
                     <LogoMark job={job} size="lg" />
-                    <span className="absolute -bottom-1 -right-1 grid size-7 place-items-center rounded-full bg-emerald-500 text-white ring-2 ring-white">
-                      <Check
-                        aria-hidden="true"
-                        className="size-3.5"
-                        strokeWidth={3}
-                      />
-                    </span>
                   </div>
 
                   <div className="flex min-w-0 flex-wrap items-center gap-2 text-[13px] font-semibold text-teal-700">
                     <span className="rounded-md bg-teal-50 px-2 py-0.5 ring-1 ring-teal-200/60">
                       {job.company_name}
                     </span>
-                    <span className="text-neutral-300">/</span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-linear-to-r from-emerald-500 to-teal-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm shadow-emerald-500/30">
-                      <Sparkles aria-hidden="true" className="size-3" />
-                      Curated role
-                    </span>
+                    {trustIndicators.map((indicator) => (
+                      <span
+                        key={indicator.label}
+                        className="inline-flex items-center gap-1 rounded-full bg-white/70 px-2.5 py-1 text-[11px] font-semibold text-neutral-700 ring-1 ring-black/10"
+                      >
+                        <CheckCircle2
+                          aria-hidden="true"
+                          className="size-3 text-emerald-600"
+                        />
+                        {indicator.label}
+                      </span>
+                    ))}
                   </div>
                 </div>
 
@@ -354,6 +360,31 @@ export default async function JobDetailsPage({
                         {pill.label}
                       </HeroPill>
                     ))}
+                  </div>
+                )}
+
+                {matchExplanation && (
+                  <div className="mt-4 max-w-2xl rounded-2xl border border-violet-200 bg-violet-50/80 p-4 text-sm text-violet-950">
+                    <p className="flex items-center gap-2 font-semibold">
+                      <Sparkles className="size-4" />
+                      {matchExplanation.label} · {matchExplanation.score}%
+                    </p>
+                    <p className="mt-1 text-xs text-violet-700">
+                      Why this matches your profile
+                    </p>
+                    <ul className="mt-2 flex flex-wrap gap-2">
+                      {matchExplanation.reasons.map((reason) => (
+                        <li
+                          key={reason}
+                          className="rounded-full bg-white px-2.5 py-1 text-xs ring-1 ring-violet-200"
+                        >
+                          {reason}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-[11px] text-violet-700">
+                      Uses profile skills, title, location, and experience only.
+                    </p>
                   </div>
                 )}
               </div>

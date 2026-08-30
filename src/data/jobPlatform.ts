@@ -33,6 +33,7 @@ export type JobListing = {
   requirements: string[];
   benefits: string[];
   applyUrl?: string;
+  sourceName?: string;
   applicants: number;
 };
 

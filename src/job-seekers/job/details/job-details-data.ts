@@ -3,10 +3,17 @@ import "server-only";
 import { headers } from "next/headers";
 
 import type { Job } from "@/lib/db/types";
+import {
+  explainJobMatch,
+  type JobMatchExplanation,
+  type MatchProfile,
+} from "@/lib/jobs/match-explanation";
+import { createClient } from "@/lib/supabase/server";
 import { cleanJob } from "./job-details-utils";
 
 type JobDetailsPageData = {
   job: Job | null;
+  matchExplanation: JobMatchExplanation | null;
   related: Job[];
 };
 
@@ -117,14 +124,32 @@ export async function getJobDetailsPageData(
   if (!job) {
     return {
       job: null,
+      matchExplanation: null,
       related: [],
     };
   }
 
   const related = await fetchRelatedJobs(job, jobId);
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  let matchExplanation: JobMatchExplanation | null = null;
+
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("headline, level_of_experience, location, skills")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (profile) {
+      matchExplanation = explainJobMatch(profile as MatchProfile, job);
+    }
+  }
 
   return {
     job,
+    matchExplanation,
     related,
   };
 }

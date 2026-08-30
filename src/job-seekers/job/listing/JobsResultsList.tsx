@@ -12,6 +12,12 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { toJobCardShape } from "@/lib/jobs/card-shape";
+import {
+  explainJobMatch,
+  type JobMatchExplanation,
+  type MatchProfile,
+} from "@/lib/jobs/match-explanation";
+import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
 import {
@@ -59,8 +65,34 @@ function getPageNumbers(currentPage: number, totalPages: number) {
   return nums;
 }
 
-export function JobsResultsList({ state, data }: JobsResultsListProps) {
+async function loadMatchExplanations(data: JobsPageData) {
+  const explanations = new Map<string, JobMatchExplanation>();
+  if (!data.jobs.length) return explanations;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return explanations;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("headline, level_of_experience, location, skills")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!profile) return explanations;
+
+  for (const job of data.jobs) {
+    const explanation = explainJobMatch(profile as MatchProfile, job);
+    if (explanation) explanations.set(job.id, explanation);
+  }
+
+  return explanations;
+}
+
+export async function JobsResultsList({ state, data }: JobsResultsListProps) {
   const jobs = data.jobs.map(toJobCardShape);
+  const matchExplanations = await loadMatchExplanations(data);
   const totalJobs = data.totalJobs;
   const newJobs = data.newJobs;
   const totalPages = data.totalPages;
@@ -139,6 +171,7 @@ export function JobsResultsList({ state, data }: JobsResultsListProps) {
               <li key={job.id}>
                 <PublicJobCard
                   job={job}
+                  matchExplanation={matchExplanations.get(job.id)}
                   saveHref={saveHref}
                   returnHref={currentHref}
                 />

@@ -191,6 +191,7 @@ export function toJobCardShape(job: Job): JobCardJob {
     applicants: job.applicant_count ?? 0,
 
     applyUrl: job.apply_url ?? undefined,
+    sourceName: job.source_name ?? undefined,
 
     companyTagline: job.company_tagline ?? "",
     companySize: job.company_size ?? "",
