@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 
-import { DashboardAiInsight } from "./DashboardAiInsight";
 import { DashboardCurrentRoles } from "./DashboardCurrentRoles";
+import { DashboardHiringAnalytics } from "./DashboardHiringAnalytics";
 import { DashboardRecentActivity } from "./DashboardRecentActivity";
 import { DashboardStatCards } from "./DashboardStatCards";
 import type { EmployerDashboardData } from "./employer-dashboard-data";
@@ -17,7 +17,7 @@ export function DashboardOverviewPage({ data }: DashboardOverviewPageProps) {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[28px] font-semibold tracking-tight">
-            Good morning, Nick
+            Good morning
           </h1>
           <p className="mt-0.5 text-sm text-neutral-500">
             Here&apos;s what&apos;s happening with your hiring pipeline today.
@@ -35,11 +35,15 @@ export function DashboardOverviewPage({ data }: DashboardOverviewPageProps) {
 
       <DashboardStatCards stats={data.stats} />
 
+      <DashboardHiringAnalytics
+        analytics={data.analytics}
+        premiumAnalytics={data.premiumAnalytics}
+      />
+
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(360px,1fr)]">
         <DashboardCurrentRoles jobs={data.jobs} />
 
         <div className="space-y-4">
-          {data.premiumAnalytics ? <DashboardAiInsight /> : null}
           <DashboardRecentActivity activity={data.recentActivity} />
         </div>
       </div>

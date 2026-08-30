@@ -49,6 +49,6 @@ describe("employer entitlement route wiring", () => {
     ).toContain("premiumAnalytics: entitlements.premiumAnalytics");
     expect(
       source("employer/dashboard/overview/DashboardOverviewPage.tsx"),
-    ).toContain("data.premiumAnalytics ? <DashboardAiInsight /> : null");
+    ).toContain("premiumAnalytics={data.premiumAnalytics}");
   });
 });

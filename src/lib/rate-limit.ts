@@ -191,6 +191,11 @@ export const employerBillingRateLimit = mutationLimiter(
   "1 h",
   "employer-billing",
 );
+export const employerExportRateLimit = mutationLimiter(
+  10,
+  "24 h",
+  "employer-exports",
+);
 export const savedJobRateLimit = mutationLimiter(120, "1 h", "saved-jobs");
 export const savedSearchRateLimit = mutationLimiter(
   60,

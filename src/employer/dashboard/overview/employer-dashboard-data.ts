@@ -1,4 +1,4 @@
-import { Briefcase, Eye, FileText, Users } from "lucide-react";
+import { Briefcase, Clock3, FileText, Users } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
 import { loadEmployerEntitlements } from "@/lib/billing/entitlements";
@@ -39,7 +39,51 @@ export type EmployerDashboardData = {
     icon: typeof Briefcase;
   }[];
   recentActivity: RecentActivity[];
+  analytics: EmployerHiringAnalytics;
 };
+
+export type EmployerHiringAnalytics = {
+  days: number;
+  applications: number;
+  previousApplications: number;
+  averageFirstResponseHours: number | null;
+  funnel: {
+    applied: number;
+    reviewed: number;
+    interviewed: number;
+    offered: number;
+    rejected: number;
+  };
+  dailyApplications: { date: string; applications: number }[];
+  jobPerformance: {
+    jobId: string;
+    title: string;
+    applications: number;
+    interviews: number;
+    offers: number;
+  }[];
+};
+
+const emptyAnalytics: EmployerHiringAnalytics = {
+  days: 30,
+  applications: 0,
+  previousApplications: 0,
+  averageFirstResponseHours: null,
+  funnel: { applied: 0, reviewed: 0, interviewed: 0, offered: 0, rejected: 0 },
+  dailyApplications: [],
+  jobPerformance: [],
+};
+
+async function loadHiringAnalytics(supabase: SupabaseServerClient) {
+  const { data, error } = await supabase.rpc("employer_hiring_analytics", {
+    p_days: 30,
+  });
+  if (error || !data || typeof data !== "object" || Array.isArray(data)) {
+    if (error) console.error("[loadEmployerHiringAnalytics]", error);
+    return emptyAnalytics;
+  }
+  return { ...emptyAnalytics, ...(data as unknown as EmployerHiringAnalytics) };
+}
 
 function compactNumber(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -105,26 +149,6 @@ async function loadRecentActivity(
   });
 }
 
-async function countApplications(
-  supabase: SupabaseServerClient,
-  recruiterId: string,
-) {
-  const { count, error } = await supabase
-    .from("applications")
-    .select("id, jobs!inner(recruiter_id)", {
-      count: "exact",
-      head: true,
-    })
-    .eq("jobs.recruiter_id", recruiterId);
-
-  if (error) {
-    console.error("[countApplications]", error);
-    return 0;
-  }
-
-  return count ?? 0;
-}
-
 export async function getEmployerDashboardData(): Promise<EmployerDashboardData> {
   const supabase = await createClient();
   const {
@@ -139,26 +163,33 @@ export async function getEmployerDashboardData(): Promise<EmployerDashboardData>
         { label: "Published jobs", value: "0", icon: Briefcase },
         { label: "Draft jobs", value: "0", icon: FileText },
         { label: "Applications", value: "0", icon: Users },
-        { label: "Job views", value: "0", icon: Eye },
+        { label: "Avg. first response", value: "—", icon: Clock3 },
       ],
       recentActivity: [],
+      analytics: emptyAnalytics,
     };
   }
 
-  const [jobsResult, activity, applicationCount, entitlements] =
-    await Promise.all([
-      getEmployerJobsPage({
-        supabase,
-        recruiterId: user.id,
-        page: 1,
-        pageSize: 4,
-        status: "All",
-      }),
-      loadRecentActivity(supabase, user.id),
-      countApplications(supabase, user.id),
-      loadEmployerEntitlements(supabase),
-    ]);
+  const [jobsResult, activity, entitlements, analytics] = await Promise.all([
+    getEmployerJobsPage({
+      supabase,
+      recruiterId: user.id,
+      page: 1,
+      pageSize: 4,
+      status: "All",
+    }),
+    loadRecentActivity(supabase, user.id),
+    loadEmployerEntitlements(supabase),
+    loadHiringAnalytics(supabase),
+  ]);
   const totals = jobsResult.data.totals;
+  const applicationChange = analytics.previousApplications
+    ? Math.round(
+        ((analytics.applications - analytics.previousApplications) /
+          analytics.previousApplications) *
+          100,
+      )
+    : null;
 
   return {
     premiumAnalytics: entitlements.premiumAnalytics,
@@ -176,15 +207,27 @@ export async function getEmployerDashboardData(): Promise<EmployerDashboardData>
       },
       {
         label: "Applications",
-        value: compactNumber(applicationCount),
+        value: compactNumber(analytics.applications),
+        change:
+          applicationChange === null
+            ? undefined
+            : `${applicationChange >= 0 ? "+" : ""}${applicationChange}%`,
+        changeTone:
+          applicationChange !== null && applicationChange < 0
+            ? "negative"
+            : "positive",
         icon: Users,
       },
       {
-        label: "Job views",
-        value: "0",
-        icon: Eye,
+        label: "Avg. first response",
+        value:
+          analytics.averageFirstResponseHours === null
+            ? "—"
+            : `${analytics.averageFirstResponseHours}h`,
+        icon: Clock3,
       },
     ],
     recentActivity: activity,
+    analytics,
   };
 }

@@ -1611,6 +1611,10 @@ export type Database = {
         };
         Returns: Database["public"]["Tables"]["applications"]["Row"];
       };
+      employer_hiring_analytics: {
+        Args: { p_days?: number };
+        Returns: Json;
+      };
       can_access_employer_application: {
         Args: { p_application_id: string; p_user_id?: string };
         Returns: boolean;

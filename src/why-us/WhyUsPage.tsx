@@ -95,7 +95,7 @@ const faqs = [
   },
   {
     q: "Can I integrate with my ATS?",
-    a: "Yes. We have native integrations with Ashby, Greenhouse, Lever, and Workday, plus an open API on the Scale plan.",
+    a: "You can export application data as protected CSV or versioned JSON for ATS import and internal reporting workflows. We do not currently advertise native two-way ATS synchronization.",
   },
 ];
 

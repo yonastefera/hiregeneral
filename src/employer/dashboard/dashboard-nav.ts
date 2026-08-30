@@ -6,6 +6,7 @@ import {
   Database,
   LayoutDashboard,
   MessageSquare,
+  Plug,
   PlusSquare,
   Send,
   Users,
@@ -78,6 +79,11 @@ export const dashboardNavGroups: DashboardNavGroup[] = [
         href: "/employers/dashboard/team",
         label: "Hiring team",
         icon: UsersRound,
+      },
+      {
+        href: "/employers/dashboard/integrations",
+        label: "Integrations & exports",
+        icon: Plug,
       },
       {
         href: "/employers/dashboard/company",
