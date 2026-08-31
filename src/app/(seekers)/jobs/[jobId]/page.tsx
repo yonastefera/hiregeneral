@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import JobDetailsPage from "@/job-seekers/job/details/JobDetailsPage";
 import { getJobDetailsPageData } from "@/job-seekers/job/details/job-details-data";
 import { compactText } from "@/job-seekers/job/details/job-details-utils";
+import { getCanonicalJobPath } from "@/lib/seo/site";
 
 type JobDetailsRouteProps = {
   params: Promise<{
@@ -19,10 +20,14 @@ export async function generateMetadata({
 
   if (!job) {
     return {
-      title: "Job Not Found | Your Site Name",
+      title: "Job Not Found | HireGeneral",
       description: "This job listing is no longer available.",
       alternates: {
         canonical: `/jobs/${jobId}`,
+      },
+      robots: {
+        index: false,
+        follow: true,
       },
     };
   }
@@ -31,13 +36,13 @@ export async function generateMetadata({
   const description = compactText(job.enrichment?.summary ?? job.description);
 
   return {
-    title: `${title} at ${job.company_name} | Your Site Name`,
+    title: `${title} at ${job.company_name}`,
     description:
       description.length > 160
         ? `${description.slice(0, 157).trim()}...`
         : description,
     alternates: {
-      canonical: `/jobs/${job.slug ?? job.id}`,
+      canonical: getCanonicalJobPath(job),
     },
     openGraph: {
       title: `${title} at ${job.company_name}`,
@@ -45,7 +50,7 @@ export async function generateMetadata({
         description.length > 160
           ? `${description.slice(0, 157).trim()}...`
           : description,
-      url: `/jobs/${job.slug ?? job.id}`,
+      url: getCanonicalJobPath(job),
       type: "article",
     },
   };
