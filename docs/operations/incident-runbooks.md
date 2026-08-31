@@ -6,7 +6,8 @@ owner, and resolution. Never paste credentials or applicant data into tickets.
 
 ## Production outage
 
-1. Confirm impact from two networks and Vercel/Supabase status pages.
+1. Check `/api/health`, then confirm impact from two networks and the
+   Vercel/Supabase status pages.
 2. Identify the first failing release or provider event from structured logs.
 3. Stop risky background work and place destructive jobs in report-only mode.
 4. Roll back the deployment when the failure began with the current release.

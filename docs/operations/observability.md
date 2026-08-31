@@ -51,3 +51,7 @@ configuration inside the existing hosting free tier. Before traffic or support
 needs outgrow its retention and alerting capabilities, evaluate a dedicated
 error monitor. Any future provider must receive redacted metadata only and must
 be added to the subprocessor disclosure before activation.
+
+The measurable launch targets, health endpoint, escalation thresholds, and
+error-budget response are defined in
+[`service-level-objectives.md`](./service-level-objectives.md).
