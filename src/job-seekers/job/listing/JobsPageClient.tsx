@@ -37,6 +37,7 @@ const KeywordAutocomplete = dynamic(
     ssr: false,
     loading: () => (
       <input
+        id="job-query"
         disabled
         placeholder="Job title, skill, company, or keyword"
         className="h-12 w-full rounded-xl border-0 bg-transparent pl-9 pr-3 text-sm text-muted-foreground shadow-none outline-none"
@@ -51,6 +52,7 @@ const LocationAutocomplete = dynamic(
     ssr: false,
     loading: () => (
       <input
+        id="job-location"
         disabled
         placeholder="City, state, or ZIP"
         className="h-12 w-full rounded-xl border-0 bg-transparent pl-9 pr-3 text-sm text-muted-foreground shadow-none outline-none"

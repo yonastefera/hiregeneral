@@ -18,10 +18,7 @@ const Index = ({
   initialSalaryBands,
 }: IndexProps) => {
   return (
-    <main
-      className="min-h-screen overflow-x-clip bg-background"
-      id="main-content"
-    >
+    <main className="min-h-screen overflow-x-clip bg-background">
       <section
         aria-labelledby="home-hero-heading"
         className="relative -mt-16 overflow-visible bg-hero-gradient pb-16 pt-24 md:pb-20 md:pt-28 lg:min-h-175"

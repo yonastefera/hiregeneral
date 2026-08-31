@@ -328,7 +328,7 @@ export default function ResumeSection({
               <span aria-hidden="true">+</span>
             </div>
 
-            <main className="min-h-0 flex-1 overflow-auto bg-muted/20 p-4">
+            <div className="min-h-0 flex-1 overflow-auto bg-muted/20 p-4">
               <div className="mx-auto h-full max-w-6xl overflow-hidden border border-border bg-white">
                 <iframe
                   src={resumeView.href}
@@ -336,7 +336,7 @@ export default function ResumeSection({
                   className="h-full min-h-[70vh] w-full bg-white"
                 />
               </div>
-            </main>
+            </div>
 
             <footer className="flex items-center justify-end gap-3 border-t border-border px-4 py-3">
               <Button variant="outline" asChild>

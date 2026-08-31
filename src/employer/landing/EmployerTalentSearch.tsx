@@ -14,6 +14,7 @@ const KeywordAutocomplete = dynamic(
     ssr: false,
     loading: () => (
       <input
+        id="employer-talent-keyword"
         disabled
         placeholder="Role, skill, or department"
         className="h-12 w-full border-0 bg-transparent pl-11 pr-3 text-sm text-neutral-400 shadow-none outline-none placeholder:text-neutral-400"
@@ -28,6 +29,7 @@ const LocationAutocomplete = dynamic(
     ssr: false,
     loading: () => (
       <input
+        id="employer-talent-location"
         disabled
         placeholder="Location or remote"
         className="h-12 w-full border-0 bg-transparent pl-11 pr-3 text-sm text-neutral-400 shadow-none outline-none placeholder:text-neutral-400"

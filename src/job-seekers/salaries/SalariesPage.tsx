@@ -162,6 +162,7 @@ const KeywordAutocomplete = dynamic(
     ssr: false,
     loading: () => (
       <input
+        aria-label="Job title"
         disabled
         placeholder="Software Engineer"
         className="h-14 w-full border-0 bg-transparent pl-11 text-[15px] text-muted-foreground shadow-none outline-none"
@@ -176,6 +177,7 @@ const LocationAutocomplete = dynamic(
     ssr: false,
     loading: () => (
       <input
+        aria-label="Location"
         disabled
         placeholder="Atlanta, GA"
         className="h-14 w-full border-0 bg-transparent pl-11 text-[15px] text-muted-foreground shadow-none outline-none"
