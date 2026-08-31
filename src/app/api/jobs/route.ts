@@ -8,6 +8,7 @@ import {
   requestIp,
   safeServerError,
 } from "@/lib/http/api-security";
+import { InFlightCoalescer } from "@/lib/http/in-flight";
 import { createSupabasePublicClient } from "@/lib/supabase/public";
 import {
   JOB_ENRICHMENT_SELECT,
@@ -161,6 +162,8 @@ type DirectJobsResult = {
   total: number;
   newJobs: number;
 };
+
+const jobSearchCoalescer = new InFlightCoalescer<JobsApiPayload | null>();
 
 function toCount(value: number | string | null | undefined): number {
   if (typeof value === "number") return value;
@@ -737,115 +740,121 @@ export async function GET(req: NextRequest) {
       return jobsJsonResponse(cached, ttlSeconds);
     }
 
-    let rows: JobsPublicRpcRow[];
-    let total: number;
-    let newJobs: number;
+    const { owner: ownsLoad, value: payload } = await jobSearchCoalescer.run(
+      cacheKey,
+      async () => {
+        let rows: JobsPublicRpcRow[];
+        let total: number;
+        let newJobs: number;
 
-    try {
-      if (!query.trim() && !easyApply) {
-        const directResult = await searchJobsDirect({
-          query,
-          daysAgo,
-          location,
-          workMode,
-          employmentType,
-          category,
-          company,
-          excludeId,
+        try {
+          if (!query.trim() && !easyApply) {
+            const directResult = await searchJobsDirect({
+              query,
+              daysAgo,
+              location,
+              workMode,
+              employmentType,
+              category,
+              company,
+              excludeId,
+              page,
+              pageSize,
+              easyApply,
+              balance,
+            });
+
+            rows = directResult.rows;
+            total = directResult.total;
+            newJobs = directResult.newJobs;
+          } else if (easyApply) {
+            const easyApplyResult = await getEasyApplyRows({
+              query,
+              daysAgo,
+              location,
+              workMode,
+              employmentType,
+              category,
+              company,
+              excludeId,
+              page,
+              pageSize,
+              balance,
+            });
+
+            rows = easyApplyResult.rows;
+            total = easyApplyResult.total;
+            newJobs = easyApplyResult.newJobs;
+          } else {
+            const knowledgeResult = await searchJobsKnowledgePublic({
+              query,
+              daysAgo,
+              location,
+              workMode,
+              employmentType,
+              category,
+              company,
+              excludeId,
+              page,
+              pageSize,
+              balance,
+            });
+            rows = knowledgeResult.rows;
+            total = knowledgeResult.total;
+            newJobs = knowledgeResult.newJobs;
+          }
+        } catch (rpcError) {
+          if (!shouldUseDirectJobsFallback(rpcError)) {
+            logServerError("jobs_search_query_failed", rpcError);
+            return null;
+          }
+
+          try {
+            const fallbackResult = await searchJobsDirect({
+              query,
+              daysAgo,
+              location,
+              workMode,
+              employmentType,
+              category,
+              company,
+              excludeId,
+              page,
+              pageSize,
+              easyApply,
+              balance,
+            });
+
+            rows = fallbackResult.rows;
+            total = fallbackResult.total;
+            newJobs = fallbackResult.newJobs;
+          } catch (fallbackError) {
+            logServerError("jobs_search_fallback_failed", fallbackError);
+            return null;
+          }
+        }
+
+        rows = dedupeJobListings(rows);
+        const pageCandidates = toJobCandidateRows(rows);
+        const pageJobs = await hydrateJobDetails(pageCandidates);
+        const isCompanyBalanced = balance === "company";
+
+        return {
+          data: pageJobs,
+          total,
+          newJobs,
+          newJobsWindowDays: NEW_JOBS_WINDOW_DAYS,
+          balance: isCompanyBalanced ? "company" : "none",
+          seed: null,
           page,
           pageSize,
-          easyApply,
-          balance,
-        });
+          totalPages: Math.max(1, Math.ceil(total / pageSize)),
+        } satisfies JobsApiPayload;
+      },
+    );
 
-        rows = directResult.rows;
-        total = directResult.total;
-        newJobs = directResult.newJobs;
-      } else if (easyApply) {
-        const easyApplyResult = await getEasyApplyRows({
-          query,
-          daysAgo,
-          location,
-          workMode,
-          employmentType,
-          category,
-          company,
-          excludeId,
-          page,
-          pageSize,
-          balance,
-        });
-
-        rows = easyApplyResult.rows;
-        total = easyApplyResult.total;
-        newJobs = easyApplyResult.newJobs;
-      } else {
-        const knowledgeResult = await searchJobsKnowledgePublic({
-          query,
-          daysAgo,
-          location,
-          workMode,
-          employmentType,
-          category,
-          company,
-          excludeId,
-          page,
-          pageSize,
-          balance,
-        });
-        rows = knowledgeResult.rows;
-        total = knowledgeResult.total;
-        newJobs = knowledgeResult.newJobs;
-      }
-    } catch (rpcError) {
-      if (!shouldUseDirectJobsFallback(rpcError)) {
-        logServerError("jobs_search_query_failed", rpcError);
-        return safeServerError("Failed to load jobs.");
-      }
-
-      try {
-        const fallbackResult = await searchJobsDirect({
-          query,
-          daysAgo,
-          location,
-          workMode,
-          employmentType,
-          category,
-          company,
-          excludeId,
-          page,
-          pageSize,
-          easyApply,
-          balance,
-        });
-
-        rows = fallbackResult.rows;
-        total = fallbackResult.total;
-        newJobs = fallbackResult.newJobs;
-      } catch (fallbackError) {
-        logServerError("jobs_search_fallback_failed", fallbackError);
-        return safeServerError("Failed to load jobs.");
-      }
-    }
-
-    rows = dedupeJobListings(rows);
-    const pageCandidates = toJobCandidateRows(rows);
-    const pageJobs = await hydrateJobDetails(pageCandidates);
-    const isCompanyBalanced = balance === "company";
-
-    const payload: JobsApiPayload = {
-      data: pageJobs,
-      total,
-      newJobs,
-      newJobsWindowDays: NEW_JOBS_WINDOW_DAYS,
-      balance: isCompanyBalanced ? "company" : "none",
-      seed: null,
-      page,
-      pageSize,
-      totalPages: Math.max(1, Math.ceil(total / pageSize)),
-    };
-
-    await writeJobsCache(cacheKey, payload, ttlSeconds);
+    if (!payload) return safeServerError("Failed to load jobs.");
+    if (ownsLoad) await writeJobsCache(cacheKey, payload, ttlSeconds);
 
     return jobsJsonResponse(payload, ttlSeconds);
   } catch (error) {

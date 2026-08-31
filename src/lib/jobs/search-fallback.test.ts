@@ -3,12 +3,21 @@ import { describe, expect, it } from "vitest";
 import { shouldUseDirectJobsFallback } from "@/lib/jobs/search-fallback";
 
 describe("public job search fallback", () => {
-  it.each(["57014", "PGRST202", "42883"])(
+  it.each(["PGRST202", "42883"])(
     "uses direct search for recoverable database code %s",
     (code) => {
       expect(shouldUseDirectJobsFallback({ code })).toBe(true);
     },
   );
+
+  it("does not amplify a statement timeout with another expensive query", () => {
+    expect(shouldUseDirectJobsFallback({ code: "57014" })).toBe(false);
+    expect(
+      shouldUseDirectJobsFallback({
+        message: "canceling due to statement timeout",
+      }),
+    ).toBe(false);
+  });
 
   it("uses direct search when PostgREST identifies the missing RPC by name", () => {
     for (const functionName of [

@@ -4,6 +4,11 @@ HireGeneral includes a dependency-free, read-only load test for the public job
 search API. It measures error rate plus p50 and p95 latency for browse, keyword,
 and location searches.
 
+The runner first warms each route once and reports those cold-request timings
+separately. Warmup failures fail the run. Thresholds apply to the following
+concurrent steady-state sample so several callers waiting on the same initial
+cache fill do not distort the operational percentile.
+
 The launch thresholds match the operational search objective:
 
 - p95 latency at or below 1,500 ms
@@ -38,3 +43,13 @@ Optional bounded controls are `LOAD_TEST_REQUESTS`, `LOAD_TEST_CONCURRENCY`,
 `LOAD_TEST_TIMEOUT_MS`, `LOAD_TEST_MAX_P95_MS`, and
 `LOAD_TEST_MAX_ERROR_RATE`. A threshold failure exits nonzero so the runner can
 be used as a release gate after a stable performance baseline is established.
+
+## Keyword-search remediation
+
+If keyword requests return PostgreSQL `57014`, apply
+`20260830231500_optimize_knowledge_job_search.sql` to the dedicated test project
+and run `verify-knowledge-search-performance.sql`. The migration changes the
+exact-evidence predicate to the form supported by the existing trigram index.
+The API also avoids launching a second expensive fallback after a statement
+timeout, preventing load amplification. Rerun this benchmark and require a
+passing result before applying the migration to production.

@@ -59,6 +59,23 @@ async function main() {
   const samples: LoadSample[] = [];
   let nextRequest = 0;
 
+  console.log(`Warming ${routes.length} routes before measured traffic`);
+  for (const route of routes) {
+    const startedAt = performance.now();
+    const response = await fetch(new URL(route, target), {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    await response.arrayBuffer();
+    const durationMs = Math.round(performance.now() - startedAt);
+    console.log(`Warmup ${route} status=${response.status} ${durationMs}ms`);
+    if (!response.ok) {
+      throw new Error(
+        `Warmup failed for ${route} with status ${response.status}.`,
+      );
+    }
+  }
+
   async function runWorker() {
     while (nextRequest < requestCount) {
       const requestIndex = nextRequest++;
