@@ -453,6 +453,7 @@ export default function ApplyJobClient({
                 alt={`${job.company_name} logo`}
                 width={44}
                 height={44}
+                unoptimized={isLogoProxyUrl(logoUrl)}
                 className="size-11 rounded-md object-contain"
               />
             ) : null}
@@ -993,3 +994,4 @@ export default function ApplyJobClient({
     </main>
   );
 }
+import { isLogoProxyUrl } from "@/lib/logos";

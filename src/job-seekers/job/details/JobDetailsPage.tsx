@@ -59,6 +59,7 @@ function LogoMark({
         alt={`${job.company_name} logo`}
         width={size === "lg" ? 72 : 40}
         height={size === "lg" ? 72 : 40}
+        unoptimized={isLogoProxyUrl(logoUrl)}
         className={cn(
           sizeClass,
           "shrink-0 object-contain ring-1 ring-black/5",
@@ -698,3 +699,4 @@ export default async function JobDetailsPage({
     </main>
   );
 }
+import { isLogoProxyUrl } from "@/lib/logos";

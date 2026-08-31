@@ -134,3 +134,7 @@ export function isSupportedLogoUrl(value: string | null | undefined) {
     return Boolean(normalizeLogoDomain(value));
   }
 }
+
+export function isLogoProxyUrl(value: string | null | undefined) {
+  return Boolean(value?.startsWith("/api/logos"));
+}

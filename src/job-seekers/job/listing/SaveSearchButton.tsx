@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { BookmarkPlus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -29,6 +30,7 @@ export default function SaveSearchButton({
 }: {
   state: JobsSearchState;
 }) {
+  const router = useRouter();
   const defaultName = useMemo(() => suggestedName(state), [state]);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(defaultName);
@@ -61,7 +63,7 @@ export default function SaveSearchButton({
       } | null;
 
       if (response.status === 401) {
-        window.location.assign(
+        router.push(
           `/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`,
         );
         return;

@@ -20,7 +20,11 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
 import { listingTitle } from "@/lib/jobs/display";
-import { companyInitials, isSupportedLogoUrl } from "@/lib/logos";
+import {
+  companyInitials,
+  isLogoProxyUrl,
+  isSupportedLogoUrl,
+} from "@/lib/logos";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 8;
@@ -213,6 +217,7 @@ function CompanyAvatar({ company, logo }: { company: string; logo: string }) {
           alt=""
           width={48}
           height={48}
+          unoptimized={isLogoProxyUrl(logoUrl)}
           className="size-full object-contain p-1.5"
         />
       ) : (

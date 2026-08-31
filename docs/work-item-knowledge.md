@@ -263,8 +263,8 @@ These are active constraints, not assumptions to silently work around:
   successful paired-artifact restore drill against the dedicated test project.
 - Production application migration history is not represented by a discovered
   migration ledger. Treat live-schema reconciliation as a controlled operation.
-- Dependency auditing blocks CI on critical production advisories; high and
-  lower advisories still require deliberate review and remediation.
+- Dependency auditing blocks CI on high and critical production advisories;
+  moderate and lower advisories still require deliberate review.
 - Location autocomplete improved after matching indexes but remains dominated
   by ZIP-row processing and city/state deduplication. A maintained city-level
   structure is the documented future direction, not another incidental index.

@@ -77,6 +77,7 @@ function SimilarRoleCard({ job }: { job: Job }) {
               alt={`${job.company_name} logo`}
               width={40}
               height={40}
+              unoptimized={isLogoProxyUrl(logoUrl)}
               className="size-11 shrink-0 rounded-xl object-contain ring-1 ring-black/5"
             />
           ) : (
@@ -190,3 +191,4 @@ export default function SimilarRoles({ jobs }: SimilarRolesProps) {
     </section>
   );
 }
+import { isLogoProxyUrl } from "@/lib/logos";

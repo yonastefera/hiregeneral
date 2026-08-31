@@ -1,5 +1,6 @@
 import Image from "next/image";
 
+import { isLogoProxyUrl } from "@/lib/logos";
 import type { Job } from "@/lib/db/types";
 import { formatSalary, getJobTitle, supportedLogoUrl } from "./apply-utils";
 
@@ -28,6 +29,7 @@ export default function ApplySidebar({ job, userEmail }: ApplySidebarProps) {
               alt={`${job.company_name} logo`}
               width={40}
               height={40}
+              unoptimized={isLogoProxyUrl(logoUrl)}
               className="size-10 rounded-md object-contain"
             />
           ) : (

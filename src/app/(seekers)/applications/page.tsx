@@ -14,7 +14,7 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { isSupportedLogoUrl } from "@/lib/logos";
+import { isLogoProxyUrl, isSupportedLogoUrl } from "@/lib/logos";
 import { supabase } from "@/lib/supabase/client";
 
 type ApplicationStatus =
@@ -198,6 +198,7 @@ export default function ApplicationsPage() {
                         alt={job.company_name}
                         width={48}
                         height={48}
+                        unoptimized={isLogoProxyUrl(logoUrl)}
                         className="size-12 shrink-0 rounded-xl object-contain"
                       />
                     ) : (

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useState } from "react";
 
-import { logoSrcFromUrl } from "@/lib/logos";
+import { isLogoProxyUrl, logoSrcFromUrl } from "@/lib/logos";
 import { cn } from "@/lib/utils";
 
 type CompanyLogoProps = {
@@ -66,6 +66,7 @@ export default function CompanyLogo({
       alt={`${companyName} logo`}
       width={size === "lg" ? 96 : size === "md" ? 48 : 40}
       height={size === "lg" ? 96 : size === "md" ? 48 : 40}
+      unoptimized={isLogoProxyUrl(proxiedSrc)}
       className={cn(
         "shrink-0 bg-white object-contain ring-1 ring-black/5",
         sizeClass,

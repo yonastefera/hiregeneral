@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   Bell,
@@ -64,6 +65,7 @@ const settingsCards: SettingsCardConfig[] = [
 ];
 
 export default function AccountSettings() {
+  const router = useRouter();
   const { user } = useAuthUser();
 
   const [confirm, setConfirm] = useState("");
@@ -194,7 +196,8 @@ export default function AccountSettings() {
 
       toast.success("Account deletion requested. You have been signed out.");
 
-      window.location.assign("/");
+      router.replace("/");
+      router.refresh();
     } catch {
       toast.error("Something went wrong. Please try again.");
     } finally {
