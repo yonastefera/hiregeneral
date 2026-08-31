@@ -33,6 +33,27 @@ const forward = paths.filter(({ relative: name }) => forwardPattern.test(name));
 const historical = paths.filter(
   ({ relative: name }) => !forwardPattern.test(name),
 );
+const historicalOrder = baseline.historicalOrder;
+
+if (
+  !Array.isArray(historicalOrder) ||
+  historicalOrder.length !== baseline.historicalFileCount ||
+  new Set(historicalOrder).size !== historicalOrder.length
+) {
+  throw new Error("Migration baseline has an invalid historical order.");
+}
+
+const discoveredHistorical = historical.map(({ relative: name }) => name);
+const orderedHistorical = [...historicalOrder].sort((left, right) =>
+  left.localeCompare(right),
+);
+if (
+  JSON.stringify(discoveredHistorical) !== JSON.stringify(orderedHistorical)
+) {
+  throw new Error(
+    "Historical migration inventory differs from migration-baseline.json.",
+  );
+}
 
 for (const { absolute, relative: name } of paths) {
   const sql = await readFile(absolute, "utf8");

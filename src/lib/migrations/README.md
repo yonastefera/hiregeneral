@@ -8,6 +8,21 @@ This includes `file1.sql` through `file98.sql`, the existing eight-digit dated
 files, and the one nested historical migration. Do not rename, edit, move,
 squash, or delete them.
 
+The legacy names predate the current convention. Their authoritative execution
+order is recorded once in `migration-baseline.json` and consumed by both
+validation and disposable schema reconstruction. The numbered files are grouped
+as follows:
+
+- `file1.sql`–`file4.sql`: initial schema, authorization, Storage, and profiles;
+- `file5.sql`–`file37.sql`: ingestion foundations and early ATS sources;
+- `file38.sql`–`file47.sql`: enrichment, salary, employer, billing, and contact;
+- `file48.sql`–`file69.sql`: expanded employer-source coverage;
+- `file70.sql`: canonical salary benchmark structure;
+- `file71.sql`–`file98.sql`: later curated employer-source coverage.
+
+This catalog is documentation, not permission to replay individual historical
+files against an existing environment.
+
 All future migrations must be forward-only files at this directory's root with
 the format:
 

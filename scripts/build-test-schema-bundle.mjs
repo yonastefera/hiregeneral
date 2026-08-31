@@ -3,40 +3,21 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 const migrationDirectory = resolve("src/lib/migrations");
+const baseline = JSON.parse(
+  await readFile(join(migrationDirectory, "migration-baseline.json"), "utf8"),
+);
 const outputPath =
   process.env.HIREGENERAL_TEST_SCHEMA_OUTPUT ??
   join(tmpdir(), "hiregeneral-test-schema.sql");
 
-const entries = await readdir(migrationDirectory, { withFileTypes: true });
-const legacy = entries
-  .filter((entry) => entry.isFile())
-  .map((entry) => entry.name)
-  .filter((name) => /^file\d+\.sql$/.test(name))
-  .sort((left, right) => {
-    const leftNumber = Number(left.match(/\d+/)?.[0]);
-    const rightNumber = Number(right.match(/\d+/)?.[0]);
-    return leftNumber - rightNumber;
-  });
+const historical = baseline.historicalOrder;
 
-const dated = [
-  "20260513_add_resume_metadata_to_profiles.sql",
-  "20260513_create_locations_table.sql",
-  "20260513_create_schools_table.sql",
-  "supabase/migrations/20260513_add_school_popularity_rank.sql",
-  "20260801_atomic_initial_role_assignment.sql",
-  "20260801_role_assignment_audit.sql",
-  "20260802_rls_authorization_hardening.sql",
-  "20260802_rls_authorization_followup.sql",
-  "20260802_storage_ownership_hardening.sql",
-  "20260802_security_audit_and_stripe_idempotency.sql",
-  "20260802_stripe_lifecycle_ordering.sql",
-  "20260802_employer_entitlement_enforcement.sql",
-  "20260802_data_retention.sql",
-  "20260809_job_enrichments_rls.sql",
-  "20260814_application_submission_fields.sql",
-  "20260814_job_applicant_counts_view.sql",
-  "20260814_profile_schema_parity.sql",
-];
+if (
+  !Array.isArray(historical) ||
+  historical.length !== baseline.historicalFileCount
+) {
+  throw new Error("Migration baseline has an invalid historical order.");
+}
 
 async function walk(path) {
   const children = await readdir(path, { withFileTypes: true });
@@ -54,11 +35,7 @@ const forward = (await walk(migrationDirectory))
   .map((path) => relative(migrationDirectory, path).split(sep).join("/"))
   .sort();
 
-if (legacy.length !== 98) {
-  throw new Error(`Expected 98 legacy migrations, found ${legacy.length}.`);
-}
-
-const files = [...legacy, ...dated, ...forward];
+const files = [...historical, ...forward];
 const discovered = (await walk(migrationDirectory)).filter((path) =>
   path.endsWith(".sql"),
 );
