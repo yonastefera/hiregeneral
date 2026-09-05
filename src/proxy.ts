@@ -46,6 +46,28 @@ function redirect(req: NextRequest, pathname: string) {
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  const isProtected = startsWithAny(pathname, PROTECTED_ROUTES);
+  const isJobSeekerRoute = startsWithAny(pathname, JOB_SEEKER_ROUTES);
+  const isEmployerRoute = startsWithAny(pathname, EMPLOYER_ROUTES);
+  const isAdminRoute = startsWithAny(pathname, ADMIN_ROUTES);
+  const isAuthRoute = startsWithAny(pathname, AUTH_ROUTES);
+  const isChooseRoleRoute = pathname.startsWith("/auth/choose-role");
+  const requiresAuth =
+    isProtected ||
+    isJobSeekerRoute ||
+    isEmployerRoute ||
+    isAdminRoute ||
+    isChooseRoleRoute;
+  const hasAuthCookie = req.cookies
+    .getAll()
+    .some(({ name }) => name.startsWith("sb-") && name.includes("-auth-token"));
+
+  // Anonymous public traffic, including crawlers, does not need a Supabase
+  // session refresh. Authenticated visitors still refresh on public pages.
+  if (!requiresAuth && !isAuthRoute && !hasAuthCookie) {
+    return NextResponse.next({ request: req });
+  }
+
   // Build a response we can attach refreshed Supabase cookies to.
   let response = NextResponse.next({
     request: req,
@@ -80,20 +102,6 @@ export async function proxy(req: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  const isProtected = startsWithAny(pathname, PROTECTED_ROUTES);
-  const isJobSeekerRoute = startsWithAny(pathname, JOB_SEEKER_ROUTES);
-  const isEmployerRoute = startsWithAny(pathname, EMPLOYER_ROUTES);
-  const isAdminRoute = startsWithAny(pathname, ADMIN_ROUTES);
-  const isAuthRoute = startsWithAny(pathname, AUTH_ROUTES);
-  const isChooseRoleRoute = pathname.startsWith("/auth/choose-role");
-
-  const requiresAuth =
-    isProtected ||
-    isJobSeekerRoute ||
-    isEmployerRoute ||
-    isAdminRoute ||
-    isChooseRoleRoute;
 
   // Not logged in — redirect to sign in.
   if (requiresAuth && !user && pathname !== "/signin") {

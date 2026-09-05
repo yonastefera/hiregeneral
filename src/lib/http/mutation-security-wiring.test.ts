@@ -100,13 +100,21 @@ describe("high-risk mutation security wiring", () => {
     }
   });
 
-  it.each([
-    "app/api/jobs/route.ts",
-    "app/api/jobs/[slug]/route.ts",
-    "app/api/salaries/route.ts",
-  ])("uses anonymous rather than service-role access for %s", (route) => {
-    const routeSource = source(route);
-    expect(routeSource).toContain("createSupabasePublicClient");
-    expect(routeSource).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
+  it.each(["app/api/jobs/route.ts", "app/api/salaries/route.ts"])(
+    "uses anonymous rather than service-role access for %s",
+    (route) => {
+      const routeSource = source(route);
+      expect(routeSource).toContain("createSupabasePublicClient");
+      expect(routeSource).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
+    },
+  );
+
+  it("keeps shared public job-detail loading on anonymous access", () => {
+    const routeSource = source("app/api/jobs/[slug]/route.ts");
+    const loaderSource = source("lib/jobs/public-job-detail.ts");
+
+    expect(routeSource).toContain("loadPublicJobDetail");
+    expect(loaderSource).toContain("createSupabasePublicClient");
+    expect(loaderSource).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
   });
 });

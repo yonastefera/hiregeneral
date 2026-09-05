@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import JobDetailsPage from "@/job-seekers/job/details/JobDetailsPage";
-import { getJobDetailsPageData } from "@/job-seekers/job/details/job-details-data";
+import { getPublicJobDetail } from "@/job-seekers/job/details/job-details-data";
 import { compactText } from "@/job-seekers/job/details/job-details-utils";
 import { getCanonicalJobPath } from "@/lib/seo/site";
 
@@ -16,7 +16,7 @@ export async function generateMetadata({
   params,
 }: JobDetailsRouteProps): Promise<Metadata> {
   const { jobId } = await params;
-  const { job } = await getJobDetailsPageData(jobId);
+  const job = await getPublicJobDetail(jobId);
 
   if (!job) {
     return {

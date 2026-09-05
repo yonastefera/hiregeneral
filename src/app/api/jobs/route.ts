@@ -34,9 +34,9 @@ const EASY_APPLY_SCAN_PAGE_SIZE = 25;
 const EASY_APPLY_MAX_SCAN_PAGES = 40;
 
 const JOBS_API_CACHE_VERSION = process.env.JOBS_API_CACHE_VERSION ?? "6";
-const JOBS_BROWSE_CACHE_TTL_SECONDS = 60 * 3; // 3 minutes
-const JOBS_SEARCH_CACHE_TTL_SECONDS = 60; // 1 minute
-const JOBS_FILTER_CACHE_TTL_SECONDS = 60 * 2; // 2 minutes
+const JOBS_BROWSE_CACHE_TTL_SECONDS = 60 * 30; // 30 minutes
+const JOBS_SEARCH_CACHE_TTL_SECONDS = 60 * 5; // 5 minutes
+const JOBS_FILTER_CACHE_TTL_SECONDS = 60 * 10; // 10 minutes
 const publicJobQuerySchema = z.object({
   query: z.string().max(160),
   location: z.string().max(160),
@@ -700,13 +700,6 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const limited = await enforceRateLimit({
-      limiter: publicJobSearchRateLimit,
-      key: requestIp(req),
-      context: "public_job_search",
-    });
-    if (limited) return limited;
-
     const ttlSeconds = cacheTtlForRequest({
       query,
       location,
@@ -739,6 +732,13 @@ export async function GET(req: NextRequest) {
     if (cached) {
       return jobsJsonResponse(cached, ttlSeconds);
     }
+
+    const limited = await enforceRateLimit({
+      limiter: publicJobSearchRateLimit,
+      key: requestIp(req),
+      context: "public_job_search",
+    });
+    if (limited) return limited;
 
     const { owner: ownsLoad, value: payload } = await jobSearchCoalescer.run(
       cacheKey,
