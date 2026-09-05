@@ -11,9 +11,9 @@ import {
 import { InFlightCoalescer } from "@/lib/http/in-flight";
 import { createSupabasePublicClient } from "@/lib/supabase/public";
 import {
-  JOB_ENRICHMENT_SELECT,
-  mapJobEnrichments,
-} from "@/lib/jobs/enrichment";
+  type JobCardEnrichmentRow,
+  toCompactJobListItem,
+} from "@/lib/jobs/list-item";
 import { shouldUseDirectJobsFallback } from "@/lib/jobs/search-fallback";
 import {
   dedupeJobListings,
@@ -33,7 +33,7 @@ const MAX_PAGE_SIZE = 25;
 const EASY_APPLY_SCAN_PAGE_SIZE = 25;
 const EASY_APPLY_MAX_SCAN_PAGES = 40;
 
-const JOBS_API_CACHE_VERSION = process.env.JOBS_API_CACHE_VERSION ?? "6";
+const JOBS_API_CACHE_VERSION = process.env.JOBS_API_CACHE_VERSION ?? "7";
 const JOBS_BROWSE_CACHE_TTL_SECONDS = 60 * 30; // 30 minutes
 const JOBS_SEARCH_CACHE_TTL_SECONDS = 60 * 5; // 5 minutes
 const JOBS_FILTER_CACHE_TTL_SECONDS = 60 * 10; // 10 minutes
@@ -48,14 +48,6 @@ const publicJobQuerySchema = z.object({
   excludeId: z.string().max(100),
   balance: z.enum(["none", "company"]),
 });
-
-const JOB_DETAIL_SELECT = `
-  id,
-  description,
-  responsibilities,
-  requirements,
-  benefits
-`;
 
 const JOB_LISTING_SELECT = `
   id,
@@ -132,11 +124,6 @@ type JobRow = {
 type JobCandidateRow = Omit<
   JobRow,
   "responsibilities" | "requirements" | "benefits"
->;
-
-type JobDetailRow = Pick<
-  JobRow,
-  "id" | "description" | "responsibilities" | "requirements" | "benefits"
 >;
 
 type JobsPublicRpcRow = Omit<JobCandidateRow, "job_applicant_counts"> & {
@@ -306,57 +293,15 @@ async function writeJobsCache(
   }
 }
 
-function stripHtml(input: string | null | undefined) {
-  if (!input) return "";
-
-  const decoded = input
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/gi, "'")
-    .replace(/&mdash;/gi, "—")
-    .replace(/&ndash;/gi, "–")
-    .replace(/&rsquo;/gi, "’")
-    .replace(/&ldquo;/gi, "“")
-    .replace(/&rdquo;/gi, "”");
-
-  return decoded
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, " ")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/p>/gi, "\n\n")
-    .replace(/<\/div>/gi, "\n")
-    .replace(/<\/h[1-6]>/gi, "\n\n")
-    .replace(/<\/li>/gi, "\n")
-    .replace(/<li[^>]*>/gi, "• ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+\n/g, "\n")
-    .replace(/\n\s+/g, "\n")
-    .replace(/[ \t]+/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-async function hydrateJobDetails(candidates: JobCandidateRow[]) {
+async function buildJobListItems(candidates: JobCandidateRow[]) {
   if (candidates.length === 0) return [];
 
   const ids = candidates.map((job) => job.id);
-  const [{ data, error }, { data: enrichmentRows, error: enrichmentError }] =
-    await Promise.all([
-      supabasePublic.from("jobs").select(JOB_DETAIL_SELECT).in("id", ids),
-      supabasePublic
-        .from("job_enrichments")
-        .select(JOB_ENRICHMENT_SELECT)
-        .in("job_id", ids)
-        .eq("status", "ready"),
-    ]);
-
-  if (error) {
-    throw new Error(`Could not load job details: ${error.message}`);
-  }
+  const { data: enrichmentRows, error: enrichmentError } = await supabasePublic
+    .from("job_enrichments")
+    .select("job_id, display_title, display_location, summary")
+    .in("job_id", ids)
+    .eq("status", "ready");
 
   if (enrichmentError && enrichmentError.code !== "42P01") {
     throw new Error(
@@ -364,26 +309,24 @@ async function hydrateJobDetails(candidates: JobCandidateRow[]) {
     );
   }
 
-  const detailsById = new Map(
-    ((data ?? []) as JobDetailRow[]).map((job) => [job.id, job]),
+  const enrichmentsByJobId = new Map(
+    enrichmentError
+      ? []
+      : ((enrichmentRows ?? []) as JobCardEnrichmentRow[]).map((row) => [
+          row.job_id,
+          row,
+        ]),
   );
-  const enrichmentsByJobId = enrichmentError
-    ? new Map()
-    : mapJobEnrichments(enrichmentRows ?? []);
 
-  return candidates.map((job) => {
-    const details = detailsById.get(job.id);
-
-    return {
-      ...job,
-      description: stripHtml(details?.description ?? job.description),
-      responsibilities: details?.responsibilities ?? [],
-      requirements: details?.requirements ?? [],
-      benefits: details?.benefits ?? [],
-      applicant_count: job.job_applicant_counts?.[0]?.applicant_count ?? 0,
-      enrichment: enrichmentsByJobId.get(job.id) ?? null,
-    };
-  });
+  return candidates.map((job) =>
+    toCompactJobListItem(
+      {
+        ...job,
+        applicant_count: job.job_applicant_counts?.[0]?.applicant_count ?? 0,
+      },
+      enrichmentsByJobId.get(job.id),
+    ),
+  );
 }
 
 function toJobCandidateRows(rows: JobsPublicRpcRow[]) {
@@ -847,7 +790,7 @@ export async function GET(req: NextRequest) {
 
         rows = dedupeJobListings(rows);
         const pageCandidates = toJobCandidateRows(rows);
-        const pageJobs = await hydrateJobDetails(pageCandidates);
+        const pageJobs = await buildJobListItems(pageCandidates);
         const isCompanyBalanced = balance === "company";
 
         return {

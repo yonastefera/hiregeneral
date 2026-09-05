@@ -121,6 +121,25 @@ describe("runSourceWorker", () => {
     expect(maximumActive).toBe(2);
   });
 
+  it("does not start another source after the execution deadline", async () => {
+    mocks.adapter.fetchJobs.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return [importedJob];
+    });
+    const sources = Array.from({ length: 3 }, (_, index) => ({
+      ...source,
+      id: `source-${index}`,
+      sourceSlug: `acme-${index}`,
+    }));
+
+    const results = await runSourceWorkers(sources, 1, {
+      deadlineAt: Date.now() + 10,
+    });
+
+    expect(results).toHaveLength(1);
+    expect(mocks.adapter.fetchJobs).toHaveBeenCalledTimes(1);
+  });
+
   it("retries and dead-letters an exhausted source", async () => {
     mocks.adapter.fetchJobs.mockRejectedValue(new Error("provider offline"));
     const failureSource = {

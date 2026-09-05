@@ -98,12 +98,14 @@ async function mapWithConcurrency<T, R>(
   items: T[],
   concurrency: number,
   mapper: (item: T) => Promise<R>,
+  shouldStart: () => boolean = () => true,
 ) {
-  const results: R[] = [];
+  const results: Array<R | undefined> = [];
   let nextIndex = 0;
 
   async function worker() {
     while (nextIndex < items.length) {
+      if (!shouldStart()) break;
       const index = nextIndex++;
       results[index] = await mapper(items[index]);
     }
@@ -112,7 +114,7 @@ async function mapWithConcurrency<T, R>(
   await Promise.all(
     Array.from({ length: Math.min(concurrency, items.length) }, worker),
   );
-  return results;
+  return results.filter((result): result is R => result !== undefined);
 }
 
 async function fetchSourceJobs(source: JobSource, signal: AbortSignal) {
@@ -312,10 +314,12 @@ export async function runSourceWorker(
 export async function runSourceWorkers(
   sources: JobSource[],
   concurrency: number,
+  options: { deadlineAt?: number } = {},
 ) {
   return mapWithConcurrency(
     sources,
     Math.max(1, Math.min(Math.floor(concurrency), 10)),
     runSourceWorker,
+    () => !options.deadlineAt || Date.now() < options.deadlineAt,
   );
 }

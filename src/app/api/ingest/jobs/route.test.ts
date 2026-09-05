@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   audit: vi.fn(),
+  getSchedule: vi.fn(),
   getPreviousSuccessfulJobCount: vi.fn(),
   getPublishedImportedJobCount: vi.fn(),
   getSources: vi.fn(),
@@ -29,6 +30,7 @@ vi.mock("@/lib/ingest/ingestion-runs", () => ({
   startIngestionRun: vi.fn(),
   finishIngestionRun: vi.fn(),
   getPreviousSuccessfulJobCount: mocks.getPreviousSuccessfulJobCount,
+  getIngestionSourceSchedule: mocks.getSchedule,
 }));
 vi.mock("@/lib/ingest/source", () => ({ validateImportedJobs: vi.fn() }));
 vi.mock("@/lib/ingest/upsert-jobs", () => ({
@@ -52,6 +54,7 @@ beforeEach(() => {
   process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-test";
   mocks.limit.mockResolvedValue({ success: true, reset: Date.now() + 60_000 });
   mocks.getSources.mockResolvedValue([]);
+  mocks.getSchedule.mockResolvedValue([]);
   mocks.runSourceWorkers.mockResolvedValue([]);
   mocks.getPreviousSuccessfulJobCount.mockResolvedValue(null);
   mocks.getPublishedImportedJobCount.mockResolvedValue(0);
@@ -111,8 +114,69 @@ describe("POST /api/ingest/jobs", () => {
 
     const response = await POST(request("ingest-secret", "?sourceSlug=acme"));
     expect(response.status).toBe(200);
-    expect(mocks.runSourceWorkers).toHaveBeenCalledWith([source], 4);
+    expect(mocks.runSourceWorkers).toHaveBeenCalledWith(
+      [source],
+      4,
+      expect.objectContaining({ deadlineAt: expect.any(Number) }),
+    );
+    expect(mocks.getSchedule).not.toHaveBeenCalled();
     delete process.env.INGEST_SOURCE_CONCURRENCY;
+  });
+
+  it("limits unfiltered ingestion to the configured fair batch", async () => {
+    process.env.INGEST_SOURCE_BATCH_SIZE = "1";
+    const older = {
+      sourceSlug: "older",
+      sourceType: "greenhouse",
+      companyName: "Older",
+    };
+    const newer = {
+      sourceSlug: "newer",
+      sourceType: "lever",
+      companyName: "Newer",
+    };
+    mocks.getSources.mockResolvedValue([newer, older]);
+    mocks.runSourceWorkers.mockResolvedValue([
+      {
+        status: "success",
+        attempts: 1,
+        fetchedJobs: 1,
+        validJobs: 1,
+        rejectedJobs: 0,
+        applyLinksChecked: 0,
+        applyLinkIssues: 0,
+        upsertedJobs: 1,
+        expiredJobs: 0,
+      },
+    ]);
+    mocks.getSchedule.mockResolvedValue([
+      {
+        sourceName: "greenhouse",
+        sourceSlug: "older",
+        lastAttemptAt: "2026-08-01T00:00:00.000Z",
+      },
+      {
+        sourceName: "lever",
+        sourceSlug: "newer",
+        lastAttemptAt: "2026-09-01T00:00:00.000Z",
+      },
+    ]);
+
+    const response = await POST(request());
+    const payload = await response.json();
+
+    expect(mocks.runSourceWorkers).toHaveBeenCalledWith(
+      [older],
+      3,
+      expect.objectContaining({ deadlineAt: expect.any(Number) }),
+    );
+    expect(payload).toMatchObject({
+      totalSources: 1,
+      eligibleSources: 2,
+      remainingSources: 1,
+      batchSize: 1,
+    });
+    delete process.env.INGEST_SOURCE_BATCH_SIZE;
   });
 
   it("returns a safe error when ingestion fails", async () => {

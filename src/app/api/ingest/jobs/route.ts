@@ -7,6 +7,11 @@ import {
   safeServerError,
 } from "@/lib/http/api-security";
 import { getEnabledJobSources } from "@/lib/ingest/job-sources";
+import { getIngestionSourceSchedule } from "@/lib/ingest/ingestion-runs";
+import {
+  ingestionBatchSize,
+  selectScheduledSources,
+} from "@/lib/ingest/source-scheduler";
 import { runSourceWorkers } from "@/lib/ingest/source-worker";
 import { ingestionRateLimit } from "@/lib/rate-limit";
 import { recordPrivilegedAction } from "@/lib/security/audit";
@@ -15,6 +20,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const DEFAULT_SOURCE_CONCURRENCY = 3;
+const DEFAULT_EXECUTION_BUDGET_MS = 240_000;
 
 const ingestionQuerySchema = z.object({
   sourceSlug: z.string().trim().min(1).max(120).nullable(),
@@ -46,6 +52,13 @@ function sourceConcurrency() {
   return Number.isInteger(configured) && configured > 0
     ? Math.min(configured, 10)
     : DEFAULT_SOURCE_CONCURRENCY;
+}
+
+function executionBudgetMs() {
+  const configured = Number(process.env.INGEST_EXECUTION_BUDGET_MS);
+  return Number.isInteger(configured) && configured > 0
+    ? Math.min(configured, 280_000)
+    : DEFAULT_EXECUTION_BUDGET_MS;
 }
 
 async function runJobsIngestion(request: Request) {
@@ -94,13 +107,30 @@ async function runJobsIngestion(request: Request) {
 
     const { sourceSlug, sourceType } = parsedQuery.data;
     const allSources = await getEnabledJobSources();
-    const sources = allSources.filter(
+    const eligibleSources = allSources.filter(
       (source) =>
         (!sourceSlug || source.sourceSlug === sourceSlug) &&
         (!sourceType || source.sourceType === sourceType),
     );
+    const isExplicitSourceRun = Boolean(sourceSlug || sourceType);
+    const batchSize = ingestionBatchSize();
+    const schedule = isExplicitSourceRun
+      ? []
+      : await getIngestionSourceSchedule();
+    const sources = isExplicitSourceRun
+      ? eligibleSources
+      : selectScheduledSources(eligibleSources, schedule, batchSize);
+    const remainingSources = Math.max(
+      eligibleSources.length - sources.length,
+      0,
+    );
     const concurrency = sourceConcurrency();
-    const sourcesResult = await runSourceWorkers(sources, concurrency);
+    const budgetMs = executionBudgetMs();
+    const sourcesResult = await runSourceWorkers(sources, concurrency, {
+      deadlineAt: Date.now() + budgetMs,
+    });
+    const deferredSources =
+      remainingSources + Math.max(sources.length - sourcesResult.length, 0);
     const totals = sourcesResult.reduce(
       (acc, source) => ({
         fetchedJobs: acc.fetchedJobs + source.fetchedJobs,
@@ -133,12 +163,25 @@ async function runJobsIngestion(request: Request) {
       action: "admin.job_ingestion_completed",
       targetType: "job_ingestion",
       targetId: sourceSlug ?? sourceType ?? "all",
-      metadata: { totalSources: sources.length, concurrency, ...totals },
+      metadata: {
+        totalSources: sources.length,
+        eligibleSources: eligibleSources.length,
+        remainingSources: deferredSources,
+        batchSize: isExplicitSourceRun ? null : batchSize,
+        executionBudgetMs: budgetMs,
+        concurrency,
+        ...totals,
+      },
     });
 
     return NextResponse.json({
       ok: totals.failedSources === 0,
-      totalSources: sources.length,
+      totalSources: sourcesResult.length,
+      scheduledSources: sources.length,
+      eligibleSources: eligibleSources.length,
+      remainingSources: deferredSources,
+      batchSize: isExplicitSourceRun ? null : batchSize,
+      executionBudgetMs: budgetMs,
       concurrency,
       totals,
       sources: sourcesResult,

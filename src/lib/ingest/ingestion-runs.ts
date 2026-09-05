@@ -8,6 +8,28 @@ const supabaseAdmin = createClient(
 
 export type IngestionRunStatus = "running" | "success" | "failed";
 
+export async function getIngestionSourceSchedule() {
+  const { data, error } = await supabaseAdmin.rpc(
+    "get_job_ingestion_source_schedule",
+  );
+
+  if (error) {
+    throw new Error(`Could not load ingestion schedule: ${error.message}`);
+  }
+
+  return (
+    (data ?? []) as Array<{
+      source_name: string;
+      source_slug: string;
+      last_attempt_at: string | null;
+    }>
+  ).map((entry) => ({
+    sourceName: entry.source_name,
+    sourceSlug: entry.source_slug,
+    lastAttemptAt: entry.last_attempt_at,
+  }));
+}
+
 export async function getPreviousSuccessfulJobCount(source: JobSource) {
   const { data, error } = await supabaseAdmin
     .from("job_ingestion_runs")
