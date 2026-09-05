@@ -1,11 +1,12 @@
 import type { MetadataRoute } from "next";
+import { unstable_cache } from "next/cache";
 
 import { getCanonicalJobUrl, getSiteUrl } from "@/lib/seo/site";
 import { createSupabasePublicClient } from "@/lib/supabase/public";
 
 const MAX_SITEMAP_URLS = 50_000;
 
-export const revalidate = 3600;
+export const revalidate = 86400;
 
 const PUBLIC_ROUTES = [
   { path: "", changeFrequency: "daily", priority: 1 },
@@ -20,20 +21,49 @@ const PUBLIC_ROUTES = [
   { path: "/terms", changeFrequency: "yearly", priority: 0.2 },
 ] as const;
 
+type SitemapJob = {
+  id: string;
+  slug: string | null;
+  updated_at: string;
+};
+
+function isSitemapJob(value: unknown): value is SitemapJob {
+  if (!value || typeof value !== "object") return false;
+
+  const job = value as Partial<SitemapJob>;
+  return (
+    typeof job.id === "string" &&
+    (typeof job.slug === "string" || job.slug === null) &&
+    typeof job.updated_at === "string"
+  );
+}
+
+const loadSitemapJobs = unstable_cache(
+  async () => {
+    const supabase = createSupabasePublicClient();
+    const jobLimit = MAX_SITEMAP_URLS - PUBLIC_ROUTES.length;
+    const { data, error } = await supabase.rpc("get_public_job_sitemap", {
+      p_limit: jobLimit,
+    });
+
+    if (error) throw new Error(error.message);
+
+    return Array.isArray(data) ? data.filter(isSitemapJob) : [];
+  },
+  ["public-job-sitemap-v1"],
+  {
+    revalidate: 86400,
+    tags: ["public-job-sitemap"],
+  },
+);
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const siteUrl = getSiteUrl();
-  const now = new Date().toISOString();
-  const supabase = createSupabasePublicClient();
-  const jobLimit = MAX_SITEMAP_URLS - PUBLIC_ROUTES.length;
-  const { data: jobs, error } = await supabase
-    .from("jobs")
-    .select("id, slug, updated_at")
-    .eq("status", "published")
-    .or(`expires_at.is.null,expires_at.gt.${now}`)
-    .order("updated_at", { ascending: false })
-    .limit(jobLimit);
+  let jobs: SitemapJob[] = [];
 
-  if (error) {
+  try {
+    jobs = await loadSitemapJobs();
+  } catch {
     console.error("[sitemap:jobs] Failed to load published jobs.");
   }
 
@@ -43,7 +73,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency,
       priority,
     })),
-    ...(jobs ?? []).map((job) => ({
+    ...jobs.map((job) => ({
       url: getCanonicalJobUrl(job),
       lastModified: job.updated_at,
       changeFrequency: "daily" as const,
