@@ -13,7 +13,7 @@ import {
   Row,
   Section,
   Text,
-} from "@react-email/components";
+} from "react-email";
 
 const SITE_NAME = "HireGeneral";
 const SITE_URL = "https://hiregeneral.com";

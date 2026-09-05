@@ -1,4 +1,4 @@
-import { render } from "@react-email/components";
+import { render } from "react-email";
 import { describe, expect, it } from "vitest";
 
 import ConfirmEmail from "@/emails/confirm-email";
