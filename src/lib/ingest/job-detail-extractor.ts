@@ -4,6 +4,7 @@ import {
   safeDescription,
   type ImportedJob,
 } from "./normalize";
+import { readCachedJobDetail, writeCachedJobDetail } from "./detail-cache";
 import { sanitizeJobPostingHtml } from "@/lib/text/html";
 
 type JobPostingSchema = {
@@ -52,6 +53,7 @@ export type ExtractedJobDetailContent = {
 };
 
 const MIN_USEFUL_DESCRIPTION_LENGTH = 300;
+const enhancedJobs = new WeakSet<ImportedJob>();
 
 function decodeHtml(value: string) {
   return value
@@ -642,8 +644,15 @@ export async function enhanceImportedJobFromDetailPage({
   signal,
 }: EnhanceImportedJobInput): Promise<ImportedJob> {
   if (!detailUrl) return job;
+  if (enhancedJobs.has(job)) return job;
 
   try {
+    const cachedJob = await readCachedJobDetail(job, detailUrl);
+    if (cachedJob) {
+      enhancedJobs.add(cachedJob);
+      return cachedJob;
+    }
+
     const detail = await extractJobDetailContentFromUrl({
       detailUrl,
       fallbackDescription: job.description,
@@ -652,7 +661,7 @@ export async function enhanceImportedJobFromDetailPage({
 
     if (!detail) return job;
 
-    return {
+    const enrichedJob = {
       ...job,
       description:
         detail.descriptionHtml ||
@@ -675,6 +684,9 @@ export async function enhanceImportedJobFromDetailPage({
       skills: job.skills.length > 0 ? job.skills : detail.skills,
       postedAt: job.postedAt || detail.postedAt || new Date().toISOString(),
     };
+    await writeCachedJobDetail(job, detailUrl, enrichedJob);
+    enhancedJobs.add(enrichedJob);
+    return enrichedJob;
   } catch {
     return job;
   }
