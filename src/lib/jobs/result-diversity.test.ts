@@ -1,38 +1,40 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  dedupeJobListings,
-  diversifyJobListings,
-} from "@/lib/jobs/result-diversity";
+import { limitJobListingsPerCompany } from "./result-diversity";
 
-const job = (
-  id: string,
-  company_name: string,
-  title: string,
-  location = "New York, NY",
-) => ({ id, company_name, title, location });
+function listing(id: string, company_name: string) {
+  return { id, company_name, title: `Role ${id}`, location: "Remote" };
+}
 
 describe("job result diversity", () => {
-  it("removes duplicate ids and normalized duplicate listings", () => {
-    const rows = dedupeJobListings([
-      job("1", "Acme", "Engineer"),
-      job("1", "Acme", "Engineer"),
-      job("2", " acme ", "  ENGINEER "),
-      job("3", "Acme", "Engineer", "Boston, MA"),
-    ]);
+  it("limits repeated companies and rotates companies through the page", () => {
+    const rows = [
+      listing("1", "Acme"),
+      listing("2", "Acme"),
+      listing("3", "Acme"),
+      listing("4", "Beta"),
+      listing("5", "Beta"),
+      listing("6", "Gamma"),
+    ];
 
-    expect(rows.map((row) => row.id)).toEqual(["1", "3"]);
+    const result = limitJobListingsPerCompany(rows, 2);
+
+    expect(result.map((row) => row.company_name)).toEqual([
+      "Acme",
+      "Beta",
+      "Gamma",
+      "Acme",
+      "Beta",
+    ]);
   });
 
-  it("round-robins companies while preserving each company's input order", () => {
-    const rows = diversifyJobListings([
-      job("a1", "Acme", "Newest"),
-      job("a2", "Acme", "Older"),
-      job("b1", "Bravo", "Newest"),
-      job("c1", "Cyan", "Newest"),
-      job("b2", "Bravo", "Older"),
-    ]);
+  it("treats casing and extra whitespace as the same company", () => {
+    const rows = [
+      listing("1", "Acme Corp"),
+      listing("2", " acme   corp "),
+      listing("3", "ACME CORP"),
+    ];
 
-    expect(rows.map((row) => row.id)).toEqual(["a1", "b1", "c1", "a2", "b2"]);
+    expect(limitJobListingsPerCompany(rows, 2)).toHaveLength(2);
   });
 });

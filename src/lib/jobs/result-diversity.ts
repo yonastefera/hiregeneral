@@ -56,3 +56,19 @@ export function diversifyJobListings<T extends ListingIdentity>(rows: T[]) {
 
   return diversified;
 }
+
+export function limitJobListingsPerCompany<T extends ListingIdentity>(
+  rows: T[],
+  limit: number,
+) {
+  const companyCounts = new Map<string, number>();
+
+  return diversifyJobListings(rows).filter((row) => {
+    const companyKey = normalizeIdentityPart(row.company_name) || row.id;
+    const count = companyCounts.get(companyKey) ?? 0;
+    if (count >= limit) return false;
+
+    companyCounts.set(companyKey, count + 1);
+    return true;
+  });
+}

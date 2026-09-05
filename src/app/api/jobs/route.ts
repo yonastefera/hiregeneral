@@ -18,6 +18,7 @@ import { shouldUseDirectJobsFallback } from "@/lib/jobs/search-fallback";
 import {
   dedupeJobListings,
   diversifyJobListings,
+  limitJobListingsPerCompany,
 } from "@/lib/jobs/result-diversity";
 
 export const runtime = "nodejs";
@@ -31,7 +32,7 @@ const DEFAULT_DAYS_AGO = 30;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 25;
 
-const JOBS_API_CACHE_VERSION = process.env.JOBS_API_CACHE_VERSION ?? "7";
+const JOBS_API_CACHE_VERSION = process.env.JOBS_API_CACHE_VERSION ?? "8";
 const JOBS_BROWSE_CACHE_TTL_SECONDS = 60 * 30; // 30 minutes
 const JOBS_SEARCH_CACHE_TTL_SECONDS = 60 * 5; // 5 minutes
 const JOBS_FILTER_CACHE_TTL_SECONDS = 60 * 10; // 10 minutes
@@ -628,7 +629,10 @@ export async function GET(req: NextRequest) {
           }
         }
 
-        rows = dedupeJobListings(rows);
+        rows =
+          balance === "company"
+            ? limitJobListingsPerCompany(rows, 2)
+            : dedupeJobListings(rows);
         const pageCandidates = toJobCandidateRows(rows);
         const pageJobs = buildJobListItems(pageCandidates);
         const isCompanyBalanced = balance === "company";
