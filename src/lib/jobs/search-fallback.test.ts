@@ -21,6 +21,7 @@ describe("public job search fallback", () => {
 
   it("uses direct search when PostgREST identifies the missing RPC by name", () => {
     for (const functionName of [
+      "search_job_cards_public",
       "search_jobs_public",
       "search_jobs_knowledge_public",
     ]) {

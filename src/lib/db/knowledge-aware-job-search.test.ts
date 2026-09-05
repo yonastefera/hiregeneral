@@ -37,8 +37,8 @@ describe("knowledge-aware job search", () => {
     expect(migration).not.toMatch(/OFFSET\s+\(parameters\./);
   });
 
-  it("wires the API to the versioned RPC and bumps the cache namespace", () => {
-    expect(route).toContain('"search_jobs_knowledge_public"');
+  it("keeps a versioned cache namespace for the public search API", () => {
+    expect(route).toContain('"search_job_cards_public"');
     expect(route).toContain('JOBS_API_CACHE_VERSION ?? "7"');
   });
 

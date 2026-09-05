@@ -19,15 +19,12 @@ describe("public traffic cost controls", () => {
     expect(rateLimit).toBeGreaterThan(cacheRead);
   });
 
-  it("uses paginated database search for normal browsing", () => {
+  it("uses one paginated database search for every public listing mode", () => {
     const route = source("../../app/api/jobs/route.ts");
-    const defaultBrowse = route.slice(
-      route.indexOf("if (!query.trim() && !easyApply)"),
-      route.indexOf("} else if (easyApply)"),
-    );
 
-    expect(defaultBrowse).toContain("searchJobsPaginated");
-    expect(defaultBrowse).not.toContain("searchJobsDirect");
+    expect(route).toContain("const searchResult = await searchJobCardsPublic");
+    expect(route).toContain("easyApply,");
+    expect(route).not.toContain("EASY_APPLY_MAX_SCAN_PAGES");
   });
 
   it("bypasses authentication work for anonymous public pages", () => {

@@ -8,6 +8,7 @@ export function shouldUseDirectJobsFallback(error: unknown) {
   return (
     record.code === "PGRST202" ||
     record.code === "42883" ||
+    message.includes("search_job_cards_public") ||
     message.includes("search_jobs_public") ||
     message.includes("search_jobs_knowledge_public")
   );

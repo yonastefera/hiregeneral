@@ -30,8 +30,6 @@ const DEFAULT_COMPANY_BALANCE = "company";
 const DEFAULT_DAYS_AGO = 30;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 25;
-const EASY_APPLY_SCAN_PAGE_SIZE = 25;
-const EASY_APPLY_MAX_SCAN_PAGES = 40;
 
 const JOBS_API_CACHE_VERSION = process.env.JOBS_API_CACHE_VERSION ?? "7";
 const JOBS_BROWSE_CACHE_TTL_SECONDS = 60 * 30; // 30 minutes
@@ -124,7 +122,9 @@ type JobRow = {
 type JobCandidateRow = Omit<
   JobRow,
   "responsibilities" | "requirements" | "benefits"
->;
+> & {
+  enrichment?: JobCardEnrichmentRow | null;
+};
 
 type JobsPublicRpcRow = Omit<JobCandidateRow, "job_applicant_counts"> & {
   applicant_count: number | null;
@@ -293,38 +293,14 @@ async function writeJobsCache(
   }
 }
 
-async function buildJobListItems(candidates: JobCandidateRow[]) {
-  if (candidates.length === 0) return [];
-
-  const ids = candidates.map((job) => job.id);
-  const { data: enrichmentRows, error: enrichmentError } = await supabasePublic
-    .from("job_enrichments")
-    .select("job_id, display_title, display_location, summary")
-    .in("job_id", ids)
-    .eq("status", "ready");
-
-  if (enrichmentError && enrichmentError.code !== "42P01") {
-    throw new Error(
-      `Could not load job enrichments: ${enrichmentError.message}`,
-    );
-  }
-
-  const enrichmentsByJobId = new Map(
-    enrichmentError
-      ? []
-      : ((enrichmentRows ?? []) as JobCardEnrichmentRow[]).map((row) => [
-          row.job_id,
-          row,
-        ]),
-  );
-
+function buildJobListItems(candidates: JobCandidateRow[]) {
   return candidates.map((job) =>
     toCompactJobListItem(
       {
         ...job,
         applicant_count: job.job_applicant_counts?.[0]?.applicant_count ?? 0,
       },
-      enrichmentsByJobId.get(job.id),
+      job.enrichment ?? undefined,
     ),
   );
 }
@@ -354,10 +330,6 @@ function toJobCandidateRows(rows: JobsPublicRpcRow[]) {
     });
 }
 
-function isEasyApplyRow(row: JobsPublicRpcRow) {
-  return !row.apply_url?.trim();
-}
-
 function isNewJob(row: JobsPublicRpcRow) {
   const postedAt = Date.parse(row.posted_at);
   if (Number.isNaN(postedAt)) return false;
@@ -373,7 +345,7 @@ function toIlikePattern(value: string) {
   return `%${escapePostgrestPattern(value.trim())}%`;
 }
 
-async function searchJobsPublic(params: {
+async function searchJobCardsPublic(params: {
   query: string;
   daysAgo: number;
   location: string;
@@ -385,8 +357,9 @@ async function searchJobsPublic(params: {
   page: number;
   pageSize: number;
   balance: string;
-}) {
-  const { data, error } = await supabasePublic.rpc("search_jobs_public", {
+  easyApply: boolean;
+}): Promise<DirectJobsResult> {
+  const { data, error } = await supabasePublic.rpc("search_job_cards_public", {
     p_query: params.query.trim() || null,
     p_days_ago: params.daysAgo,
     p_location: params.location.trim() || null,
@@ -398,60 +371,12 @@ async function searchJobsPublic(params: {
     p_page: params.page,
     p_page_size: params.pageSize,
     p_balance: params.balance,
+    p_easy_apply: params.easyApply,
   });
-
-  if (error) {
-    throw error;
-  }
-
-  return (data ?? []) as JobsPublicRpcRow[];
-}
-
-async function searchJobsPaginated(
-  params: Parameters<typeof searchJobsPublic>[0],
-) {
-  const rows = await searchJobsPublic(params);
-
-  return {
-    rows,
-    total: toCount(rows[0]?.total_count),
-    newJobs: toCount(rows[0]?.new_jobs_count),
-  } satisfies DirectJobsResult;
-}
-
-async function searchJobsKnowledgePublic(params: {
-  query: string;
-  daysAgo: number;
-  location: string;
-  workMode: string;
-  employmentType: string;
-  category: string;
-  company: string;
-  excludeId: string;
-  page: number;
-  pageSize: number;
-  balance: string;
-}): Promise<DirectJobsResult> {
-  const { data, error } = await supabasePublic.rpc(
-    "search_jobs_knowledge_public",
-    {
-      p_query: params.query.trim(),
-      p_days_ago: params.daysAgo,
-      p_location: params.location.trim() || null,
-      p_work_mode: params.workMode || null,
-      p_employment_type: params.employmentType || null,
-      p_category: params.category || null,
-      p_company: params.company.trim() || null,
-      p_exclude_id: params.excludeId || null,
-      p_page: params.page,
-      p_page_size: params.pageSize,
-      p_balance: params.balance,
-    },
-  );
 
   if (error) throw error;
   if (!data || typeof data !== "object" || Array.isArray(data)) {
-    throw new Error("Knowledge search returned an invalid response.");
+    throw new Error("Job-card search returned an invalid response.");
   }
 
   const payload = data as Record<string, unknown>;
@@ -564,54 +489,6 @@ async function searchJobsDirect(params: {
   };
 }
 
-async function getEasyApplyRows(params: {
-  query: string;
-  daysAgo: number;
-  location: string;
-  workMode: string;
-  employmentType: string;
-  category: string;
-  company: string;
-  excludeId: string;
-  page: number;
-  pageSize: number;
-  balance: string;
-}) {
-  const matchedRows: JobsPublicRpcRow[] = [];
-  let originalTotal = 0;
-
-  for (let page = 1; page <= EASY_APPLY_MAX_SCAN_PAGES; page += 1) {
-    const rows = await searchJobsPublic({
-      ...params,
-      page,
-      pageSize: EASY_APPLY_SCAN_PAGE_SIZE,
-    });
-
-    if (page === 1) {
-      originalTotal = toCount(rows[0]?.total_count);
-    }
-
-    matchedRows.push(...rows.filter(isEasyApplyRow));
-
-    if (
-      rows.length < EASY_APPLY_SCAN_PAGE_SIZE ||
-      page * EASY_APPLY_SCAN_PAGE_SIZE >= originalTotal
-    ) {
-      break;
-    }
-  }
-
-  const total = matchedRows.length;
-  const start = (params.page - 1) * params.pageSize;
-  const end = start + params.pageSize;
-
-  return {
-    rows: matchedRows.slice(start, end),
-    total,
-    newJobs: matchedRows.filter(isNewJob).length,
-  };
-}
-
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = req.nextUrl;
@@ -703,60 +580,23 @@ export async function GET(req: NextRequest) {
         let newJobs: number;
 
         try {
-          if (!query.trim() && !easyApply) {
-            const paginatedResult = await searchJobsPaginated({
-              query,
-              daysAgo,
-              location,
-              workMode,
-              employmentType,
-              category,
-              company,
-              excludeId,
-              page,
-              pageSize,
-              balance,
-            });
-
-            rows = paginatedResult.rows;
-            total = paginatedResult.total;
-            newJobs = paginatedResult.newJobs;
-          } else if (easyApply) {
-            const easyApplyResult = await getEasyApplyRows({
-              query,
-              daysAgo,
-              location,
-              workMode,
-              employmentType,
-              category,
-              company,
-              excludeId,
-              page,
-              pageSize,
-              balance,
-            });
-
-            rows = easyApplyResult.rows;
-            total = easyApplyResult.total;
-            newJobs = easyApplyResult.newJobs;
-          } else {
-            const knowledgeResult = await searchJobsKnowledgePublic({
-              query,
-              daysAgo,
-              location,
-              workMode,
-              employmentType,
-              category,
-              company,
-              excludeId,
-              page,
-              pageSize,
-              balance,
-            });
-            rows = knowledgeResult.rows;
-            total = knowledgeResult.total;
-            newJobs = knowledgeResult.newJobs;
-          }
+          const searchResult = await searchJobCardsPublic({
+            query,
+            daysAgo,
+            location,
+            workMode,
+            employmentType,
+            category,
+            company,
+            excludeId,
+            page,
+            pageSize,
+            balance,
+            easyApply,
+          });
+          rows = searchResult.rows;
+          total = searchResult.total;
+          newJobs = searchResult.newJobs;
         } catch (rpcError) {
           if (!shouldUseDirectJobsFallback(rpcError)) {
             logServerError("jobs_search_query_failed", rpcError);
@@ -790,7 +630,7 @@ export async function GET(req: NextRequest) {
 
         rows = dedupeJobListings(rows);
         const pageCandidates = toJobCandidateRows(rows);
-        const pageJobs = await buildJobListItems(pageCandidates);
+        const pageJobs = buildJobListItems(pageCandidates);
         const isCompanyBalanced = balance === "company";
 
         return {
