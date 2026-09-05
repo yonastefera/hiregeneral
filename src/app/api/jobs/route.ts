@@ -464,6 +464,18 @@ async function searchJobsPublic(params: {
   return (data ?? []) as JobsPublicRpcRow[];
 }
 
+async function searchJobsPaginated(
+  params: Parameters<typeof searchJobsPublic>[0],
+) {
+  const rows = await searchJobsPublic(params);
+
+  return {
+    rows,
+    total: toCount(rows[0]?.total_count),
+    newJobs: toCount(rows[0]?.new_jobs_count),
+  } satisfies DirectJobsResult;
+}
+
 async function searchJobsKnowledgePublic(params: {
   query: string;
   daysAgo: number;
@@ -749,7 +761,7 @@ export async function GET(req: NextRequest) {
 
         try {
           if (!query.trim() && !easyApply) {
-            const directResult = await searchJobsDirect({
+            const paginatedResult = await searchJobsPaginated({
               query,
               daysAgo,
               location,
@@ -760,13 +772,12 @@ export async function GET(req: NextRequest) {
               excludeId,
               page,
               pageSize,
-              easyApply,
               balance,
             });
 
-            rows = directResult.rows;
-            total = directResult.total;
-            newJobs = directResult.newJobs;
+            rows = paginatedResult.rows;
+            total = paginatedResult.total;
+            newJobs = paginatedResult.newJobs;
           } else if (easyApply) {
             const easyApplyResult = await getEasyApplyRows({
               query,

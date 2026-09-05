@@ -19,6 +19,17 @@ describe("public traffic cost controls", () => {
     expect(rateLimit).toBeGreaterThan(cacheRead);
   });
 
+  it("uses paginated database search for normal browsing", () => {
+    const route = source("../../app/api/jobs/route.ts");
+    const defaultBrowse = route.slice(
+      route.indexOf("if (!query.trim() && !easyApply)"),
+      route.indexOf("} else if (easyApply)"),
+    );
+
+    expect(defaultBrowse).toContain("searchJobsPaginated");
+    expect(defaultBrowse).not.toContain("searchJobsDirect");
+  });
+
   it("bypasses authentication work for anonymous public pages", () => {
     const proxy = source("../../proxy.ts");
     const publicBypass = proxy.indexOf(
