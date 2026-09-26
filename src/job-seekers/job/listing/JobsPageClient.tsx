@@ -143,6 +143,7 @@ export default function JobsPageClient({
     setEasyApply(Boolean(initialState.easyApply));
   }, [
     initialState.query,
+    initialState.market,
     initialState.location,
     initialState.dateFilter,
     initialState.distance,
@@ -185,6 +186,7 @@ export default function JobsPageClient({
     navigateToState(
       {
         query: "",
+        market: "",
         location: "",
         dateFilter: DEFAULT_POSTED,
         distance: DEFAULT_DISTANCE,
@@ -206,6 +208,7 @@ export default function JobsPageClient({
     navigateToState(
       {
         query: nextQuery,
+        market: "",
         location: nextLocation,
         dateFilter,
         distance,
@@ -223,6 +226,7 @@ export default function JobsPageClient({
     navigateToState(
       {
         query: submittedQuery,
+        market: initialState.market,
         location: submittedLocation,
         dateFilter: nextDateFilter,
         distance,
@@ -240,6 +244,7 @@ export default function JobsPageClient({
     navigateToState(
       {
         query: submittedQuery,
+        market: initialState.market,
         location: submittedLocation,
         dateFilter,
         distance: nextDistance,
@@ -257,6 +262,7 @@ export default function JobsPageClient({
     navigateToState(
       {
         query: submittedQuery,
+        market: initialState.market,
         location: submittedLocation,
         dateFilter,
         distance,
@@ -274,6 +280,7 @@ export default function JobsPageClient({
     navigateToState(
       {
         query: submittedQuery,
+        market: initialState.market,
         location: submittedLocation,
         dateFilter,
         distance,
@@ -569,9 +576,8 @@ export default function JobsPageClient({
           <div className="mt-6 space-y-2 border-t border-border/60 pt-5 text-xs text-muted-foreground">
             <p className="flex items-center gap-2">
               <CalendarDays aria-hidden="true" className="size-3.5" />
-              {dateFilter === DEFAULT_POSTED
-                ? "Any time"
-                : `${dateFilter} day window`}
+              {postedOptions.find((option) => option.value === dateFilter)
+                ?.label ?? `${dateFilter} day window`}
             </p>
 
             <p className="flex items-center gap-2">
@@ -597,6 +603,7 @@ export default function JobsPageClient({
           <SaveSearchButton
             state={{
               query: submittedQuery,
+              market: initialState.market,
               location: submittedLocation,
               dateFilter,
               distance,

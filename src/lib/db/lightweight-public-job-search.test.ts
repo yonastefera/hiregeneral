@@ -16,6 +16,15 @@ const route = readFileSync(
   fileURLToPath(new URL("../../app/api/jobs/route.ts", import.meta.url)),
   "utf8",
 );
+const marketCategoryMigration = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../migrations/20260925201500_align_market_category_search.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 
 describe("lightweight public job search", () => {
   it("projects bounded card fields instead of complete job rows", () => {
@@ -52,5 +61,16 @@ describe("lightweight public job search", () => {
     expect(migration).toContain("FROM PUBLIC;");
     expect(migration).toContain("TO anon, authenticated;");
     expect(migration).not.toContain("SECURITY DEFINER");
+  });
+
+  it("keeps market-card searches aligned with homepage category terms", () => {
+    expect(marketCategoryMigration).toContain("WHEN 'market:design'");
+    expect(marketCategoryMigration).toContain(
+      "'designer', 'design', 'ux', 'ui', 'user experience', 'creative'",
+    );
+    expect(marketCategoryMigration).toContain(
+      "CASE WHEN p_balance = 'company' THEN company_rank ELSE 1 END",
+    );
+    expect(marketCategoryMigration).not.toContain("company_rank <= 3");
   });
 });

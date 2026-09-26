@@ -23,4 +23,18 @@ describe("public jobs search defaults", () => {
       "60",
     );
   });
+
+  it("uses a market category without narrowing it to the display label", () => {
+    const state = parseJobsSearchParams({
+      q: "Design",
+      market: "design",
+      posted: "3650",
+    });
+    const params = buildJobsApiParams(state);
+
+    expect(state.query).toBe("Design");
+    expect(params.get("query")).toBeNull();
+    expect(params.get("category")).toBe("market:design");
+    expect(params.get("daysAgo")).toBe("3650");
+  });
 });

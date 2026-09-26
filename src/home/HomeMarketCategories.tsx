@@ -8,6 +8,14 @@ type HomeMarketCategoriesProps = {
   categories: HomeMarketCategory[];
 };
 
+function marketCategorySlug(name: string) {
+  return name
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 export default function HomeMarketCategories({
   categories,
 }: HomeMarketCategoriesProps) {
@@ -49,7 +57,11 @@ export default function HomeMarketCategories({
             return (
               <Link
                 key={category.name}
-                href={`/jobs?q=${encodeURIComponent(category.query)}`}
+                href={`/jobs?${new URLSearchParams({
+                  q: category.name,
+                  market: marketCategorySlug(category.name),
+                  posted: "3650",
+                }).toString()}`}
                 className={`group flex items-center justify-between rounded-2xl bg-gradient-to-br ${style.accent} p-5 transition hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2`}
               >
                 <span className="flex items-center gap-4">

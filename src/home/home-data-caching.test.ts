@@ -44,4 +44,12 @@ describe("home data cost controls", () => {
     ).toThrow();
     expect(() => source("../app/api/home/salary-insights/route.ts")).toThrow();
   });
+
+  it("links market cards to the matching all-time category result set", () => {
+    const categories = source("./HomeMarketCategories.tsx");
+
+    expect(categories).toContain("market: marketCategorySlug(category.name)");
+    expect(categories).toContain('posted: "3650"');
+    expect(categories).not.toContain("category.query)");
+  });
 });

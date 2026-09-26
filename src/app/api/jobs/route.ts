@@ -32,7 +32,62 @@ const DEFAULT_DAYS_AGO = 30;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 25;
 
-const JOBS_API_CACHE_VERSION = process.env.JOBS_API_CACHE_VERSION ?? "8";
+const MARKET_CATEGORY_TERMS: Record<string, string[]> = {
+  "market:engineering": [
+    "engineer",
+    "developer",
+    "software",
+    "frontend",
+    "backend",
+    "full stack",
+    "platform",
+    "devops",
+    "sre",
+  ],
+  "market:data-and-ai": [
+    "data",
+    "analytics",
+    "machine learning",
+    "artificial intelligence",
+    "ai",
+    "bi",
+    "scientist",
+  ],
+  "market:design": [
+    "designer",
+    "design",
+    "ux",
+    "ui",
+    "user experience",
+    "creative",
+  ],
+  "market:security": ["security", "cyber", "risk", "compliance", "privacy"],
+  "market:product": [
+    "product",
+    "program manager",
+    "project manager",
+    "scrum",
+    "agile",
+  ],
+  "market:healthcare-tech": [
+    "health",
+    "clinical",
+    "medical",
+    "pharmacy",
+    "patient",
+    "healthcare",
+  ],
+  "market:marketing-tech": [
+    "marketing",
+    "growth",
+    "crm",
+    "campaign",
+    "seo",
+    "content",
+  ],
+};
+
+const JOBS_API_CACHE_VERSION = process.env.JOBS_API_CACHE_VERSION ?? "9";
 const JOBS_BROWSE_CACHE_TTL_SECONDS = 60 * 30; // 30 minutes
 const JOBS_SEARCH_CACHE_TTL_SECONDS = 60 * 5; // 5 minutes
 const JOBS_FILTER_CACHE_TTL_SECONDS = 60 * 10; // 10 minutes
@@ -437,7 +492,14 @@ async function searchJobsDirect(params: {
     request = request.eq("employment_type", params.employmentType);
   }
 
-  if (params.category) {
+  const marketTerms = MARKET_CATEGORY_TERMS[params.category];
+  if (marketTerms) {
+    request = request.or(
+      marketTerms
+        .map((term) => `search_text.ilike.${toIlikePattern(term)}`)
+        .join(","),
+    );
+  } else if (params.category) {
     request = request.eq("category", params.category);
   }
 

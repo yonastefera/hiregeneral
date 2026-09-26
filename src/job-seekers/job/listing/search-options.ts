@@ -8,6 +8,7 @@ export const SEARCH_DEBOUNCE_MS = 300;
 
 export type JobsSearchState = {
   query: string;
+  market: string;
   location: string;
   dateFilter: string;
   distance: string;
@@ -86,6 +87,7 @@ export function parseJobsSearchParams(
 ): JobsSearchState {
   return {
     query: getKeywordSearchParamValue(searchParams),
+    market: getSearchParamValue(searchParams.market),
     location: getSearchParamValue(searchParams.location),
     dateFilter: getSearchParamValue(searchParams.posted, DEFAULT_POSTED),
     distance: getSearchParamValue(searchParams.distance, DEFAULT_DISTANCE),
@@ -99,6 +101,7 @@ export function buildJobsApiParams(state: JobsSearchState) {
   const query = state.query.trim();
   const location = state.location.trim();
   const hasKeywordSearch = query.length > 0;
+  const hasMarketCategory = state.market.length > 0;
 
   const params = new URLSearchParams({
     page: String(state.page),
@@ -106,12 +109,16 @@ export function buildJobsApiParams(state: JobsSearchState) {
     daysAgo: state.dateFilter,
     distance: state.distance,
 
-    loadMode: hasKeywordSearch ? "pool" : "latest",
+    loadMode: hasKeywordSearch || hasMarketCategory ? "pool" : "latest",
     balance: "company",
   });
 
-  if (hasKeywordSearch) {
+  if (hasKeywordSearch && !hasMarketCategory) {
     params.set("query", query);
+  }
+
+  if (hasMarketCategory) {
+    params.set("category", `market:${state.market}`);
   }
 
   if (location) {
@@ -134,6 +141,10 @@ export function buildJobsUrlParams(state: JobsSearchState) {
 
   if (state.query.trim()) {
     params.set("query", state.query.trim());
+  }
+
+  if (state.market) {
+    params.set("market", state.market);
   }
 
   if (state.location.trim()) {
