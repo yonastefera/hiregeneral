@@ -87,7 +87,7 @@ const MARKET_CATEGORY_TERMS: Record<string, string[]> = {
   ],
 };
 
-const JOBS_API_CACHE_VERSION = process.env.JOBS_API_CACHE_VERSION ?? "9";
+const JOBS_API_CACHE_VERSION = process.env.JOBS_API_CACHE_VERSION ?? "10";
 const JOBS_BROWSE_CACHE_TTL_SECONDS = 60 * 30; // 30 minutes
 const JOBS_SEARCH_CACHE_TTL_SECONDS = 60 * 5; // 5 minutes
 const JOBS_FILTER_CACHE_TTL_SECONDS = 60 * 10; // 10 minutes

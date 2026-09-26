@@ -25,6 +25,15 @@ const marketCategoryMigration = readFileSync(
   ),
   "utf8",
 );
+const marketPopulationMigration = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../migrations/20260926154500_match_market_category_population.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 
 describe("lightweight public job search", () => {
   it("projects bounded card fields instead of complete job rows", () => {
@@ -72,5 +81,14 @@ describe("lightweight public job search", () => {
       "CASE WHEN p_balance = 'company' THEN company_rank ELSE 1 END",
     );
     expect(marketCategoryMigration).not.toContain("company_rank <= 3");
+  });
+
+  it("uses the same bounded active population as homepage market counts", () => {
+    expect(marketPopulationMigration).toContain("market_population AS (");
+    expect(marketPopulationMigration).toContain("ORDER BY job.posted_at DESC");
+    expect(marketPopulationMigration).toContain("LIMIT 3000");
+    expect(marketPopulationMigration).toContain(
+      "job.id IN (SELECT market_population.id FROM market_population)",
+    );
   });
 });
