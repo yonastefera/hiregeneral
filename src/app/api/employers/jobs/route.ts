@@ -14,6 +14,7 @@ import {
   safeServerError,
 } from "@/lib/http/api-security";
 import { slugify } from "@/lib/ingest/normalize";
+import { isUsText } from "@/lib/ingest/filters";
 import { employerJobRateLimit } from "@/lib/rate-limit";
 import { getEmployerJobsPage } from "@/employer/dashboard/jobs/employer-jobs-data";
 
@@ -35,7 +36,14 @@ const postJobSchema = z
     id: z.string().uuid().optional(),
     title: z.string().trim().min(2, "Job title is required."),
     companyName: z.string().trim().min(2, "Hiring company is required."),
-    location: z.string().trim().min(2, "Job location is required."),
+    location: z
+      .string()
+      .trim()
+      .min(2, "Job location is required.")
+      .refine(
+        isUsText,
+        "Only U.S.-based job locations are currently supported.",
+      ),
     streetAddress: z.string().trim().optional().default(""),
     remote: z.enum(["yes", "no"]).default("no"),
     distance: z.coerce.number().int().min(10).max(200).default(50),

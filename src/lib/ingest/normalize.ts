@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isUsText } from "@/lib/ingest/filters";
 import { htmlToText } from "@/lib/text/html";
 
 const isoDateString = z
@@ -18,7 +19,11 @@ export const importedJobSchema = z.object({
 
   title: z.string().trim().min(1),
   description: z.string().trim().min(1),
-  location: z.string().trim().min(1),
+  location: z
+    .string()
+    .trim()
+    .min(1)
+    .refine(isUsText, "Only U.S.-based job locations are supported."),
 
   latitude: z.number().nullable(),
   longitude: z.number().nullable(),
