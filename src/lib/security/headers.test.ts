@@ -62,4 +62,14 @@ describe("Phase 2 security headers", () => {
     expect(frameDirective).toContain("https://*.supabase.co");
     expect(frameDirective).toContain("https://js.stripe.com");
   });
+
+  it("allows Microsoft Clarity's runtime script host", () => {
+    const policy = contentSecurityPolicy("production");
+    const scriptDirective = policy
+      .split(";")
+      .find((directive) => directive.trim().startsWith("script-src"));
+
+    expect(scriptDirective).toContain("https://www.clarity.ms");
+    expect(scriptDirective).toContain("https://scripts.clarity.ms");
+  });
 });

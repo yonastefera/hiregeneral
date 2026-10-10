@@ -5,7 +5,7 @@ export function contentSecurityPolicy(nodeEnv: string = process.env.NODE_ENV) {
 
   return normalizeCsp(`
     default-src 'self';
-    script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""} https://www.clarity.ms https://www.googletagmanager.com https://www.google-analytics.com;
+    script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""} https://www.clarity.ms https://scripts.clarity.ms https://www.googletagmanager.com https://www.google-analytics.com;
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://img.logo.dev https://*.supabase.co https://*.clarity.ms https://www.google-analytics.com https://*.google-analytics.com https://c.bing.com;
     font-src 'self' data:;
